@@ -8,6 +8,12 @@ local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while th
 local disableControlsThread = false
 local previewTattoos = {}
 
+-- Session-local, never sent to the server or persisted: what a tattoo/barber/
+-- hairdresser session temporarily overrode (bare skin for tattoos, hat/mask
+-- removed for hair work) so it can be put back exactly as found on close.
+-- { components = { [id] = { d, t } }, props = { [id] = { d, t } | false } }
+local temporaryOverride = nil
+
 local function notify(message, kind)
     QB.notify.send({ title = 'Clothing', message = message, type = kind or 'info' })
 end
@@ -136,6 +142,67 @@ local function applyModel(model, skin)
     return true
 end
 
+-- --- temporary strip for tattoo/barber/hairdresser sessions ---
+
+---@return table|false  -- { d, t } if a hat was worn, else false (nothing to restore)
+local function stripHat(ped)
+    local drawable = GetPedPropIndex(ped, 0)
+    local saved = drawable >= 0 and { d = drawable, t = GetPedPropTextureIndex(ped, 0) } or false
+    ClearPedProp(ped, 0)
+    return saved
+end
+
+---Bares whatever this service's own work needs to actually be seen --
+---underwear for a tattoo session (every catalogue group would otherwise sit
+---under clothing), hat/mask removed for barber/hairdresser (both cover the
+---hair being edited). Captures the pre-override state into
+---`temporaryOverride` first so `restoreTemporaryOverride` can put it back
+---unconditionally, regardless of what (if anything) changed during the
+---session -- a tattoo/barber/hairdresser session's own component/prop
+---whitelist is empty or hair-only (Config.services), so nothing here can be
+---legitimately re-edited by the player during the session anyway.
+---@param ped integer
+---@param service string
+---@param model string
+local function applyTemporaryStrip(ped, service, model)
+    temporaryOverride = nil
+
+    if service == 'tattoo' then
+        local strip = Config.tattooStrip[Shared.modelGender(model)]
+        if not strip then return end
+
+        local override = { components = {}, props = { [0] = stripHat(ped) } }
+        for id, variation in pairs(strip) do
+            override.components[id] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
+            SetPedComponentVariation(ped, id, variation.d, variation.t, 0)
+        end
+        temporaryOverride = override
+    elseif service == 'barber' or service == 'hairdresser' then
+        temporaryOverride = {
+            components = { [1] = { d = GetPedDrawableVariation(ped, 1), t = GetPedTextureVariation(ped, 1) } },
+            props = { [0] = stripHat(ped) },
+        }
+        SetPedComponentVariation(ped, 1, 0, 0, 0) -- mask: none
+    end
+end
+
+local function restoreTemporaryOverride(ped)
+    if not temporaryOverride then return end
+    local override = temporaryOverride
+    temporaryOverride = nil
+
+    for id, variation in pairs(override.components) do
+        SetPedComponentVariation(ped, id, variation.d, variation.t, 0)
+    end
+    for id, variation in pairs(override.props) do
+        if variation then
+            SetPedPropIndex(ped, id, variation.d, variation.t, true)
+        else
+            ClearPedProp(ped, id)
+        end
+    end
+end
+
 -- --- movement lock while the fitting room is open ---
 
 local function startControlLock()
@@ -173,6 +240,11 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         mandatory = payload.mandatory == true,
         shopLabel = payload.shopLabel,
     }
+
+    -- After the real skin is applied, not before -- this has to override
+    -- what the player actually walked in wearing, not whatever the ped's
+    -- default/previous state happened to be.
+    applyTemporaryStrip(ped, activeSession.service, currentModelName(ped))
 
     startControlLock()
     Camera.start(ped)
@@ -227,12 +299,20 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
             -- Config.clothingAsItem: the purchase was boxed as an inventory
             -- item, not worn -- the live ped was only ever a try-on preview,
             -- so revert it to whatever was actually equipped before this
-            -- session started.
+            -- session started. That already restores everything a temporary
+            -- strip touched (hat/mask/underwear), so there's nothing left
+            -- for restoreTemporaryOverride to do here.
+            temporaryOverride = nil
             applyModel(result.revertTo.model, result.revertTo.skin)
             notify('Outfit added to your inventory.', 'success')
         else
+            restoreTemporaryOverride(PlayerPedId())
             notify('Outfit updated.', 'success')
         end
+    else
+        -- Cancelled, or the session ended some other way -- still put back
+        -- whatever a tattoo/barber/hairdresser strip removed.
+        restoreTemporaryOverride(PlayerPedId())
     end
     activeSession = nil
 end)

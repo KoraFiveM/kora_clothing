@@ -130,6 +130,31 @@ Config.tattoos = {
     { id = 'importexport_wings', label = 'Wings', group = 'Back', collection = 'mpimportexport_overlays', male = 'MP_MP_ImportExport_Tat_001_M', female = 'MP_MP_ImportExport_Tat_001_F', price = 150 },
 }
 
+-- Component variations applied for the duration of a tattoo session only
+-- (captured and restored around them, never persisted) so every catalogue
+-- group -- Head/Torso/Arms/Back/Legs -- is actually visible while browsing
+-- instead of hidden under whatever the player walked in wearing. These are
+-- the standard freemode "swimwear/underwear" drawables and are stable base-
+-- game content (DLC only appends new indices after them, never reorders),
+-- but verify in-game and adjust per gender if a clothing pack this server
+-- runs happens to shift what looks best here.
+Config.tattooStrip = {
+    male = {
+        [1]  = { d = 0,  t = 0 }, -- mask: none
+        [3]  = { d = 15, t = 0 }, -- torso: bare chest
+        [4]  = { d = 21, t = 0 }, -- legs: boxers
+        [8]  = { d = 15, t = 0 }, -- undershirt: none
+        [11] = { d = 0,  t = 0 }, -- torso 2 (decal overlay): none
+    },
+    female = {
+        [1]  = { d = 0,  t = 0 },
+        [3]  = { d = 14, t = 0 },
+        [4]  = { d = 15, t = 0 },
+        [8]  = { d = 15, t = 0 },
+        [11] = { d = 0,  t = 0 },
+    },
+}
+
 Config.interactDistance = 2.0
 
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`

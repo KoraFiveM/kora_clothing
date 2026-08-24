@@ -109,6 +109,20 @@ H.ok(server:find('Shared.tattooById(model, id)', 1, true), 'tattoos are validate
 H.ok(client:find("RegisterNUICallback('qbclothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')
 H.ok(client:find('ClearPedDecorations(ped)', 1, true) and client:find('AddPedDecorationFromHashes', 1, true), 'tattoo decorations are reapplied to live peds')
 
+-- A tattoo session bares whatever the catalogue needs to actually be seen,
+-- and barber/hairdresser remove hat/mask so the hair being edited is visible
+-- -- both temporary, captured and restored around the session, never sent to
+-- the server or persisted.
+H.ok(config:find('Config.tattooStrip = {', 1, true), 'tattoo strip variations are configurable per gender')
+H.ok(client:find('local function applyTemporaryStrip(ped, service, model)', 1, true), 'a strip/hat-removal override is applied when a specialist session opens')
+H.ok(client:find("local strip = Config.tattooStrip[Shared.modelGender(model)]", 1, true), 'the tattoo strip is resolved from config, not hardcoded per call site')
+H.ok(client:find("service == 'barber' or service == 'hairdresser'", 1, true), 'barber and hairdresser both strip hat/mask, not just one')
+H.ok(client:find('local function restoreTemporaryOverride(ped)', 1, true), 'the strip/removal is reversible')
+H.ok(client:find('applyTemporaryStrip(ped, activeSession.service, currentModelName(ped))', 1, true), 'the override is applied only after the real skin is on the ped')
+H.ok(client:find('restoreTemporaryOverride(PlayerPedId())', 1, true), 'closing the session restores whatever was temporarily overridden')
+H.ok(client:find('temporaryOverride = nil\n            applyModel(result.revertTo.model, result.revertTo.skin)', 1, true),
+    'a boxed-item close reapplies the full pre-session skin instead of double-restoring')
+
 -- Real qb-clothing / qb-multicharacter wire-protocol compat.
 H.ok(server:find("QB.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
 H.ok(server:find("QB.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
