@@ -40,21 +40,48 @@ local function applyTattoos(ped, model, tattoos)
     end
 end
 
+-- SetPedComponentVariation/SetPedPropIndex fault inside the game's own
+-- executable (not a catchable Lua error) when given a drawable/texture index
+-- the CURRENT model/slot doesn't actually have -- server-side sanitiseSkin
+-- only clamps to a generous [-1, 999] "not garbage" range (see its own
+-- comment: the true per-model/per-slot cap can't be known server-side), and
+-- `skin` here can also arrive completely unsanitised (the spawn-time
+-- qb-clothing:server:getSkin callback returns the raw DB row). So every index
+-- gets bounds-checked here, against the SAME live GetNumberOfPed*Variations
+-- queries buildCategoryPayload already uses to build the NUI list, right
+-- before the native call that would otherwise crash on it.
 local function applySkin(ped, skin, model)
     skin = skin or {}
     local components = skin.components or {}
     for id in pairs(Shared.components) do
         local entry = components[tostring(id)]
         if entry then
-            SetPedComponentVariation(ped, id, entry.d or 0, entry.t or 0, 0)
+            local drawableCount = GetNumberOfPedDrawableVariations(ped, id)
+            if drawableCount > 0 then
+                local drawable = entry.d or 0
+                if type(drawable) ~= 'number' or drawable < 0 or drawable >= drawableCount then drawable = 0 end
+                local textureCount = GetNumberOfPedTextureVariations(ped, id, drawable)
+                local texture = entry.t or 0
+                if textureCount <= 0 or type(texture) ~= 'number' or texture < 0 or texture >= textureCount then
+                    texture = 0
+                end
+                SetPedComponentVariation(ped, id, drawable, texture, 0)
+            end
         end
     end
 
     local props = skin.props or {}
     for id in pairs(Shared.props) do
         local entry = props[tostring(id)]
-        if entry and entry.d and entry.d >= 0 then
-            SetPedPropIndex(ped, id, entry.d, entry.t or 0, true)
+        local drawable = entry and entry.d
+        if entry and type(drawable) == 'number' and drawable >= 0
+            and drawable < GetNumberOfPedPropDrawableVariations(ped, id) then
+            local textureCount = GetNumberOfPedPropTextureVariations(ped, id, drawable)
+            local texture = entry.t or 0
+            if textureCount <= 0 or type(texture) ~= 'number' or texture < 0 or texture >= textureCount then
+                texture = 0
+            end
+            SetPedPropIndex(ped, id, drawable, texture, true)
         else
             ClearPedProp(ped, id)
         end
@@ -381,9 +408,19 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     cb({ ok = true, model = currentModelName(ped), categories = buildCategoryPayload(ped, activeSession.service), selectedTattoos = previewTattoos })
 end)
 
+-- These four fire the tokenised QB.events gateway (server/server.lua) rather
+-- than a raw TriggerServerEvent -- trigger() can fail if the connect-time
+-- handshake hasn't landed yet (10s timeout), which the existing sessionError
+-- display already handles, so a failure here is surfaced the same way any
+-- other server-side rejection of these actions already is.
+local function triggerOrError(name, ...)
+    local ok, err = QB.events.trigger(name, ...)
+    if not ok then TriggerEvent('qbclothing:client:sessionError', err) end
+end
+
 RegisterNUICallback('qbclothing:nui:deleteOutfit', function(data, cb)
     if activeSession and type(data) == 'table' and data.id then
-        TriggerServerEvent('qbclothing:server:deleteOutfit', tonumber(data.id))
+        triggerOrError('qbclothing:server:deleteOutfit', tonumber(data.id))
     end
     cb({})
 end)
@@ -391,7 +428,7 @@ end)
 RegisterNUICallback('qbclothing:nui:confirm', function(data, cb)
     if not activeSession then cb({ ok = false }); return end
     local ped = PlayerPedId()
-    TriggerServerEvent('qbclothing:server:confirmSession', {
+    triggerOrError('qbclothing:server:confirmSession', {
         model = currentModelName(ped),
         skin = currentSkinSnapshot(ped),
         saveName = type(data) == 'table' and data.saveName or nil,
@@ -401,7 +438,7 @@ end)
 
 RegisterNUICallback('qbclothing:nui:cancel', function(_, cb)
     if not activeSession or activeSession.mandatory then cb({ ok = false }); return end
-    TriggerServerEvent('qbclothing:server:cancelSession')
+    triggerOrError('qbclothing:server:cancelSession')
     cb({ ok = true })
 end)
 
@@ -409,7 +446,7 @@ end)
 
 local function openSession(mode, extra)
     if activeSession then return end
-    TriggerServerEvent('qbclothing:server:requestSession', mode, extra)
+    triggerOrError('qbclothing:server:requestSession', mode, extra)
 end
 
 -- Re-applies the player's last-saved appearance on every login (not just
@@ -418,9 +455,29 @@ end
 -- for a brand-new character too (QBCore:Client:OnPlayerLoaded is the same
 -- adopt() path createCharacter uses), where it's simply a no-op since
 -- qb-clothing:server:getSkin has nothing saved yet.
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+--
+-- Bumped once per call and captured as `generation`: the callback trigger
+-- below is a network round trip, so two calls can legitimately be in flight
+-- at once (a real fresh login fires BOTH this event and the state-bag
+-- reconcile below in close succession). Only the call whose generation is
+-- still current when its answer arrives actually applies the skin, so the
+-- player doesn't get the same (or a stale) skin applied twice. Mirrors
+-- qbhud's client/bridge/qbcore.lua loginGeneration pattern.
+local skinApplyGeneration = 0
+
+local function applySavedSkin()
+    skinApplyGeneration = skinApplyGeneration + 1
+    local generation = skinApplyGeneration
+
     CreateThread(function()
-        local model, skin = QB.callback.trigger('qb-clothing:server:getSkin')
+        -- pcall'd: QB.callback.trigger is a cross-resource call into qblib,
+        -- which can error if qblib is mid-restart at the same moment (e.g.
+        -- this resource restarting alongside its dependencies). An uncaught
+        -- error here would otherwise silently kill this CreateThread body.
+        local ok, model, skin = pcall(function() return QB.callback.trigger('qb-clothing:server:getSkin') end)
+        if not ok then return end
+        if generation ~= skinApplyGeneration then return end
+
         -- The callback trigger is a network round trip -- a fitting-room
         -- session can legitimately open while it's in flight (e.g. another
         -- resource calls exports.qbclothing:OpenWardrobe() right after
@@ -429,7 +486,31 @@ RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
         if not model or activeSession then return end
         applyModel(model, skin)
     end)
+end
+
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', applySavedSkin)
+
+-- Additional path for "this resource just restarted while a player was
+-- already logged in" (e.g. `ensure qbclothing` mid-session): the legacy
+-- OnPlayerLoaded event above does NOT re-fire on a resource restart, so
+-- without this a restarted qbclothing leaves the player's saved skin
+-- un-applied until they relog. Mirrors qbhud's client/bridge/qbcore.lua --
+-- watch the server-owned login state bag directly rather than the legacy
+-- lifecycle event, and reconcile immediately at chunk load to cover the
+-- already-logged-in case, since a bag-change handler only observes future
+-- transitions.
+local CLOTHING_LOGIN_STATE = 'qbcore:loggedIn'
+
+local function reconcileClothingLogin(value)
+    if value == true then applySavedSkin() end
+end
+
+local clothingLocalPlayerBag = ('player:%s'):format(GetPlayerServerId(PlayerId()))
+AddStateBagChangeHandler(CLOTHING_LOGIN_STATE, clothingLocalPlayerBag, function(_, _, value)
+    reconcileClothingLogin(value == true)
 end)
+
+reconcileClothingLogin(LocalPlayer.state[CLOTHING_LOGIN_STATE] == true)
 
 -- Config.clothingAsItem: fired by the server when a `qbclothing_outfit` item
 -- is used from inventory. Never applied while a fitting-room session is open
@@ -471,20 +552,27 @@ end)
 -- selection inside qbclothing means external callers never have to duplicate
 -- this resource's shop ordering; the server still performs the authoritative
 -- distance check when it receives requestSession('shop', index).
-RegisterNetEvent('qbclothing:client:openNearestShop', function()
+RegisterNetEvent('qbclothing:client:openNearestShop', function(service)
+    service = service or 'clothing'
     local coords = GetEntityCoords(PlayerPedId())
     local nearestIndex, nearestDistance
     for index, shop in ipairs(Config.shops) do
-        if (shop.service or 'clothing') == 'clothing' then
-            local distance = #(coords - shop.coords)
+        if (shop.service or 'clothing') == service then
+            -- shop.coords is a vector4 (heading in .w); vector3 - vector4 is
+            -- an unsupported operation, so drop to the vector3 component set.
+            local shopCoords = vector3(shop.coords.x, shop.coords.y, shop.coords.z)
+            local distance = #(coords - shopCoords)
             if not nearestDistance or distance < nearestDistance then
                 nearestIndex, nearestDistance = index, distance
             end
         end
     end
 
-    if not nearestIndex or nearestDistance > Config.interactDistance then
-        QB.notify.send({ type = 'error', message = 'You are not near a clothing shop' })
+    -- Match the server's authoritative tolerance exactly.  The extra metre
+    -- accommodates ped/zone placement while the server still performs the
+    -- final coordinate check before it creates a session.
+    if not nearestIndex or nearestDistance > (Config.interactDistance + 1.0) then
+        QB.notify.send({ type = 'error', message = ('You are not near a %s shop'):format(service) })
         return
     end
     openSession('shop', { shopId = nearestIndex })
@@ -492,6 +580,14 @@ end)
 
 RegisterNetEvent('qb-clothing:client:openOutfitMenu', function()
     openSession('wardrobe')
+end)
+
+-- Admin-only combined session: clothing + hair + tattoos in one sitting, free
+-- and with no shop/model restrictions (mirrors the character-creation
+-- service policy). Permission is re-checked server-side in requestSession --
+-- this event is just the trigger.
+RegisterNetEvent('qbclothing:client:openAdminSession', function()
+    openSession('admin')
 end)
 
 RegisterNetEvent('qb-clothing:client:loadOutfit', function(outfit)
@@ -539,3 +635,11 @@ AddEventHandler('onResourceStop', function(resource)
         FreezeEntityPosition(PlayerPedId(), false)
     end
 end)
+
+-- Deliberately absent in production. Same pattern as qbtarget's
+-- Config.target.testMode -> Target._testRuntime: lets the standalone smoke
+-- suite exercise applySkin's index bounds-checking without a running client.
+if Config.testMode then
+    QBClothing = QBClothing or {}
+    QBClothing._testRuntime = { applySkin = applySkin }
+end

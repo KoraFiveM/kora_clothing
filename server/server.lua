@@ -360,10 +360,15 @@ end
 
 -- --- session lifecycle ---
 
-RegisterNetEvent('qbclothing:server:requestSession', function(mode, extra)
-    local src = source
+-- Session open/confirm move real money (confirmSession) and gate an
+-- admin-only free fitting (requestSession's 'admin' mode) -- routed through
+-- qblib's tokenised QB.events instead of a raw RegisterNetEvent so a static
+-- exploit menu can't fire these guessable names directly; the server-side
+-- checks below (session state, price computed from a DB diff, re-checked
+-- admin permission) remain the actual authorization, same as before.
+QB.events.register('qbclothing:server:requestSession', function(src, mode, extra)
     if sessions[src] then return end
-    if mode ~= 'firstCharacter' and mode ~= 'shop' and mode ~= 'wardrobe' then return end
+    if mode ~= 'firstCharacter' and mode ~= 'shop' and mode ~= 'wardrobe' and mode ~= 'admin' then return end
 
     local citizenid = citizenIdFor(src)
     if not citizenid then return end
@@ -390,6 +395,13 @@ RegisterNetEvent('qbclothing:server:requestSession', function(mode, extra)
         service = shop.service or 'clothing'
         free = shop.free == true
     elseif mode == 'firstCharacter' then
+        service = 'creation'
+        free = true
+    elseif mode == 'admin' then
+        -- Re-check here even though qbadmin already greys this out for
+        -- non-admins client-side -- that gate is cosmetic, this one is
+        -- authoritative.
+        if not exports.qbcore:hasPermission(src, 'admin') then return end
         service = 'creation'
         free = true
     else
@@ -446,8 +458,7 @@ QB.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
     return row.model, decode(row.skin)
 end)
 
-RegisterNetEvent('qbclothing:server:deleteOutfit', function(id)
-    local src = source
+QB.events.register('qbclothing:server:deleteOutfit', function(src, id)
     local session = sessions[src]
     if not session then return end
     id = tonumber(id)
@@ -460,8 +471,7 @@ RegisterNetEvent('qbclothing:server:deleteOutfit', function(id)
     TriggerClientEvent('qbclothing:client:outfitsUpdated', src, dbListOutfits(session.citizenid))
 end)
 
-RegisterNetEvent('qbclothing:server:confirmSession', function(payload)
-    local src = source
+QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     local session = sessions[src]
     if not session then return end
     if type(payload) ~= 'table' then return end
@@ -559,8 +569,7 @@ RegisterNetEvent('qbclothing:server:confirmSession', function(payload)
     })
 end)
 
-RegisterNetEvent('qbclothing:server:cancelSession', function()
-    local src = source
+QB.events.register('qbclothing:server:cancelSession', function(src)
     local session = sessions[src]
     if not session or session.mandatory then return end
 
@@ -582,7 +591,12 @@ QB.callback.register('qb-clothing:server:getSkin', function(src)
     if not citizenid then return nil end
     local saved = dbGetSkin(citizenid)
     if not saved then return nil end
-    return saved.model, saved.skin
+    -- The only read path that used to skip sanitiseSkin -- this feeds the
+    -- client's spawn-time applyModel/applySkin directly, so a stale/malformed
+    -- `playerskins.skin` row (an old clothing pack, a hand-edited row) went
+    -- straight onto SetPedComponentVariation/SetPedPropIndex unclamped. Every
+    -- other read path (wardrobe/shop open, outfit apply) already sanitises.
+    return saved.model, sanitiseSkin(saved.skin, saved.model)
 end)
 
 -- Overrides qbcore's own honest "no clothing module exists" stub

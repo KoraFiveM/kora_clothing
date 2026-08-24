@@ -34,7 +34,7 @@ end
 -- Session state is the sole authority for bucket restore and mandatory-mode
 -- enforcement -- never trust client-submitted session identity.
 H.ok(server:find('local sessions = {}', 1, true), 'server keeps its own session table')
-H.ok(server:find("RegisterNetEvent('qbclothing:server:requestSession'", 1, true), 'session open is an explicit transport')
+H.ok(server:find("QB.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through qblib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
 H.ok(server:find("if sessions[src] then return end", 1, true), 'duplicate session requests are rejected')
 H.ok(server:find('local session = sessions[src]', 1, true), 'confirm/cancel/delete look up session server-side')
 H.ok(server:find('if not session or session.mandatory then return end', 1, true), 'mandatory first-character sessions cannot be cancelled')
@@ -125,10 +125,17 @@ H.ok(client:find('temporaryOverride = nil\n            applyModel(result.revertT
 
 -- Real qb-clothing / qb-multicharacter wire-protocol compat.
 H.ok(server:find("QB.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
+H.ok(server:find('return saved.model, sanitiseSkin(saved.skin, saved.model)', 1, true),
+    'the spawn-time getSkin callback sanitises the saved skin like every other read path -- ' ..
+    'it used to return the raw DB blob straight to SetPedComponentVariation/SetPedPropIndex')
 H.ok(server:find("QB.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:CreateFirstCharacter'", 1, true), 'real qb-clothing CreateFirstCharacter event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openMenu'", 1, true), 'real qb-clothing openMenu event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openOutfitMenu'", 1, true), 'real qb-clothing openOutfitMenu event is implemented')
+H.ok(client:find("RegisterNetEvent('qbclothing:client:openNearestShop'", 1, true), 'admin integrations can request the nearest configured service shop')
+H.ok(client:find("RegisterNetEvent('qbclothing:client:openAdminSession'", 1, true), 'admin integrations use a dedicated full-styling session')
+H.ok(client:find("nearestDistance > (Config.interactDistance + 1.0)", 1, true), 'nearest-shop client feedback uses the same tolerance as the authoritative server check')
+H.ok(server:find("elseif mode == 'admin' then", 1, true) and server:find("exports.qbcore:hasPermission(src, 'admin')", 1, true), 'full-styling admin sessions are permission-checked server-side')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:loadOutfit'", 1, true), 'real qb-clothing loadOutfit event is implemented')
 H.ok(client:find("exports('OpenClothingRoom'", 1, true), 'real qb-clothing OpenClothingRoom export is implemented')
 H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the qb-clothing identity')

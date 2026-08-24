@@ -116,11 +116,15 @@ QB.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model
 
 ### Session net events
 ```lua
--- client -> server
-TriggerServerEvent('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
-TriggerServerEvent('qbclothing:server:confirmSession', { model, skin, saveName })
-TriggerServerEvent('qbclothing:server:cancelSession')
-TriggerServerEvent('qbclothing:server:deleteOutfit', outfitId)
+-- client -> server (qblib's tokenised QB.events gateway, not a raw
+-- RegisterNetEvent -- confirmSession moves real money and requestSession
+-- gates an admin-only free fitting, so these go through the per-session
+-- token instead of a guessable static event name; see qblib's
+-- local/events/docs.md)
+QB.events.trigger('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
+QB.events.trigger('qbclothing:server:confirmSession', { model, skin, saveName })
+QB.events.trigger('qbclothing:server:cancelSession')
+QB.events.trigger('qbclothing:server:deleteOutfit', outfitId)
 
 -- server -> client
 TriggerClientEvent('qbclothing:client:openSession', src, payload)
@@ -134,9 +138,13 @@ within `Config.interactDistance` of the shop's `coords`), finalised by
 `confirmSession` (server re-diffs, prices and persists — never trusts the
 client's price), and torn down by `cancelSession` or `closeSession`. Shop
 sessions are also reachable via qbtarget zones attached to each configured
-shop ped, and `qbclothing:client:openNearestShop` opens the closest clothing
-(non-specialist) shop by proximity — used by qbadmin's self-service clothing
-entry.
+shop ped, and `qbclothing:client:openNearestShop(service)` opens the closest
+shop by proximity for the given service (`'clothing'` by default, or
+`'barber'`/`'tattoo'`) — used by qbadmin's self-service clothing/barber/tattoo
+entries. `qbclothing:client:openAdminSession` opens a free, unrestricted
+clothing+hair+tattoo session (the same `creation` service policy used for
+first-character fittings); the server re-checks `admin` permission before
+granting it regardless of what qbadmin's menu shows client-side.
 
 ## Config highlights (`config.lua`)
 
