@@ -108,8 +108,8 @@ local function clampIndex(value)
     return QB.util.clamp(math.floor(value), -1, 999)
 end
 
-local function sanitiseSkin(rawSkin)
-    local skin = { components = {}, props = {} }
+local function sanitiseSkin(rawSkin, model)
+    local skin = { components = {}, props = {}, tattoos = {} }
     if type(rawSkin) ~= 'table' then return skin end
 
     local components = type(rawSkin.components) == 'table' and rawSkin.components or {}
@@ -128,13 +128,58 @@ local function sanitiseSkin(rawSkin)
         end
     end
 
+    local seen = {}
+    for _, id in ipairs(type(rawSkin.tattoos) == 'table' and rawSkin.tattoos or {}) do
+        if not seen[id] and Shared.tattooById(model, id) then
+            seen[id] = true
+            skin.tattoos[#skin.tattoos + 1] = id
+        end
+    end
+
     return skin
+end
+
+local function serviceConfig(service)
+    return Config.services[service] or Config.services.clothing
+end
+
+local function serviceAllowsModel(service, model)
+    local required = serviceConfig(service).model
+    return not required or required == Shared.modelGender(model)
+end
+
+local function idAllowed(ids, id)
+    for _, candidate in ipairs(ids or {}) do
+        if candidate == id then return true end
+    end
+    return false
+end
+
+-- Specialist sessions may only alter their own fields. This merge is server
+-- authority: a modified browser can submit every drawable, but it cannot turn
+-- a barber visit into a clothing editor.
+local function mergeServiceSkin(before, requested, service, model)
+    local policy = serviceConfig(service)
+    if policy.all then return requested end
+    if not before then return requested end
+
+    local merged = { components = {}, props = {}, tattoos = {} }
+    for id in pairs(Shared.components) do
+        local key = tostring(id)
+        merged.components[key] = idAllowed(policy.components, id) and requested.components[key] or before.components[key]
+    end
+    for id in pairs(Shared.props) do
+        local key = tostring(id)
+        merged.props[key] = idAllowed(policy.props, id) and requested.props[key] or before.props[key]
+    end
+    merged.tattoos = policy.tattoos and requested.tattoos or before.tattoos
+    return sanitiseSkin(merged, model)
 end
 
 -- One price per CATEGORY that actually changed, not per component -- matches
 -- Config.shop.prices' granularity and real qb-clothing's "you pay once per
 -- section you touched" shop pricing.
-local function priceDiff(previousSkin, newSkin)
+local function priceDiff(previousSkin, newSkin, prices)
     local touchedCategories = {}
 
     local function markIfChanged(catalogue, previousBag, newBag)
@@ -154,7 +199,22 @@ local function priceDiff(previousSkin, newSkin)
 
     local total = 0
     for category in pairs(touchedCategories) do
-        total = total + (Config.shop.prices[category] or 0)
+        total = total + ((prices or {})[category] or 0)
+    end
+    return total
+end
+
+-- Additions/replacements cost their individual configured price; removal and
+-- existing tattoos are free. The server resolves every id against the current
+-- model's catalogue before this runs, so client prices are never trusted.
+local function tattooPriceDiff(previousSkin, newSkin, model)
+    local owned, total = {}, 0
+    for _, id in ipairs(previousSkin.tattoos or {}) do owned[id] = true end
+    for _, id in ipairs(newSkin.tattoos or {}) do
+        if not owned[id] then
+            local tattoo = Shared.tattooById(model, id)
+            total = total + (tattoo and tattoo.price or 0)
+        end
     end
     return total
 end
@@ -173,8 +233,18 @@ local function skinsMatch(a, b)
         return true
     end
 
+    local function tattoosMatch(tattoosA, tattoosB)
+        local entriesA, entriesB = {}, {}
+        for _, id in ipairs(tattoosA or {}) do entriesA[id] = true end
+        for _, id in ipairs(tattoosB or {}) do entriesB[id] = true end
+        for id in pairs(entriesA) do if not entriesB[id] then return false end end
+        for id in pairs(entriesB) do if not entriesA[id] then return false end end
+        return true
+    end
+
     return bagsMatch(Shared.components, a.components or {}, b.components or {})
         and bagsMatch(Shared.props, a.props or {}, b.props or {})
+        and tattoosMatch(a.tattoos, b.tattoos)
 end
 
 -- True if `skin`+`model` is an exact match for one of the citizen's already-
@@ -222,7 +292,7 @@ end
 local function equipFromItem(src, item)
     local info = (item and item.info) or {}
     local model = Shared.isFreemodeModel(info.model) and info.model or defaultModelFor(src)
-    local skin = sanitiseSkin(info.skin)
+    local skin = sanitiseSkin(info.skin, model)
 
     local citizenid = citizenIdFor(src)
     if not citizenid then return false end
@@ -307,13 +377,34 @@ RegisterNetEvent('qbclothing:server:requestSession', function(mode, extra)
     -- to a normal (paid, cancellable) wardrobe session once one exists.
     if mode == 'firstCharacter' and saved then return end
 
-    local shopIndex, shopLabel
+    local shopIndex, shopLabel, service, free
     if mode == 'shop' then
-        shopIndex = tonumber(extra)
+        -- New callers pass { shopId = n }; numeric input remains supported by
+        -- the legacy qb-clothing event/export. Only the configured shop id is
+        -- accepted -- service/free/category policy is never client-supplied.
+        shopIndex = tonumber(type(extra) == 'table' and extra.shopId or extra)
         local shop = shopIndex and Config.shops[shopIndex]
         if not shop then return end
         if not nearShop(src, shop) then return end
         shopLabel = shop.label
+        service = shop.service or 'clothing'
+        free = shop.free == true
+    elseif mode == 'firstCharacter' then
+        service = 'creation'
+        free = true
+    else
+        -- Wardrobes can manage clothing looks but must not bypass specialist
+        -- hair/tattoo stores.
+        service = 'clothing'
+    end
+
+    if not Config.services[service] then return end
+
+    local model = (saved and saved.model) or defaultModelFor(src)
+    if not serviceAllowsModel(service, model) then
+        TriggerClientEvent('qbclothing:client:sessionError', src,
+            service == 'barber' and 'Barbers are available to male freemode models only.' or 'Hairdressers are available to female freemode models only.')
+        return
     end
 
     local previousBucket = enterFittingRoom(src)
@@ -323,21 +414,25 @@ RegisterNetEvent('qbclothing:server:requestSession', function(mode, extra)
         previousBucket = previousBucket,
         citizenid = citizenid,
         shopIndex = shopIndex,
+        service = service,
+        free = free == true,
     }
 
-    local model = (saved and saved.model) or defaultModelFor(src)
-    local skin = (saved and saved.skin) or { components = {}, props = {} }
+    local skin = sanitiseSkin((saved and saved.skin) or {}, model)
 
     local moneyOk, money = pcall(function() return exports.qbcore:getPlayerData(src, { 'money' }) end)
 
     TriggerClientEvent('qbclothing:client:openSession', src, {
         mode = mode,
+        service = service,
+        free = free == true,
         mandatory = sessions[src].mandatory,
         shopLabel = shopLabel,
         model = model,
         skin = skin,
         outfits = dbListOutfits(citizenid),
-        prices = Config.shop.prices,
+        prices = serviceConfig(service).prices or {},
+        tattoos = serviceConfig(service).tattoos and Shared.tattoosFor(model) or {},
         currency = Config.shop.currency,
         money = moneyOk and money or nil,
     })
@@ -371,15 +466,17 @@ RegisterNetEvent('qbclothing:server:confirmSession', function(payload)
     if not session then return end
     if type(payload) ~= 'table' then return end
 
-    local model = Shared.isFreemodeModel(payload.model) and payload.model or defaultModelFor(src)
-    local newSkin = sanitiseSkin(payload.skin)
-
     -- Re-read from the DB rather than trusting anything cached from session
     -- open -- the authoritative "before" state for both pricing and (if this
     -- ends up boxed as an item instead of worn) what to revert the live ped to.
     local before = dbGetSkin(session.citizenid)
     local beforeModel = (before and before.model) or defaultModelFor(src)
-    local beforeSkin = (before and before.skin) or { components = {}, props = {} }
+    -- Normal sessions cannot swap a model; that closes a model-spoofing hole
+    -- and keeps barber/hairdresser model policy meaningful.
+    local model = session.mode == 'firstCharacter' and defaultModelFor(src) or beforeModel
+    local beforeSkin = sanitiseSkin((before and before.skin) or {}, model)
+    local requestedSkin = sanitiseSkin(payload.skin, model)
+    local newSkin = mergeServiceSkin(before and beforeSkin or nil, requestedSkin, session.service, model)
 
     -- Priced for every mode except the one-time free "firstCharacter" fitting
     -- -- NOT just 'shop'. A live component editor is otherwise identical
@@ -396,8 +493,11 @@ RegisterNetEvent('qbclothing:server:confirmSession', function(payload)
     -- outfit this citizen already owns (saved to playeroutfits before) --
     -- you paid for those pieces once; re-wearing them isn't a new purchase.
     local chargedAmount = 0
-    if session.mode ~= 'firstCharacter' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then
-        local price = priceDiff(beforeSkin, newSkin)
+    if not session.free and session.mode ~= 'firstCharacter' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then
+        local price = priceDiff(beforeSkin, newSkin, serviceConfig(session.service).prices)
+        if serviceConfig(session.service).tattoos then
+            price = price + tattooPriceDiff(beforeSkin, newSkin, model)
+        end
         if price > 0 then
             local paid, err = exports.qbcore:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')
             if not paid then
@@ -417,7 +517,7 @@ RegisterNetEvent('qbclothing:server:confirmSession', function(payload)
     -- The one-time free fitting always equips directly -- there's nothing to
     -- box up yet on a character that owns nothing. Otherwise, when enabled,
     -- give a physical item instead of silently changing the persisted look.
-    local wantsBox = session.mode ~= 'firstCharacter' and Config.clothingAsItem
+    local wantsBox = not session.free and session.mode ~= 'firstCharacter' and Config.clothingAsItem
     local boxed = wantsBox and giveOutfitItem(src, model, newSkin, saveName or session.shopLabel or 'Outfit')
 
     if not boxed then

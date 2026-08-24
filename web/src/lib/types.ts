@@ -33,14 +33,25 @@ export interface MoneyInfo {
     crypto?: number
 }
 
-export type PriceTable = Record<CategoryGroup, number>
+export type PriceTable = Partial<Record<CategoryGroup, number>>
+
+export interface TattooItem {
+    id: string
+    label: string
+    group: string
+    price: number
+}
 
 export interface OpenPayload {
     mode: ClothingMode
+    service: string
+    free: boolean
     mandatory: boolean
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]
+    tattoos: TattooItem[]
+    selectedTattoos: string[]
     outfits: OutfitSummary[]
     money?: MoneyInfo
     prices: PriceTable
@@ -78,6 +89,7 @@ export interface LoadOutfitResponse {
     ok: boolean
     model?: string
     categories?: ClothingCategoryItem[]
+    selectedTattoos?: string[]
 }
 
 export interface ConfirmPayload {
@@ -86,6 +98,11 @@ export interface ConfirmPayload {
 
 export interface ConfirmResponse {
     ok: boolean
+}
+
+export interface SetTattoosResponse {
+    ok: boolean
+    tattoos?: string[]
 }
 
 export interface CancelResponse {

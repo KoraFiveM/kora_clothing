@@ -4,8 +4,9 @@
 -- this talks to it with the raw natives directly -- QB.nui.* would dispatch
 -- into qblib's own resource VM/frame instead of this one.
 
-local activeSession -- { mode, mandatory, shopLabel } while the NUI is open, else nil
+local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
 local disableControlsThread = false
+local previewTattoos = {}
 
 local function notify(message, kind)
     QB.notify.send({ title = 'Clothing', message = message, type = kind or 'info' })
@@ -13,7 +14,27 @@ end
 
 -- --- ped appearance helpers ---
 
-local function applySkin(ped, skin)
+local function sanitiseTattoos(model, tattoos)
+    local selected, seen = {}, {}
+    for _, id in ipairs(type(tattoos) == 'table' and tattoos or {}) do
+        if not seen[id] and Shared.tattooById(model, id) then
+            seen[id] = true
+            selected[#selected + 1] = id
+        end
+    end
+    return selected
+end
+
+local function applyTattoos(ped, model, tattoos)
+    previewTattoos = sanitiseTattoos(model, tattoos)
+    ClearPedDecorations(ped)
+    for _, id in ipairs(previewTattoos) do
+        local tattoo = Shared.tattooById(model, id)
+        if tattoo then AddPedDecorationFromHashes(ped, GetHashKey(tattoo.collection), GetHashKey(tattoo.overlay)) end
+    end
+end
+
+local function applySkin(ped, skin, model)
     skin = skin or {}
     local components = skin.components or {}
     for id in pairs(Shared.components) do
@@ -32,10 +53,11 @@ local function applySkin(ped, skin)
             ClearPedProp(ped, id)
         end
     end
+    applyTattoos(ped, model, skin.tattoos)
 end
 
 local function currentSkinSnapshot(ped)
-    local skin = { components = {}, props = {} }
+    local skin = { components = {}, props = {}, tattoos = previewTattoos }
     for id in pairs(Shared.components) do
         skin.components[tostring(id)] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
     end
@@ -48,11 +70,18 @@ local function currentSkinSnapshot(ped)
     return skin
 end
 
-local function buildCategoryPayload(ped)
+local function buildCategoryPayload(ped, service)
     local categories = {}
+    local policy = Config.services[service] or Config.services.clothing
+    local function allowed(ids, id)
+        if policy.all then return true end
+        for _, candidate in ipairs(ids or {}) do if candidate == id then return true end end
+        return false
+    end
     for id, meta in pairs(Shared.components) do
-        local drawable = GetPedDrawableVariation(ped, id)
-        categories[#categories + 1] = {
+        if allowed(policy.components, id) then
+            local drawable = GetPedDrawableVariation(ped, id)
+            categories[#categories + 1] = {
             kind = 'component',
             id = id,
             label = meta.label,
@@ -61,11 +90,13 @@ local function buildCategoryPayload(ped)
             texture = GetPedTextureVariation(ped, id),
             drawableCount = GetNumberOfPedDrawableVariations(ped, id),
             textureCount = GetNumberOfPedTextureVariations(ped, id, drawable),
-        }
+            }
+        end
     end
     for id, meta in pairs(Shared.props) do
-        local drawable = GetPedPropIndex(ped, id)
-        categories[#categories + 1] = {
+        if allowed(policy.props, id) then
+            local drawable = GetPedPropIndex(ped, id)
+            categories[#categories + 1] = {
             kind = 'prop',
             id = id,
             label = meta.label,
@@ -75,7 +106,8 @@ local function buildCategoryPayload(ped)
             texture = drawable >= 0 and GetPedPropTextureIndex(ped, id) or 0,
             drawableCount = GetNumberOfPedPropDrawableVariations(ped, id),
             textureCount = drawable >= 0 and GetNumberOfPedPropTextureVariations(ped, id, drawable) or 0,
-        }
+            }
+        end
     end
     return categories
 end
@@ -100,7 +132,7 @@ local function applyModel(model, skin)
         ped = PlayerPedId()
         SetPedDefaultComponentVariation(ped)
     end
-    applySkin(ped, skin)
+    applySkin(ped, skin, model)
     return true
 end
 
@@ -137,6 +169,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
 
     activeSession = {
         mode = payload.mode,
+        service = payload.service or 'clothing',
         mandatory = payload.mandatory == true,
         shopLabel = payload.shopLabel,
     }
@@ -149,13 +182,17 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         action = 'qbclothing:nui:open',
         data = {
             mode = payload.mode,
+            service = activeSession.service,
+            free = payload.free == true,
             mandatory = activeSession.mandatory,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
             -- if the requested model failed to stream in time, this must
             -- reflect what the player is actually wearing, not what was asked for.
             model = currentModelName(ped),
-            categories = buildCategoryPayload(ped),
+            categories = buildCategoryPayload(ped, activeSession.service),
+            tattoos = payload.tattoos or {},
+            selectedTattoos = previewTattoos,
             outfits = payload.outfits or {},
             money = payload.money,
             prices = payload.prices,
@@ -236,6 +273,15 @@ RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
     end
 end)
 
+RegisterNUICallback('qbclothing:nui:setTattoos', function(data, cb)
+    if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
+    local policy = Config.services[activeSession.service] or {}
+    if not policy.tattoos then cb({ ok = false }); return end
+    local ped = PlayerPedId()
+    applyTattoos(ped, currentModelName(ped), data.tattoos)
+    cb({ ok = true, tattoos = previewTattoos })
+end)
+
 RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
     if type(data) == 'table' and data.zone then Camera.setZone(data.zone) end
     cb({})
@@ -252,7 +298,7 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     if not model then cb({ ok = false }); return end
     applyModel(model, skin)
     local ped = PlayerPedId()
-    cb({ ok = true, model = currentModelName(ped), categories = buildCategoryPayload(ped) })
+    cb({ ok = true, model = currentModelName(ped), categories = buildCategoryPayload(ped, activeSession.service), selectedTattoos = previewTattoos })
 end)
 
 RegisterNUICallback('qbclothing:nui:deleteOutfit', function(data, cb)
@@ -338,7 +384,7 @@ RegisterNetEvent('qb-clothing:client:CreateFirstCharacter', function()
 end)
 
 RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
-    openSession('shop', tonumber(shopType) or 1)
+    openSession('shop', type(shopType) == 'table' and shopType or { shopId = tonumber(shopType) or 1 })
 end)
 
 -- Used by qbadmin's self-service clothing entry.  Keeping the nearest-shop
@@ -349,9 +395,11 @@ RegisterNetEvent('qbclothing:client:openNearestShop', function()
     local coords = GetEntityCoords(PlayerPedId())
     local nearestIndex, nearestDistance
     for index, shop in ipairs(Config.shops) do
-        local distance = #(coords - shop.coords)
-        if not nearestDistance or distance < nearestDistance then
-            nearestIndex, nearestDistance = index, distance
+        if (shop.service or 'clothing') == 'clothing' then
+            local distance = #(coords - shop.coords)
+            if not nearestDistance or distance < nearestDistance then
+                nearestIndex, nearestDistance = index, distance
+            end
         end
     end
 
@@ -359,7 +407,7 @@ RegisterNetEvent('qbclothing:client:openNearestShop', function()
         QB.notify.send({ type = 'error', message = 'You are not near a clothing shop' })
         return
     end
-    openSession('shop', nearestIndex)
+    openSession('shop', { shopId = nearestIndex })
 end)
 
 RegisterNetEvent('qb-clothing:client:openOutfitMenu', function()
@@ -371,7 +419,11 @@ RegisterNetEvent('qb-clothing:client:loadOutfit', function(outfit)
     applyModel(outfit.model or Shared.models.male, outfit.skin)
 end)
 
-exports('OpenClothingRoom', function(shopType) openSession('shop', tonumber(shopType) or 1) end)
+-- Public modern form: exports.qbclothing:OpenClothingRoom({ shopId = 1 }).
+-- The numeric form remains for existing qb-clothing consumers.
+exports('OpenClothingRoom', function(options)
+    openSession('shop', type(options) == 'table' and options or { shopId = tonumber(options) or 1 })
+end)
 exports('OpenWardrobe', function() openSession('wardrobe') end)
 exports('IsClothingMenuOpen', function() return activeSession ~= nil end)
 exports('GetPedModels', function() return Shared.models end)
@@ -384,10 +436,10 @@ CreateThread(function()
         if ped then
             exports.qbtarget:addEntity(ped, {
                 {
-                    label = ('Browse clothing (%s)'):format(shop.label),
+                    label = ('Open %s'):format(shop.label),
                     icon = 'Shirt',
                     distance = Config.interactDistance,
-                    onSelect = function() openSession('shop', index) end,
+                    onSelect = function() openSession('shop', { shopId = index }) end,
                 },
             }, Config.interactDistance)
         end

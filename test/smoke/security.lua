@@ -60,8 +60,8 @@ H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-su
 -- (wardrobe shares the same live editor as shop), not just 'shop'.
 H.ok(server:find("if mode == 'firstCharacter' and saved then return end", 1, true), 'firstCharacter cannot be replayed once a skin is already saved')
 H.ok(server:find('if not nearShop(src, shop) then return end', 1, true), 'shop sessions require server-measured proximity')
-H.ok(server:find("if session.mode ~= 'firstCharacter' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then", 1, true), 'every session mode except the one-time fitting is priced, not just shop')
-H.ok(server:find('local beforeSkin = (before and before.skin) or { components = {}, props = {} }', 1, true), 'an empty placeholder baseline exists only for the revert path, never for pricing')
+H.ok(server:find('if not session.free and session.mode ~= \'firstCharacter\' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then', 1, true), 'configured free shops bypass pricing while paid sessions remain server-priced')
+H.ok(server:find('local beforeSkin = sanitiseSkin((before and before.skin) or {}, model)', 1, true), 'the saved baseline is sanitised before pricing and persistence')
 H.ok(server:find('return ok and added == true', 1, true), "boxing an outfit checks addItem's actual return value, not just that the export call didn't throw")
 H.ok(server:find('if wantsBox then', 1, true) and server:find("equipped it directly instead", 1, true), 'a failed box falls back to a direct equip and tells the player, instead of silently losing a paid purchase')
 
@@ -86,15 +86,28 @@ H.ok(config:find('Config.clothingAsItem = false', 1, true), 'clothing-as-item de
 H.ok(server:find("exports.qbcore:registerShared('items', Config.clothingItem.name,", 1, true), 'the outfit item is registered with qbcore, not assumed to pre-exist')
 H.ok(server:find("exports.qbinventory:createUseable(Config.clothingItem.name, equipFromItem)", 1, true), 'the outfit item registers a qbinventory use handler')
 H.ok(server:find('local function equipFromItem(src, item)', 1, true) and server:find('return false\nend', 1, true), 'using an outfit item does not consume it')
-H.ok(server:find('local wantsBox = session.mode ~= ' .. "'firstCharacter'" .. ' and Config.clothingAsItem', 1, true), 'the free first-fitting never boxes as an item, only equips directly')
+H.ok(server:find('local wantsBox = not session.free and session.mode ~= ' .. "'firstCharacter'" .. ' and Config.clothingAsItem', 1, true), 'free configured sessions never produce free inventory outfit items')
 H.ok(server:find('revertTo = boxed and { model = beforeModel, skin = beforeSkin } or nil', 1, true), 'a boxed purchase reverts the live try-on preview instead of leaving it worn')
 H.ok(client:find("RegisterNetEvent('qbclothing:client:wearItem'", 1, true), 'client applies an equipped item on use')
 H.ok(client:find('if activeSession then return end', 1, true), 'wearing an item is ignored while a fitting-room session is open')
 
 -- Appearance is clamped server-side even though the true per-model cap can
 -- only be known client-side.
-H.ok(server:find('local function sanitiseSkin(rawSkin)', 1, true), 'submitted skin data is sanitised before persistence')
+H.ok(server:find('local function sanitiseSkin(rawSkin, model)', 1, true), 'submitted skin data is sanitised against the active model before persistence')
 H.ok(server:find('local function clampIndex(value)', 1, true), 'drawable/texture indices are clamped')
+
+-- Specialist shop policy is server-authoritative: a client may select only a
+-- configured shop id, and mergeServiceSkin keeps every non-service field.
+H.ok(config:find('Config.services = {', 1, true), 'service policy is configurable independently of locations')
+H.ok(config:find("service = 'tattoo'", 1, true) and config:find("service = 'barber'", 1, true) and config:find("service = 'hairdresser'", 1, true), 'separate specialist shop locations are configured')
+H.ok(config:find('coords = vector4(127.02, -223.29, 53.56, 70.0)', 1, true), 'the original clothing clerk is lowered by one metre')
+H.ok(server:find("shopIndex = tonumber(type(extra) == 'table' and extra.shopId or extra)", 1, true), 'new options-table and legacy numeric shop opens share server validation')
+H.ok(server:find('local function mergeServiceSkin(before, requested, service, model)', 1, true), 'specialist sessions merge only permitted appearance fields')
+H.ok(server:find('if not serviceAllowsModel(service, model) then', 1, true), 'barber and hairdresser model restrictions are checked server-side')
+H.ok(server:find('local function tattooPriceDiff(previousSkin, newSkin, model)', 1, true), 'new tattoos are individually priced server-side')
+H.ok(server:find('Shared.tattooById(model, id)', 1, true), 'tattoos are validated against the configured model catalogue')
+H.ok(client:find("RegisterNUICallback('qbclothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')
+H.ok(client:find('ClearPedDecorations(ped)', 1, true) and client:find('AddPedDecorationFromHashes', 1, true), 'tattoo decorations are reapplied to live peds')
 
 -- Real qb-clothing / qb-multicharacter wire-protocol compat.
 H.ok(server:find("QB.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
@@ -125,7 +138,7 @@ H.ok(client:find('if not model or activeSession then return end', 1, true), 'a l
 -- stream in time (RequestModel can legitimately time out).
 H.ok(client:find('local function currentModelName(ped)', 1, true), 'current model is derived from the live ped, not trusted from a request')
 H.ok(client:find('model = currentModelName(ped),', 1, true), 'session-open payload reports the actual applied model')
-H.ok(client:find('cb({ ok = true, model = currentModelName(ped), categories =', 1, true), 'loadOutfit response reports the actual applied model')
+H.ok(client:find('model = currentModelName(ped), categories = buildCategoryPayload(ped, activeSession.service)', 1, true), 'loadOutfit response reports the actual applied model and service-filtered categories')
 H.ok(client:find('model = currentModelName(ped),\n        skin = currentSkinSnapshot(ped),', 1, true), 'confirm submits the actual applied model')
 
 -- NUI is this resource's own frame -- raw natives only, never qblib's QB.nui.*

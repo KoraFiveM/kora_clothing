@@ -103,6 +103,14 @@ button { color: inherit; }
 .outfit-card .outfit-info { min-width: 0; }
 .outfit-card .outfit-name { display: block; overflow: hidden; color: hsl(var(--foreground)); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .outfit-card .outfit-model { display: block; overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tattoo-panel { max-height: 285px; overflow: auto; }
+.tattoo-list { display: flex; flex-direction: column; gap: 2px; }
+.tattoo-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 5px 2px; border-bottom: 1px solid hsl(var(--border) / .55); cursor: pointer; }
+.tattoo-row input { accent-color: hsl(var(--primary)); }
+.tattoo-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.tattoo-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.tattoo-copy small { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.tattoo-price { color: hsl(var(--primary)); font-size: 11px; font-weight: 700; }
 .outfit-card .outfit-actions { display: flex; flex: none; gap: 4px; }
 .icon-btn { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); cursor: pointer; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); }
 .icon-btn:hover { color: hsl(var(--foreground)); border-color: hsl(var(--brand-border)); }

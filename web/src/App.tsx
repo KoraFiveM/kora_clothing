@@ -18,12 +18,14 @@ import type {
     RotatePayload,
     SetVariationPayload,
     SetVariationResponse,
+    SetTattoosResponse,
+    TattooItem,
     ThemeTokens,
 } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
-const GROUP_LABEL: Record<CategoryGroup, string> = { tops: "Tops", legs: "Legs", shoes: "Shoes", body: "Face & Hair", accessories: "Accessories" }
+const GROUP_LABEL: Record<CategoryGroup, string> = { tops: "Tops", legs: "Legs", shoes: "Shoes", body: "Style", accessories: "Accessories" }
 const GROUP_ICON: Record<CategoryGroup, typeof Shirt> = { tops: Shirt, legs: PersonStanding, shoes: Footprints, body: Smile, accessories: Gem }
 
 type Zone = CameraPayload["zone"]
@@ -35,13 +37,21 @@ const ZONES: { zone: Zone; label: string; icon: typeof Maximize2 }[] = [
     { zone: "shoes", label: "Shoes", icon: Footprints },
 ]
 
+// Config.camera.zones (client/camera.lua) has no per-limb preset, so a tattoo
+// group without a dedicated zoom (Arms, Back) falls back to the closest
+// available framing rather than staying wherever the toolbar was last left.
+const TATTOO_ZONE: Record<string, Zone> = { Head: "face", Torso: "torso", Back: "torso", Arms: "torso", Legs: "legs" }
+
 function itemKey(item: Pick<ClothingCategoryItem, "kind" | "id">) {
     return `${item.kind}:${item.id}`
 }
 
-function headlineCopy(mode: ClothingMode, shopLabel?: string) {
+function headlineCopy(mode: ClothingMode, shopLabel?: string, service?: string) {
     if (mode === "firstCharacter") return { badge: undefined, title: "Make yourself at home", sub: "Choose how you want to look before you step outside." }
-    if (mode === "shop") return { badge: shopLabel, title: "Fitting Room", sub: "Try on anything -- you only pay for what you change." }
+    if (mode === "shop") {
+        const title = service === "tattoo" ? "Tattoo Studio" : service === "barber" ? "Barber" : service === "hairdresser" ? "Hairdresser" : "Fitting Room"
+        return { badge: shopLabel, title, sub: "Try changes before you confirm them." }
+    }
     return { badge: undefined, title: "Your Wardrobe", sub: "Preview a look or save the one you're wearing." }
 }
 
@@ -182,6 +192,21 @@ function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
     </div>
 }
 
+function TattooPanel({ tattoos, selected, onToggle }: { tattoos: TattooItem[]; selected: string[]; onToggle: (id: string) => void }) {
+    if (tattoos.length === 0) return null
+    const selectedSet = new Set(selected)
+    return <div className="panel panel-pad tattoo-panel">
+        <p className="section-title">Tattoos</p>
+        <div className="tattoo-list">
+            {tattoos.map((tattoo) => <label key={tattoo.id} className="tattoo-row">
+                <input type="checkbox" checked={selectedSet.has(tattoo.id)} onChange={() => onToggle(tattoo.id)} />
+                <span className="tattoo-copy"><strong>{tattoo.label}</strong><small>{tattoo.group}</small></span>
+                <span className="tattoo-price">${tattoo.price}</span>
+            </label>)}
+        </div>
+    </div>
+}
+
 function priceOf(prices: PriceTable | undefined, group: CategoryGroup) {
     return prices?.[group] ?? 0
 }
@@ -189,6 +214,8 @@ function priceOf(prices: PriceTable | undefined, group: CategoryGroup) {
 export default function App() {
     const [open, setOpen] = useState<OpenPayload | null>(null)
     const [categories, setCategories] = useState<ClothingCategoryItem[]>([])
+    const [selectedTattoos, setSelectedTattoos] = useState<string[]>([])
+    const [baselineTattoos, setBaselineTattoos] = useState<string[]>([])
     const [baseline, setBaseline] = useState<Map<string, { drawable: number; texture: number }>>(new Map())
     // Set right after loading a saved outfit via "Wear", cleared on any
     // manual edit -- while it's set, the player is looking at exactly what
@@ -209,7 +236,7 @@ export default function App() {
     const rotate = useRotate()
 
     const resetLocalState = useCallback(() => {
-        setOpen(null); setCategories([]); setBaseline(new Map()); setOutfits([]); setActiveGroup("tops")
+        setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
     }, [])
@@ -225,6 +252,8 @@ export default function App() {
         resetLocalState()
         setOpen(payload)
         setCategories(payload.categories)
+        setSelectedTattoos(payload.selectedTattoos ?? [])
+        setBaselineTattoos(payload.selectedTattoos ?? [])
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
         const groups = new Set(payload.categories.map((item) => item.category))
@@ -243,7 +272,7 @@ export default function App() {
     const selectedItem = useMemo(() => categories.find((item) => itemKey(item) === selectedKey), [categories, selectedKey])
 
     const changedTotal = useMemo(() => {
-        if (!open || ownedSnapshot) return 0
+        if (!open || open.free || ownedSnapshot) return 0
         const changedGroups = new Set<CategoryGroup>()
         for (const item of categories) {
             const base = baseline.get(itemKey(item))
@@ -251,8 +280,12 @@ export default function App() {
         }
         let total = 0
         for (const group of changedGroups) total += priceOf(open.prices, group)
+        const baselineTattooSet = new Set(baselineTattoos)
+        for (const id of selectedTattoos) {
+            if (!baselineTattooSet.has(id)) total += open.tattoos.find((tattoo) => tattoo.id === id)?.price ?? 0
+        }
         return total
-    }, [baseline, categories, open])
+    }, [baseline, baselineTattoos, categories, open, selectedTattoos])
 
     const selectGroup = useCallback((group: CategoryGroup) => {
         setActiveGroup(group)
@@ -290,6 +323,7 @@ export default function App() {
         const response = await sendIntent<{ id: number }, LoadOutfitResponse>("qbclothing:nui:loadOutfit", { id })
         if (response.ok && response.categories) {
             setCategories(response.categories)
+            setSelectedTattoos(response.selectedTattoos ?? [])
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -298,6 +332,22 @@ export default function App() {
             setSelectedKey(first ? itemKey(first) : undefined)
         }
     }, [activeGroup])
+
+    const toggleTattoo = useCallback(async (id: string) => {
+        // Jump the camera to wherever this tattoo actually sits -- the
+        // toolbar's zoom otherwise stays wherever it was last left (often
+        // "Face" or "Full body"), so a Torso/Arms tattoo could be toggled
+        // without ever being in frame to see the result.
+        const group = open?.tattoos.find((tattoo) => tattoo.id === id)?.group
+        if (group && TATTOO_ZONE[group]) changeZone(TATTOO_ZONE[group])
+
+        const next = selectedTattoos.includes(id) ? selectedTattoos.filter((value) => value !== id) : [...selectedTattoos, id]
+        const response = await sendIntent<{ tattoos: string[] }, SetTattoosResponse>("qbclothing:nui:setTattoos", { tattoos: next })
+        if (response.ok && response.tattoos) {
+            setOwnedSnapshot(false)
+            setSelectedTattoos(response.tattoos)
+        }
+    }, [selectedTattoos, open, changeZone])
 
     const deleteOutfit = useCallback((id: number) => {
         void sendIntent<{ id: number }, object>("qbclothing:nui:deleteOutfit", { id })
@@ -325,7 +375,7 @@ export default function App() {
 
     if (!open) return import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open clothing UI harness</button> : null
 
-    const copy = headlineCopy(open.mode, open.shopLabel)
+    const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
         <Viewport onRotate={rotate} />
@@ -349,6 +399,7 @@ export default function App() {
                 <p className="section-title">Categories</p>
                 <CategoryTabs active={activeGroup} groups={groupsPresent} onSelect={selectGroup} />
             </div>
+            <TattooPanel tattoos={open.tattoos} selected={selectedTattoos} onToggle={(id) => void toggleTattoo(id)} />
             <OutfitsPanel
                 outfits={outfits}
                 expanded={outfitsExpanded}
@@ -358,7 +409,11 @@ export default function App() {
             />
         </div>
 
-        <div className="rail rail-right">
+        {/* A tattoo-only session (Config.services.tattoo has no components/props)
+            sends an empty `categories` list -- groupsPresent is then empty and
+            activeGroup never moves off its "tops" default, which would
+            otherwise show a "Tops" header over a permanently empty list. */}
+        {groupsPresent.size > 0 && <div className="rail rail-right">
             <div className="panel panel-pad">
                 <p className="section-title">{GROUP_LABEL[activeGroup]}</p>
                 <ItemList items={itemsInActiveGroup} selectedKey={selectedKey} onSelect={(item) => setSelectedKey(itemKey(item))} />
@@ -370,7 +425,7 @@ export default function App() {
                     onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
                 />
             </div>
-        </div>
+        </div>}
 
         <div className="bottom-bar">
             <label className="save-field">

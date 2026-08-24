@@ -2,6 +2,8 @@ import type { NuiWireMessage, OpenPayload } from "./types"
 
 const sample: OpenPayload = {
     mode: "shop",
+    service: "clothing",
+    free: false,
     mandatory: false,
     shopLabel: "Suburban",
     model: "mp_m_freemode_01",
@@ -23,6 +25,11 @@ const sample: OpenPayload = {
         { kind: "prop", id: 6, label: "Watch", category: "accessories", clearable: true, drawable: -1, texture: 0, drawableCount: 8, textureCount: 0 },
         { kind: "prop", id: 7, label: "Bracelet", category: "accessories", clearable: true, drawable: -1, texture: 0, drawableCount: 6, textureCount: 0 },
     ],
+    tattoos: [
+        { id: "airraces_turbulence", label: "Turbulence", group: "Torso", price: 125 },
+        { id: "hipster_anchor", label: "Anchor", group: "Arms", price: 130 },
+    ],
+    selectedTattoos: [],
     outfits: [
         { id: 1, outfitname: "Interview fit", model: "mp_m_freemode_01" },
         { id: 2, outfitname: "Night out", model: "mp_m_freemode_01" },

@@ -13,20 +13,28 @@ Config.bucket = {
     base = 1000000,
 }
 
--- Flat per-category price, matching real qb-clothing's "you pay for whichever
--- categories you actually changed" shop model. Charged server-side on
--- confirm, computed from a diff against the player's last-saved skin -- never
--- trusted from the NUI. `cash`-only by default; real qb-clothing supports a
--- configurable currency, exposed here as Config.shop.currency.
+-- Currency is shared by every paid service. Prices live beside the service
+-- policy below because hair and tattoos price differently from clothing.
 Config.shop = {
     currency = 'cash',
-    prices = {
-        tops = 175,
-        legs = 150,
-        shoes = 120,
-        body = 90,       -- face/mask/hair changes, priced as a single "styling" category
-        accessories = 60, -- bags/accessories/badges/hats/glasses/ears/watches/bracelets
+}
+
+-- Service policy is deliberately separate from locations. A shop chooses one
+-- of these services, while its own `free` flag is the only client-visible
+-- pricing override. Component/prop IDs are whitelists; omitted IDs are
+-- retained from the saved appearance when a specialist session confirms.
+Config.services = {
+    clothing = {
+        components = { 1, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+        props = { 0, 1, 2, 6, 7 },
+        prices = { tops = 175, legs = 150, shoes = 120, body = 90, accessories = 60 },
     },
+    barber = { components = { 2 }, props = {}, model = 'male', prices = { body = 90 } },
+    hairdresser = { components = { 2 }, props = {}, model = 'female', prices = { body = 90 } },
+    tattoo = { components = {}, props = {}, tattoos = true },
+    -- Character creation is the only normal flow that exposes face, clothing,
+    -- hair, and tattoos together. It is always free and mandatory.
+    creation = { all = true, tattoos = true },
 }
 
 Config.wardrobe = {
@@ -52,48 +60,74 @@ Config.clothingItem = {
     description = 'A saved outfit. Use it to put it on.',
 }
 
--- Fixed shop locations. Each entry spawns a clerk ped (qblib's QB.entities)
--- and a qbtarget zone on it that opens the shop menu for whichever gender
--- catalogue the player's current model implies. `blip` is optional per shop
--- (qbinventory's config/shops/ammunation.lua convention) -- set `enabled =
--- false` to skip map-blip creation for a given store while keeping the ped.
+-- Fixed service locations. Each entry spawns a clerk and target zone. `free`
+-- is resolved only by the server from this config; callers cannot forge it.
 Config.shops = {
     {
-        label = 'Suburban',
+        service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_02',
-        coords = vector4(127.02, -223.29, 54.56, 70.0),
+        coords = vector4(127.02, -223.29, 53.56, 70.0),
         blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
     },
     {
-        label = 'Suburban',
+        service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_04',
-        coords = vector4(72.32, -1399.2, 29.38, 0.0),
+        coords = vector4(72.32, -1399.2, 28.38, 0.0),
         blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
     },
     {
-        label = 'Ponsonbys',
+        service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_m_y_business_03',
-        coords = vector4(-708.61, -152.85, 37.42, 30.0),
+        coords = vector4(-708.61, -152.85, 36.42, 30.0),
         blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
     },
     {
-        label = 'Ponsonbys',
+        service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_f_y_business_01',
-        coords = vector4(-167.79, -299.05, 39.73, 250.0),
+        coords = vector4(-167.79, -299.05, 38.73, 250.0),
         blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
     },
     {
-        label = 'Binco',
+        service = 'clothing', free = false, label = 'Binco',
         ped = 'a_m_y_business_02',
-        coords = vector4(-1193.44, -772.12, 17.32, 130.0),
+        coords = vector4(-1193.44, -772.12, 16.32, 130.0),
         blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
     },
     {
-        label = 'Binco',
+        service = 'clothing', free = false, label = 'Binco',
         ped = 'a_f_y_hipster_02',
-        coords = vector4(-827.86, -1073.75, 10.33, 130.0),
+        coords = vector4(-827.86, -1073.75, 9.33, 130.0),
         blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
     },
+    { service = 'tattoo', free = false, label = 'Tattoo Artist', ped = 'u_m_y_tattoo_01', coords = vector4(1322.6, -1651.9, 52.28, 130.0), blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist' } },
+    { service = 'tattoo', free = false, label = 'Tattoo Artist', ped = 'u_m_y_tattoo_01', coords = vector4(-1153.6, -1425.7, 4.95, 120.0), blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist' } },
+    { service = 'barber', free = false, label = 'Barber', ped = 's_m_m_hairdress_01', coords = vector4(-814.3, -183.8, 36.57, 120.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber' } },
+    { service = 'barber', free = false, label = 'Barber', ped = 's_m_m_hairdress_01', coords = vector4(1211.0, -470.9, 65.21, 75.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber' } },
+    { service = 'hairdresser', free = false, label = 'Hairdresser', ped = 's_f_m_fembarber', coords = vector4(136.8, -1708.4, 28.29, 50.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser' } },
+    { service = 'hairdresser', free = false, label = 'Hairdresser', ped = 's_f_m_fembarber', coords = vector4(-1282.6, -1116.8, 5.99, 90.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser' } },
+}
+
+-- The catalogue is config-owned: server owners can remove entries or alter
+-- their individual price without changing code. Each overlay is native GTA
+-- base-game content. Entries missing one model's overlay simply do not appear
+-- for that model. The shape intentionally scales to the full base-game list.
+Config.tattoos = {
+    { id = 'airraces_turbulence', label = 'Turbulence', group = 'Torso', collection = 'mpairraces_overlays', male = 'MP_Airraces_Tattoo_000_M', female = 'MP_Airraces_Tattoo_000_F', price = 125 },
+    { id = 'airraces_pilot_skull', label = 'Pilot Skull', group = 'Torso', collection = 'mpairraces_overlays', male = 'MP_Airraces_Tattoo_001_M', female = 'MP_Airraces_Tattoo_001_F', price = 125 },
+    { id = 'airraces_winged_bombshell', label = 'Winged Bombshell', group = 'Torso', collection = 'mpairraces_overlays', male = 'MP_Airraces_Tattoo_002_M', female = 'MP_Airraces_Tattoo_002_F', price = 125 },
+    { id = 'beach_ship_arms', label = 'Ship Arms', group = 'Arms', collection = 'mpbeach_overlays', male = 'MP_Bea_M_Back_000', price = 110 },
+    { id = 'beach_tribal_hammerhead', label = 'Tribal Hammerhead', group = 'Torso', collection = 'mpbeach_overlays', male = 'MP_Bea_M_Chest_000', price = 110 },
+    { id = 'beach_tribal_shark', label = 'Tribal Shark', group = 'Torso', collection = 'mpbeach_overlays', male = 'MP_Bea_M_Chest_001', price = 110 },
+    { id = 'beach_dolphin', label = 'Dolphin', group = 'Legs', collection = 'mpbeach_overlays', female = 'MP_Bea_F_Leg_000', price = 110 },
+    { id = 'beach_seashell', label = 'Seashell', group = 'Torso', collection = 'mpbeach_overlays', female = 'MP_Bea_F_Back_000', price = 110 },
+    { id = 'business_moneybag', label = 'Money Bag', group = 'Arms', collection = 'mpbusiness_overlays', male = 'MP_Buis_M_Arml_000', female = 'MP_Buis_F_Arml_000', price = 140 },
+    { id = 'business_diamond', label = 'Diamond', group = 'Arms', collection = 'mpbusiness_overlays', male = 'MP_Buis_M_Arm_000', female = 'MP_Buis_F_Arm_000', price = 140 },
+    { id = 'business_luxury', label = 'Luxury', group = 'Torso', collection = 'mpbusiness_overlays', male = 'MP_Buis_M_Chest_000', female = 'MP_Buis_F_Chest_000', price = 140 },
+    { id = 'hipster_anchor', label = 'Anchor', group = 'Arms', collection = 'mphipster_overlays', male = 'FM_Hip_M_Tat_000', female = 'FM_Hip_F_Tat_000', price = 130 },
+    { id = 'hipster_geometric', label = 'Geometric', group = 'Arms', collection = 'mphipster_overlays', male = 'FM_Hip_M_Tat_004', female = 'FM_Hip_F_Tat_004', price = 130 },
+    { id = 'hipster_rose', label = 'Rose', group = 'Torso', collection = 'mphipster_overlays', male = 'FM_Hip_M_Tat_013', female = 'FM_Hip_F_Tat_013', price = 130 },
+    { id = 'importexport_skull', label = 'Skull', group = 'Head', collection = 'mpimportexport_overlays', male = 'MP_MP_ImportExport_Tat_000_M', female = 'MP_MP_ImportExport_Tat_000_F', price = 150 },
+    { id = 'importexport_wings', label = 'Wings', group = 'Back', collection = 'mpimportexport_overlays', male = 'MP_MP_ImportExport_Tat_001_M', female = 'MP_MP_ImportExport_Tat_001_F', price = 150 },
 }
 
 Config.interactDistance = 2.0

@@ -42,3 +42,29 @@ Shared.models = {
 function Shared.isFreemodeModel(model)
     return model == Shared.models.male or model == Shared.models.female
 end
+
+function Shared.modelGender(model)
+    if model == Shared.models.male then return 'male' end
+    if model == Shared.models.female then return 'female' end
+    return nil
+end
+
+function Shared.tattoosFor(model)
+    local gender, out = Shared.modelGender(model), {}
+    if not gender then return out end
+    for _, tattoo in ipairs(Config.tattoos or {}) do
+        local overlay = tattoo[gender]
+        if type(tattoo.id) == 'string' and type(tattoo.collection) == 'string' and type(overlay) == 'string' and overlay ~= '' then
+            out[#out + 1] = { id = tattoo.id, label = tattoo.label or tattoo.id, group = tattoo.group or 'Other', collection = tattoo.collection, overlay = overlay, price = math.max(0, math.floor(tonumber(tattoo.price) or 0)) }
+        end
+    end
+    return out
+end
+
+function Shared.tattooById(model, id)
+    if type(id) ~= 'string' then return nil end
+    for _, tattoo in ipairs(Shared.tattoosFor(model)) do
+        if tattoo.id == id then return tattoo end
+    end
+    return nil
+end
