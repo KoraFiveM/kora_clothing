@@ -341,6 +341,27 @@ RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
     openSession('shop', tonumber(shopType) or 1)
 end)
 
+-- Used by qbadmin's self-service clothing entry.  Keeping the nearest-shop
+-- selection inside qbclothing means external callers never have to duplicate
+-- this resource's shop ordering; the server still performs the authoritative
+-- distance check when it receives requestSession('shop', index).
+RegisterNetEvent('qbclothing:client:openNearestShop', function()
+    local coords = GetEntityCoords(PlayerPedId())
+    local nearestIndex, nearestDistance
+    for index, shop in ipairs(Config.shops) do
+        local distance = #(coords - shop.coords)
+        if not nearestDistance or distance < nearestDistance then
+            nearestIndex, nearestDistance = index, distance
+        end
+    end
+
+    if not nearestIndex or nearestDistance > Config.interactDistance then
+        QB.notify.send({ type = 'error', message = 'You are not near a clothing shop' })
+        return
+    end
+    openSession('shop', nearestIndex)
+end)
+
 RegisterNetEvent('qb-clothing:client:openOutfitMenu', function()
     openSession('wardrobe')
 end)
@@ -369,6 +390,10 @@ CreateThread(function()
                     onSelect = function() openSession('shop', index) end,
                 },
             }, Config.interactDistance)
+        end
+
+        if shop.blip and shop.blip.enabled then
+            QB.blips.create(shop.coords, shop.blip)
         end
     end
 end)

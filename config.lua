@@ -54,17 +54,45 @@ Config.clothingItem = {
 
 -- Fixed shop locations. Each entry spawns a clerk ped (qblib's QB.entities)
 -- and a qbtarget zone on it that opens the shop menu for whichever gender
--- catalogue the player's current model implies.
+-- catalogue the player's current model implies. `blip` is optional per shop
+-- (qbinventory's config/shops/ammunation.lua convention) -- set `enabled =
+-- false` to skip map-blip creation for a given store while keeping the ped.
 Config.shops = {
     {
         label = 'Suburban',
         ped = 'a_f_y_business_02',
         coords = vector4(127.02, -223.29, 54.56, 70.0),
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
+    },
+    {
+        label = 'Suburban',
+        ped = 'a_f_y_business_04',
+        coords = vector4(72.32, -1399.2, 29.38, 0.0),
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
     },
     {
         label = 'Ponsonbys',
         ped = 'a_m_y_business_03',
         coords = vector4(-708.61, -152.85, 37.42, 30.0),
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
+    },
+    {
+        label = 'Ponsonbys',
+        ped = 'a_f_y_business_01',
+        coords = vector4(-167.79, -299.05, 39.73, 250.0),
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
+    },
+    {
+        label = 'Binco',
+        ped = 'a_m_y_business_02',
+        coords = vector4(-1193.44, -772.12, 17.32, 130.0),
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
+    },
+    {
+        label = 'Binco',
+        ped = 'a_f_y_hipster_02',
+        coords = vector4(-827.86, -1073.75, 10.33, 130.0),
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
     },
 }
 
