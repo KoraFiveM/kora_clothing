@@ -1,0 +1,390 @@
+import { ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { openDevHarness } from "@/lib/dev"
+import { sendIntent } from "@/lib/nui"
+import type {
+    CameraPayload,
+    CancelResponse,
+    CategoryGroup,
+    ClothingCategoryItem,
+    ClothingMode,
+    ConfirmPayload,
+    ConfirmResponse,
+    ErrorPayload,
+    LoadOutfitResponse,
+    OpenPayload,
+    OutfitSummary,
+    PriceTable,
+    RotatePayload,
+    SetVariationPayload,
+    SetVariationResponse,
+    ThemeTokens,
+} from "@/lib/types"
+import { useNuiEvent } from "@/lib/useNuiEvent"
+
+const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
+const GROUP_LABEL: Record<CategoryGroup, string> = { tops: "Tops", legs: "Legs", shoes: "Shoes", body: "Face & Hair", accessories: "Accessories" }
+const GROUP_ICON: Record<CategoryGroup, typeof Shirt> = { tops: Shirt, legs: PersonStanding, shoes: Footprints, body: Smile, accessories: Gem }
+
+type Zone = CameraPayload["zone"]
+const ZONES: { zone: Zone; label: string; icon: typeof Maximize2 }[] = [
+    { zone: "full", label: "Full body", icon: Maximize2 },
+    { zone: "face", label: "Face", icon: Smile },
+    { zone: "torso", label: "Torso", icon: Shirt },
+    { zone: "legs", label: "Legs", icon: PersonStanding },
+    { zone: "shoes", label: "Shoes", icon: Footprints },
+]
+
+function itemKey(item: Pick<ClothingCategoryItem, "kind" | "id">) {
+    return `${item.kind}:${item.id}`
+}
+
+function headlineCopy(mode: ClothingMode, shopLabel?: string) {
+    if (mode === "firstCharacter") return { badge: undefined, title: "Make yourself at home", sub: "Choose how you want to look before you step outside." }
+    if (mode === "shop") return { badge: shopLabel, title: "Fitting Room", sub: "Try on anything -- you only pay for what you change." }
+    return { badge: undefined, title: "Your Wardrobe", sub: "Preview a look or save the one you're wearing." }
+}
+
+function confirmLabel(mode: ClothingMode, total: number) {
+    if (mode === "firstCharacter") return "Confirm"
+    if (mode === "shop") return total > 0 ? `Buy & Wear · $${total.toLocaleString()}` : "Wear · Free"
+    return "Save & Wear"
+}
+
+/** Drag-to-rotate needs to feel continuous but must not spam the NUI
+ * callback on every pointermove -- coalesce into at most one call per frame. */
+function useRotate() {
+    const pending = useRef(0)
+    const frame = useRef<number | null>(null)
+    const flush = useCallback(() => {
+        frame.current = null
+        if (pending.current === 0) return
+        const deltaDeg = pending.current
+        pending.current = 0
+        void sendIntent<RotatePayload, object>("qbclothing:nui:rotate", { deltaDeg })
+    }, [])
+    return useCallback((delta: number) => {
+        pending.current += delta
+        if (frame.current === null) frame.current = requestAnimationFrame(flush)
+    }, [flush])
+}
+
+function Viewport({ onRotate }: { onRotate: (deltaDeg: number) => void }) {
+    const dragging = useRef(false)
+    return <div
+        className="clothing-viewport"
+        onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }}
+        onPointerUp={(event) => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId) }}
+        onPointerCancel={() => { dragging.current = false }}
+        onPointerMove={(event) => { if (dragging.current) onRotate(-event.movementX * 0.3) }}
+        aria-hidden="true"
+    />
+}
+
+function ZoneToolbar({ zone, onSelect }: { zone: Zone; onSelect: (zone: Zone) => void }) {
+    return <div className="zone-toolbar">
+        {ZONES.map(({ zone: z, label, icon: Icon }) => (
+            <button key={z} type="button" aria-label={label} aria-pressed={zone === z} onClick={() => onSelect(z)}>
+                <Icon size={16} />
+            </button>
+        ))}
+    </div>
+}
+
+function CategoryTabs({ active, groups, onSelect }: { active: CategoryGroup; groups: Set<CategoryGroup>; onSelect: (group: CategoryGroup) => void }) {
+    return <nav className="tab-list" aria-label="Clothing categories">
+        {GROUP_ORDER.filter((group) => groups.has(group)).map((group) => {
+            const Icon = GROUP_ICON[group]
+            return <button key={group} type="button" className="tab" aria-pressed={active === group} onClick={() => onSelect(group)}>
+                <Icon size={16} /><span>{GROUP_LABEL[group]}</span>
+            </button>
+        })}
+    </nav>
+}
+
+function ItemList({ items, selectedKey, onSelect }: { items: ClothingCategoryItem[]; selectedKey?: string; onSelect: (item: ClothingCategoryItem) => void }) {
+    return <div className="item-list">
+        {items.map((item) => {
+            const key = itemKey(item)
+            const removed = item.kind === "prop" && item.drawable < 0
+            return <button key={key} type="button" className="item-row" aria-pressed={selectedKey === key} onClick={() => onSelect(item)}>
+                <span>{item.label}</span>
+                {removed && <span className="removed-badge">None</span>}
+            </button>
+        })}
+    </div>
+}
+
+function VariationDetail({ item, onChange, onClear }: {
+    item?: ClothingCategoryItem
+    onChange: (next: { drawable: number; texture: number }) => void
+    onClear: () => void
+}) {
+    if (!item) return <div className="empty-panel"><User size={26} /><span>Pick an item from the list to adjust it.</span></div>
+
+    const removed = item.kind === "prop" && item.drawable < 0
+    const canPrevDrawable = item.kind === "prop" && item.clearable ? item.drawable > -1 : item.drawable > 0
+    const canNextDrawable = item.drawable < item.drawableCount - 1
+    const canPrevTexture = !removed && item.texture > 0
+    const canNextTexture = !removed && item.texture < item.textureCount - 1
+
+    return <div>
+        <h3 className="detail-title">{item.label}</h3>
+        <p className="detail-sub">{item.kind === "component" ? "Clothing item" : "Accessory"}</p>
+
+        <div className="stepper">
+            <label>Style</label>
+            <button type="button" className="step-btn" aria-label="Previous style" disabled={!canPrevDrawable} onClick={() => onChange({ drawable: item.drawable - 1, texture: 0 })}><ChevronLeft size={16} /></button>
+            <span>{removed ? "None" : `${item.drawable + 1} / ${item.drawableCount}`}</span>
+            <button type="button" className="step-btn" aria-label="Next style" disabled={!canNextDrawable} onClick={() => onChange({ drawable: item.drawable + 1, texture: 0 })}><ChevronRight size={16} /></button>
+        </div>
+
+        <div className="stepper">
+            <label>Color</label>
+            <button type="button" className="step-btn" aria-label="Previous color" disabled={!canPrevTexture} onClick={() => onChange({ drawable: item.drawable, texture: item.texture - 1 })}><ChevronLeft size={16} /></button>
+            <span>{removed ? "--" : `${item.texture + 1} / ${Math.max(item.textureCount, 1)}`}</span>
+            <button type="button" className="step-btn" aria-label="Next color" disabled={!canNextTexture} onClick={() => onChange({ drawable: item.drawable, texture: item.texture + 1 })}><ChevronRight size={16} /></button>
+        </div>
+
+        {item.kind === "prop" && item.clearable && !removed && (
+            <button type="button" className="remove-action" onClick={onClear}>Remove</button>
+        )}
+    </div>
+}
+
+function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
+    outfits: OutfitSummary[]
+    expanded: boolean
+    onToggle: () => void
+    onWear: (id: number) => void
+    onDelete: (id: number) => void
+}) {
+    return <div className="panel">
+        <button type="button" className="outfits-toggle" aria-expanded={expanded} onClick={onToggle}>
+            <span>My Outfits ({outfits.length})</span>
+            <ChevronDown size={16} />
+        </button>
+        {expanded && <div className="outfits-body">
+            {outfits.length === 0 && <p className="outfits-empty">No saved outfits yet. Save the look you're wearing below.</p>}
+            {outfits.map((outfit) => (
+                <div key={outfit.id} className="outfit-card">
+                    <div className="outfit-info">
+                        <span className="outfit-name">{outfit.outfitname}</span>
+                        <span className="outfit-model">{outfit.model}</span>
+                    </div>
+                    <div className="outfit-actions">
+                        <button type="button" className="icon-btn" aria-label={`Wear ${outfit.outfitname}`} onClick={() => onWear(outfit.id)}><User size={14} /></button>
+                        <button type="button" className="icon-btn danger" aria-label={`Delete ${outfit.outfitname}`} onClick={() => onDelete(outfit.id)}><Trash2 size={14} /></button>
+                    </div>
+                </div>
+            ))}
+        </div>}
+    </div>
+}
+
+function priceOf(prices: PriceTable | undefined, group: CategoryGroup) {
+    return prices?.[group] ?? 0
+}
+
+export default function App() {
+    const [open, setOpen] = useState<OpenPayload | null>(null)
+    const [categories, setCategories] = useState<ClothingCategoryItem[]>([])
+    const [baseline, setBaseline] = useState<Map<string, { drawable: number; texture: number }>>(new Map())
+    // Set right after loading a saved outfit via "Wear", cleared on any
+    // manual edit -- while it's set, the player is looking at exactly what
+    // they already own, which the server prices as free (see
+    // ownedOutfitMatch in server/server.lua). Kept as a flag rather than
+    // re-deriving equality client-side since the browser never receives full
+    // skin data for every saved outfit, only the one just loaded.
+    const [ownedSnapshot, setOwnedSnapshot] = useState(false)
+    const [outfits, setOutfits] = useState<OutfitSummary[]>([])
+    const [activeGroup, setActiveGroup] = useState<CategoryGroup>("tops")
+    const [selectedKey, setSelectedKey] = useState<string>()
+    const [zone, setZone] = useState<Zone>("full")
+    const [error, setError] = useState<string>()
+    const [saveName, setSaveName] = useState("")
+    const [outfitsExpanded, setOutfitsExpanded] = useState(false)
+    const [confirmPending, setConfirmPending] = useState(false)
+
+    const rotate = useRotate()
+
+    const resetLocalState = useCallback(() => {
+        setOpen(null); setCategories([]); setBaseline(new Map()); setOutfits([]); setActiveGroup("tops")
+        setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
+        setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
+    }, [])
+
+    useNuiEvent<ThemeTokens>("qbclothing:nui:theme", (tokens) => {
+        for (const [key, value] of Object.entries(tokens ?? {})) document.documentElement.style.setProperty(`--${key}`, value)
+    })
+
+    useNuiEvent<OpenPayload>("qbclothing:nui:open", (payload) => {
+        // Start from the same clean slate as a close, then layer the
+        // payload-derived fields on top -- keeps the "what does a fresh
+        // session look like" defaults defined in exactly one place.
+        resetLocalState()
+        setOpen(payload)
+        setCategories(payload.categories)
+        setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
+        setOutfits(payload.outfits ?? [])
+        const groups = new Set(payload.categories.map((item) => item.category))
+        const firstGroup = GROUP_ORDER.find((group) => groups.has(group)) ?? "tops"
+        setActiveGroup(firstGroup)
+        const firstItem = payload.categories.find((item) => item.category === firstGroup)
+        setSelectedKey(firstItem ? itemKey(firstItem) : undefined)
+    })
+
+    useNuiEvent<OutfitSummary[]>("qbclothing:nui:outfits", (list) => setOutfits(list ?? []))
+    useNuiEvent<ErrorPayload>("qbclothing:nui:error", ({ message }) => { setConfirmPending(false); setError(message) })
+    useNuiEvent<object>("qbclothing:nui:close", () => resetLocalState())
+
+    const groupsPresent = useMemo(() => new Set(categories.map((item) => item.category)), [categories])
+    const itemsInActiveGroup = useMemo(() => categories.filter((item) => item.category === activeGroup), [categories, activeGroup])
+    const selectedItem = useMemo(() => categories.find((item) => itemKey(item) === selectedKey), [categories, selectedKey])
+
+    const changedTotal = useMemo(() => {
+        if (!open || ownedSnapshot) return 0
+        const changedGroups = new Set<CategoryGroup>()
+        for (const item of categories) {
+            const base = baseline.get(itemKey(item))
+            if (!base || base.drawable !== item.drawable || base.texture !== item.texture) changedGroups.add(item.category)
+        }
+        let total = 0
+        for (const group of changedGroups) total += priceOf(open.prices, group)
+        return total
+    }, [baseline, categories, open])
+
+    const selectGroup = useCallback((group: CategoryGroup) => {
+        setActiveGroup(group)
+        const first = categories.find((item) => item.category === group)
+        setSelectedKey(first ? itemKey(first) : undefined)
+    }, [categories])
+
+    const applyVariationResponse = useCallback((target: ClothingCategoryItem, response: SetVariationResponse) => {
+        if (!response.ok) return
+        setOwnedSnapshot(false) // any manual edit means this is no longer exactly the outfit that was loaded
+        setCategories((current) => current.map((item) => item.kind === target.kind && item.id === target.id
+            ? {
+                ...item,
+                drawable: response.drawable ?? item.drawable,
+                texture: response.texture ?? item.texture,
+                drawableCount: response.drawableCount ?? item.drawableCount,
+                textureCount: response.textureCount ?? item.textureCount,
+            }
+            : item))
+    }, [])
+
+    const setVariation = useCallback(async (target: ClothingCategoryItem, next: { drawable: number; texture: number }) => {
+        const response = await sendIntent<SetVariationPayload, SetVariationResponse>("qbclothing:nui:setVariation", {
+            kind: target.kind, id: target.id, drawable: next.drawable, texture: next.texture,
+        })
+        applyVariationResponse(target, response)
+    }, [applyVariationResponse])
+
+    const changeZone = useCallback((next: Zone) => {
+        setZone(next)
+        void sendIntent<CameraPayload, object>("qbclothing:nui:camera", { zone: next })
+    }, [])
+
+    const wearOutfit = useCallback(async (id: number) => {
+        const response = await sendIntent<{ id: number }, LoadOutfitResponse>("qbclothing:nui:loadOutfit", { id })
+        if (response.ok && response.categories) {
+            setCategories(response.categories)
+            setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
+            const groups = new Set(response.categories.map((item) => item.category))
+            const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
+            setActiveGroup(nextGroup)
+            const first = response.categories.find((item) => item.category === nextGroup)
+            setSelectedKey(first ? itemKey(first) : undefined)
+        }
+    }, [activeGroup])
+
+    const deleteOutfit = useCallback((id: number) => {
+        void sendIntent<{ id: number }, object>("qbclothing:nui:deleteOutfit", { id })
+    }, [])
+
+    const confirm = useCallback(async () => {
+        setConfirmPending(true)
+        const trimmed = saveName.trim()
+        const response = await sendIntent<ConfirmPayload, ConfirmResponse>("qbclothing:nui:confirm", trimmed ? { saveName: trimmed } : {})
+        if (!response.ok) setConfirmPending(false)
+        // On success, the session actually ends via the async qbclothing:nui:close message.
+    }, [saveName])
+
+    const cancel = useCallback(() => {
+        void sendIntent<object, CancelResponse>("qbclothing:nui:cancel", {})
+    }, [])
+
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape" && open && !open.mandatory) cancel()
+        }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
+    }, [cancel, open])
+
+    if (!open) return import.meta.env.DEV ? <button className="dev-launch" onClick={openDevHarness}>Open clothing UI harness</button> : null
+
+    const copy = headlineCopy(open.mode, open.shopLabel)
+
+    return <main className="clothing-shell">
+        <Viewport onRotate={rotate} />
+
+        <div className="headline">
+            {copy.badge && <span className="shop-badge">{copy.badge}</span>}
+            <h1>{copy.title}</h1>
+            <p>{copy.sub}</p>
+        </div>
+
+        <ZoneToolbar zone={zone} onSelect={changeZone} />
+
+        {error && <div className="error-banner" role="alert">
+            <CircleAlert size={16} />
+            <span>{error}</span>
+            <button type="button" aria-label="Dismiss error" onClick={() => setError(undefined)}><X size={14} /></button>
+        </div>}
+
+        <div className="rail rail-left">
+            <div className="panel panel-pad">
+                <p className="section-title">Categories</p>
+                <CategoryTabs active={activeGroup} groups={groupsPresent} onSelect={selectGroup} />
+            </div>
+            <OutfitsPanel
+                outfits={outfits}
+                expanded={outfitsExpanded}
+                onToggle={() => setOutfitsExpanded((value) => !value)}
+                onWear={(id) => void wearOutfit(id)}
+                onDelete={deleteOutfit}
+            />
+        </div>
+
+        <div className="rail rail-right">
+            <div className="panel panel-pad">
+                <p className="section-title">{GROUP_LABEL[activeGroup]}</p>
+                <ItemList items={itemsInActiveGroup} selectedKey={selectedKey} onSelect={(item) => setSelectedKey(itemKey(item))} />
+            </div>
+            <div className="panel panel-pad">
+                <VariationDetail
+                    item={selectedItem}
+                    onChange={(next) => selectedItem && void setVariation(selectedItem, next)}
+                    onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
+                />
+            </div>
+        </div>
+
+        <div className="bottom-bar">
+            <label className="save-field">
+                <Save size={15} />
+                <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Name this look" maxLength={40} />
+            </label>
+            {open.mode === "shop" && <div className="price-total">
+                <span className="price-label">Total</span>
+                <span className="price-value">${changedTotal.toLocaleString()}</span>
+            </div>}
+            {!open.mandatory && <button type="button" className="btn btn-ghost" onClick={cancel} disabled={confirmPending}>Cancel</button>}
+            <button type="button" className="btn btn-primary" onClick={() => void confirm()} disabled={confirmPending}>
+                {confirmPending ? "Working..." : confirmLabel(open.mode, changedTotal)}
+            </button>
+        </div>
+    </main>
+}
