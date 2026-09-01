@@ -149,7 +149,7 @@ H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the q
 -- The character-creation hook must be additive -- it only listens on an
 -- event qbcore/qbmultichar already fire, never edits either resource.
 H.ok(client:find("RegisterNetEvent('qb-multicharacter:client:closeNUIdefault'", 1, true), 'hooks the existing new-character signal')
-H.ok(client:find("while LocalPlayer.state['qbmultichar:mode'] ~= nil", 1, true), 'first-character clothing waits for cinematic spawn cleanup')
+H.ok(client:find("while LocalPlayer.state['qbmultichar:mode'] do", 1, true), 'first-character clothing waits for cinematic spawn cleanup')
 H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'waits for the player to actually be spawned before opening')
 
 -- A saved outfit must reappear on every future login, not just persist

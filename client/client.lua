@@ -534,7 +534,9 @@ RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
         -- clothing UI on top of it; the server-owned mode clears only after
         -- camera, bucket, focus, ped, and NUI cleanup is complete. On servers
         -- without qbmultichar the key is nil and this remains the old path.
-        while LocalPlayer.state['qbmultichar:mode'] ~= nil do Wait(50) end
+        -- Truthiness, not `~= nil`: a cleared mode is `false` (qbmultichar
+        -- cannot publish the clear as a nil deletion -- see its writeMode).
+        while LocalPlayer.state['qbmultichar:mode'] do Wait(50) end
         local timeout = GetGameTimer() + 15000
         while (not NetworkIsPlayerActive(PlayerId()) or IsEntityDead(PlayerPedId())) and GetGameTimer() < timeout do
             Wait(50)

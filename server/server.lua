@@ -632,7 +632,9 @@ end, { rateLimit = { max = 20, window = 10000 } })
 -- that source's cached pre-login reads at the same boundary so a later return
 -- to character selection cannot see an outfit saved during this session.
 AddStateBagChangeHandler('qbmultichar:mode', nil, function(bagName, _, value)
-    if value ~= nil or type(bagName) ~= 'string' then return end
+    -- A cleared mode is falsy: `false` from qbmultichar's writeMode, or nil on
+    -- a server whose qbmultichar predates that change.
+    if value or type(bagName) ~= 'string' then return end
     local src = tonumber(bagName:match('^player:(%d+)$'))
     if src then previewCache[src] = nil end
 end)
