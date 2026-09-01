@@ -45,8 +45,8 @@ end
 -- the CURRENT model/slot doesn't actually have -- server-side sanitiseSkin
 -- only clamps to a generous [-1, 999] "not garbage" range (see its own
 -- comment: the true per-model/per-slot cap can't be known server-side), and
--- `skin` here can also arrive completely unsanitised (the spawn-time
--- qb-clothing:server:getSkin callback returns the raw DB row). So every index
+-- `skin` here can also arrive from an external export/event caller rather than
+-- the sanitized server callbacks. So every index
 -- gets bounds-checked here, against the SAME live GetNumberOfPed*Variations
 -- queries buildCategoryPayload already uses to build the NUI list, right
 -- before the native call that would otherwise crash on it.
@@ -529,6 +529,12 @@ end)
 -- start order.
 RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
     CreateThread(function()
+        -- qbmultichar uses this legacy signal to open the mandatory cinematic
+        -- spawn carousel for a new character. Do not put the first-character
+        -- clothing UI on top of it; the server-owned mode clears only after
+        -- camera, bucket, focus, ped, and NUI cleanup is complete. On servers
+        -- without qbmultichar the key is nil and this remains the old path.
+        while LocalPlayer.state['qbmultichar:mode'] ~= nil do Wait(50) end
         local timeout = GetGameTimer() + 15000
         while (not NetworkIsPlayerActive(PlayerId()) or IsEntityDead(PlayerPedId())) and GetGameTimer() < timeout do
             Wait(50)
@@ -603,6 +609,19 @@ end)
 exports('OpenWardrobe', function() openSession('wardrobe') end)
 exports('IsClothingMenuOpen', function() return activeSession ~= nil end)
 exports('GetPedModels', function() return Shared.models end)
+-- Applies this resource's canonical component/prop/tattoo schema to an
+-- already-created ped. Character selectors use a local, non-networked clone,
+-- so replacing PlayerPedId() (applyModel's job) would be the wrong operation.
+exports('ApplyAppearanceToPed', function(ped, model, skin)
+    if type(ped) ~= 'number' or ped == 0 or not DoesEntityExist(ped) then
+        return false, 'invalid ped'
+    end
+    if not Shared.isFreemodeModel(model) or GetEntityModel(ped) ~= GetHashKey(model) then
+        return false, 'ped model does not match appearance model'
+    end
+    applySkin(ped, skin, model)
+    return true
+end)
 
 -- --- shop peds ---
 

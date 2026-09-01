@@ -129,6 +129,11 @@ H.ok(server:find('return saved.model, sanitiseSkin(saved.skin, saved.model)', 1,
     'the spawn-time getSkin callback sanitises the saved skin like every other read path -- ' ..
     'it used to return the raw DB blob straight to SetPedComponentVariation/SetPedPropIndex')
 H.ok(server:find("QB.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
+H.ok(server:find('exports.qbcore:ownsCharacter(src, citizenid)', 1, true), 'character preview appearance is ownership checked before reading the skin')
+H.ok(server:find('previewCache[src]', 1, true), 'selection-session appearance reads are cached per source')
+H.ok(server:find("AddStateBagChangeHandler('qbmultichar:mode'", 1, true), 'appearance cache clears when the cinematic selection session ends')
+H.ok(server:find("rateLimit = { max = 20, window = 10000 }", 1, true), 'character preview appearance reads are rate limited')
+H.ok(server:find('local skin = sanitiseSkin(saved.skin, saved.model)', 1, true), 'character preview appearance is sanitised before it reaches a ped')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:CreateFirstCharacter'", 1, true), 'real qb-clothing CreateFirstCharacter event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openMenu'", 1, true), 'real qb-clothing openMenu event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openOutfitMenu'", 1, true), 'real qb-clothing openOutfitMenu event is implemented')
@@ -138,11 +143,13 @@ H.ok(client:find("nearestDistance > (Config.interactDistance + 1.0)", 1, true), 
 H.ok(server:find("elseif mode == 'admin' then", 1, true) and server:find("exports.qbcore:hasPermission(src, 'admin')", 1, true), 'full-styling admin sessions are permission-checked server-side')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:loadOutfit'", 1, true), 'real qb-clothing loadOutfit event is implemented')
 H.ok(client:find("exports('OpenClothingRoom'", 1, true), 'real qb-clothing OpenClothingRoom export is implemented')
+H.ok(client:find("exports('ApplyAppearanceToPed'", 1, true), 'local preview peds can use qbclothing\'s bounded appearance application')
 H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the qb-clothing identity')
 
 -- The character-creation hook must be additive -- it only listens on an
 -- event qbcore/qbmultichar already fire, never edits either resource.
 H.ok(client:find("RegisterNetEvent('qb-multicharacter:client:closeNUIdefault'", 1, true), 'hooks the existing new-character signal')
+H.ok(client:find("while LocalPlayer.state['qbmultichar:mode'] ~= nil", 1, true), 'first-character clothing waits for cinematic spawn cleanup')
 H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'waits for the player to actually be spawned before opening')
 
 -- A saved outfit must reappear on every future login, not just persist

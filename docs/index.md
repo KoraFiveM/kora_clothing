@@ -97,6 +97,7 @@ exports.qbclothing:OpenClothingRoom(options)  -- options = { shopId = n } or a b
 exports.qbclothing:OpenWardrobe()
 exports.qbclothing:IsClothingMenuOpen()       -- true while the fitting-room NUI is open
 exports.qbclothing:GetPedModels()             -- { male = 'mp_m_freemode_01', female = 'mp_f_freemode_01' }
+exports.qbclothing:ApplyAppearanceToPed(ped, model, skin) -- local preview ped; (true) or (false, err)
 ```
 
 ### Legacy qb-clothing / qb-multicharacter compat events (client)
@@ -113,6 +114,12 @@ QB.callback.trigger('qb-clothing:server:getSkin')                    -- -> model
 QB.callback.trigger('qb-multicharacter:server:getSkin', citizenid)   -- -> model, skin (char-select preview)
 QB.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
 ```
+
+The multicharacter preview callback is pre-login safe: qbcore verifies that
+the requested active character belongs to the requesting license before any
+appearance is returned. Foreign and soft-deleted citizen IDs are rejected;
+successful results are sanitized, rate-limited, and cached for that source's
+selection session.
 
 ### Session net events
 ```lua

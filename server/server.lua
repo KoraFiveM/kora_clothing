@@ -8,6 +8,7 @@
 -- allowed to cancel" -- never trust the client's own idea of session state.
 
 local sessions = {} -- [src] = { mode, mandatory, previousBucket, citizenid, shopIndex }
+local previewCache = {} -- [src][citizenid] = { model, skin }; pre-login selection-session cache
 
 local function citizenIdFor(src)
     local ok, citizenid = pcall(function() return exports.qbcore:getPlayerData(src, { 'citizenid' }) end)
@@ -608,16 +609,39 @@ end)
 -- character-select preview camera.
 QB.callback.unregister('qb-multicharacter:server:getSkin')
 QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
+    local src = _src
     if type(citizenid) ~= 'string' then return nil end
+    local ok, owned = pcall(function() return exports.qbcore:ownsCharacter(src, citizenid) end)
+    if not ok or owned ~= true then return nil end
+
+    local byCitizen = previewCache[src]
+    if not byCitizen then byCitizen = {}; previewCache[src] = byCitizen end
+    local cached = byCitizen[citizenid]
+    if cached then return cached.model, cached.skin end
+
     local saved = dbGetSkin(citizenid)
     if not saved then return nil end
-    return saved.model, saved.skin
+    if not Shared.isFreemodeModel(saved.model) then return nil end
+    local skin = sanitiseSkin(saved.skin, saved.model)
+    byCitizen[citizenid] = { model = saved.model, skin = skin }
+    return saved.model, skin
+end, { rateLimit = { max = 20, window = 10000 } })
+
+-- A reconnect is not required to invalidate selection previews. The
+-- qbmultichar server clears its authoritative mode after spawn/cleanup; drop
+-- that source's cached pre-login reads at the same boundary so a later return
+-- to character selection cannot see an outfit saved during this session.
+AddStateBagChangeHandler('qbmultichar:mode', nil, function(bagName, _, value)
+    if value ~= nil or type(bagName) ~= 'string' then return end
+    local src = tonumber(bagName:match('^player:(%d+)$'))
+    if src then previewCache[src] = nil end
 end)
 
 -- --- cleanup ---
 
 AddEventHandler('playerDropped', function()
     sessions[source] = nil
+    previewCache[source] = nil
 end)
 
 AddEventHandler('onResourceStop', function(resource)
