@@ -523,27 +523,55 @@ end)
 -- The unambiguous "a character was just created" signal in this codebase:
 -- qbcore's compat (qb-multicharacter:server:createCharacter handler) fires
 -- this client event ONLY on successful character creation, never on an
--- existing-character login (that path goes through qb-spawn instead). Waiting
--- for the ped to actually be alive rather than relying on registration order
--- against qbmultichar's own handler keeps this robust regardless of resource
--- start order.
+-- existing-character login (that path goes through qb-spawn instead).
+--
+-- It is NOT, however, a "you are in the world" signal. qbmultichar answers it
+-- by opening the mandatory cinematic spawn carousel, and the fitting room must
+-- not land on top of that -- nor on the teleport/resurrect/fade-in that
+-- follows the player's choice. So this handler only arms the flow; the actual
+-- open waits for qbmultichar to say the spawn finished.
+local firstCharacterArmed = false
+
+-- Whether the multichar handling this login is our own, and so whether a
+-- completion event is coming at all. Asked at arm time, not at chunk load:
+-- qbclothing and qbmultichar start in the same batch, so a chunk-load read can
+-- catch qbmultichar as 'starting' and silently strand the session on the
+-- fallback path. By the time a character has been created both are running.
+-- Preferred over sniffing the `qbmultichar:mode` state bag, which answers a
+-- timing question ("has the mode replicated yet") rather than the capability
+-- question actually being asked here.
+local function hasSpawnCompleteSignal()
+    return GetResourceState('qbmultichar') == 'started'
+end
+
 RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
+    if hasSpawnCompleteSignal() then
+        firstCharacterArmed = true
+        return
+    end
+
+    -- Third-party qb-multicharacter: no completion event exists to wait for,
+    -- so fall back to observing the ped directly. Unchanged legacy behaviour.
     CreateThread(function()
-        -- qbmultichar uses this legacy signal to open the mandatory cinematic
-        -- spawn carousel for a new character. Do not put the first-character
-        -- clothing UI on top of it; the server-owned mode clears only after
-        -- camera, bucket, focus, ped, and NUI cleanup is complete. On servers
-        -- without qbmultichar the key is nil and this remains the old path.
-        -- Truthiness, not `~= nil`: a cleared mode is `false` (qbmultichar
-        -- cannot publish the clear as a nil deletion -- see its writeMode).
-        while LocalPlayer.state['qbmultichar:mode'] do Wait(50) end
         local timeout = GetGameTimer() + 15000
         while (not NetworkIsPlayerActive(PlayerId()) or IsEntityDead(PlayerPedId())) and GetGameTimer() < timeout do
             Wait(50)
         end
-        Wait(250) -- let qbmultichar's own handler finish its teleport/resurrect/fade-in first
+        Wait(250)
         TriggerEvent('qb-clothing:client:CreateFirstCharacter')
     end)
+end)
+
+-- qbmultichar fires this once the ped has been placed, resurrected, revealed
+-- and unfrozen and the fade-in has completed -- i.e. the player can genuinely
+-- see themselves. `isNew` is its own record of which path the spawn came from;
+-- the armed flag is checked as well so that an ordinary login can never open
+-- the creation fitting room even if the two ever disagree.
+AddEventHandler('qbmultichar:client:spawnComplete', function(isNew)
+    if not firstCharacterArmed then return end
+    firstCharacterArmed = false
+    if isNew ~= true then return end
+    TriggerEvent('qb-clothing:client:CreateFirstCharacter')
 end)
 
 -- --- real qb-clothing client wire protocol (third-party compat) ---

@@ -64,9 +64,45 @@ button { color: inherit; }
 .tab[aria-pressed="true"] { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 .tab svg { flex: none; }
 
-.item-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow: auto; scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
-.item-list::-webkit-scrollbar { width: 7px; }
-.item-list::-webkit-scrollbar-thumb { border-radius: 999px; background: hsl(var(--border)); }
+/* --- scroll surfaces --- */
+
+/* Every scrollable panel in the HUD, styled in one place. CEF's default is the
+   host OS scrollbar -- on Windows a full-width grey track with arrow buttons at
+   both ends, which reads as browser chrome sitting inside the game UI. The
+   buttons and track are removed explicitly: a `::-webkit-scrollbar` width alone
+   leaves CEF drawing both, so the thumb is all that remains. `scrollbar-width`
+   /`scrollbar-color` are the standards-track equivalents, harmless where the
+   -webkit- rules already apply. The thumb's transparent border plus
+   `background-clip: content-box` insets it from the panel edge instead of
+   letting it sit flush against the border. */
+.item-list,
+.outfits-body,
+.tattoo-panel { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+
+.item-list::-webkit-scrollbar,
+.outfits-body::-webkit-scrollbar,
+.tattoo-panel::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+
+.item-list::-webkit-scrollbar-track,
+.outfits-body::-webkit-scrollbar-track,
+.tattoo-panel::-webkit-scrollbar-track,
+.item-list::-webkit-scrollbar-corner,
+.outfits-body::-webkit-scrollbar-corner,
+.tattoo-panel::-webkit-scrollbar-corner { background: transparent; }
+
+.item-list::-webkit-scrollbar-button,
+.outfits-body::-webkit-scrollbar-button,
+.tattoo-panel::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
+
+.item-list::-webkit-scrollbar-thumb,
+.outfits-body::-webkit-scrollbar-thumb,
+.tattoo-panel::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: hsl(var(--border)); background-clip: content-box; transition: background-color 160ms cubic-bezier(0.16,1,0.3,1); }
+
+.item-list::-webkit-scrollbar-thumb:hover,
+.outfits-body::-webkit-scrollbar-thumb:hover,
+.tattoo-panel::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / .75); background-clip: content-box; }
+
+.item-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow: auto; }
 .item-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid transparent; border-radius: 7px; padding: 8px 9px; color: hsl(var(--muted-foreground)); background: transparent; cursor: pointer; text-align: left; font-size: 12.5px; font-weight: 600; transition: background 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); }
 .item-row:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
 .item-row[aria-pressed="true"] { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
@@ -96,9 +132,7 @@ button { color: inherit; }
 .outfits-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; background: transparent; padding: 11px 12px; color: hsl(var(--foreground)); cursor: pointer; font-size: 12.5px; font-weight: 700; }
 .outfits-toggle svg:last-child { color: hsl(var(--muted-foreground)); transition: transform 180ms cubic-bezier(0.16,1,0.3,1); }
 .outfits-toggle[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
-.outfits-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
-.outfits-body::-webkit-scrollbar { width: 7px; }
-.outfits-body::-webkit-scrollbar-thumb { border-radius: 999px; background: hsl(var(--border)); }
+.outfits-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
 .outfit-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid hsl(var(--border)); border-radius: 7px; padding: 8px 9px; background: hsl(var(--surface-raised)); }
 .outfit-card .outfit-info { min-width: 0; }
 .outfit-card .outfit-name { display: block; overflow: hidden; color: hsl(var(--foreground)); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }

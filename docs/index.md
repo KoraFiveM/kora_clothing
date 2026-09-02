@@ -153,6 +153,17 @@ clothing+hair+tattoo session (the same `creation` service policy used for
 first-character fittings); the server re-checks `admin` permission before
 granting it regardless of what qbadmin's menu shows client-side.
 
+### First-character fitting
+
+`qb-multicharacter:client:closeNUIdefault` (fired by qbcore only on successful
+character creation) *arms* the mandatory first fitting; it does not open it.
+The open waits for [qbmultichar](https://qbcore2.github.io/qbmultichar/)'s
+`qbmultichar:client:spawnComplete` event, which lands once the ped has been
+placed, resurrected, revealed and the fade-in has finished — so the fitting
+room can never appear over the spawn carousel or mid-teleport. On a server
+running third-party `qb-multicharacter`, where no such event exists, the old
+behaviour applies: wait for the ped to be active and alive, then open.
+
 ## Config highlights (`config.lua`)
 
 - `Config.bucket.base` (1,000,000) — fitting-room routing bucket offset, `base + source`

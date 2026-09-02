@@ -146,11 +146,18 @@ H.ok(client:find("exports('OpenClothingRoom'", 1, true), 'real qb-clothing OpenC
 H.ok(client:find("exports('ApplyAppearanceToPed'", 1, true), 'local preview peds can use qbclothing\'s bounded appearance application')
 H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the qb-clothing identity')
 
--- The character-creation hook must be additive -- it only listens on an
--- event qbcore/qbmultichar already fire, never edits either resource.
+-- The character-creation hook is a listener: it arms on the event qbcore
+-- already fires and opens on the completion event qbmultichar publishes.
 H.ok(client:find("RegisterNetEvent('qb-multicharacter:client:closeNUIdefault'", 1, true), 'hooks the existing new-character signal')
-H.ok(client:find("while LocalPlayer.state['qbmultichar:mode'] do", 1, true), 'first-character clothing waits for cinematic spawn cleanup')
-H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'waits for the player to actually be spawned before opening')
+H.ok(client:find("AddEventHandler('qbmultichar:client:spawnComplete'", 1, true),
+    'first-character clothing opens on qbmultichar\'s spawn-completion event, not on a timer -- ' ..
+    'the qbmultichar:mode bag it used to poll is cleared BEFORE the teleport runs, so a poller ' ..
+    'woke while the ped was still being placed and put the fitting room on screen pre-spawn')
+H.ok(client:find("if isNew ~= true then return end", 1, true), 'an ordinary login never opens the creation fitting room')
+H.ok(client:find("local function hasSpawnCompleteSignal()", 1, true) and client:find("GetResourceState('qbmultichar') == 'started'", 1, true),
+    'third-party qb-multicharacter, which publishes no completion event, keeps the ped-observing fallback -- ' ..
+    'asked at arm time, since a chunk-load read can catch qbmultichar still starting in the same batch')
+H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'the fallback path waits for the player to actually be spawned before opening')
 
 -- A saved outfit must reappear on every future login, not just persist
 -- silently in the database -- regression guard for that re-apply path. The
