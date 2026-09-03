@@ -1,5 +1,5 @@
 -- qbclothing client: NUI owner, ped/camera control while a fitting-room
--- session is open, shop-ped targets, and the real qb-clothing client wire
+-- session is open, shop target zones, and the real qb-clothing client wire
 -- protocol for third-party compat. Owns its own NUI frame (own `ui_page`), so
 -- this talks to it with the raw natives directly -- QB.nui.* would dispatch
 -- into qblib's own resource VM/frame instead of this one.
@@ -7,6 +7,13 @@
 local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
 local disableControlsThread = false
 local previewTattoos = {}
+
+-- Session-local mirror of the two hair-palette indices currently on the ped.
+-- Held here rather than read back with GetPedHairColor/GetPedHairHighlightColor
+-- for the same reason previewTattoos is: there is no reliable getter for what
+-- was applied (the highlight getter is missing on some builds), and the NUI is
+-- the only thing that ever changes these, so this IS the authority.
+local previewHair = { color = 0, highlight = 0 }
 
 -- Session-local, never sent to the server or persisted: what a tattoo/barber/
 -- hairdresser session temporarily overrode (bare skin for tattoos, hat/mask
@@ -38,6 +45,51 @@ local function applyTattoos(ped, model, tattoos)
         local tattoo = Shared.tattooById(model, id)
         if tattoo then AddPedDecorationFromHashes(ped, GetHashKey(tattoo.collection), GetHashKey(tattoo.overlay)) end
     end
+end
+
+-- The hair palette's real length is a live query, exactly like the drawable
+-- counts below. GetNumHairColors is absent on some older client builds, in
+-- which case this degrades to the coarse shared bound the server already
+-- clamps to rather than dropping the clamp altogether.
+local function hairColorCount()
+    if type(GetNumHairColors) ~= 'function' then return Shared.maxHairColorIndex + 1 end
+    local count = GetNumHairColors()
+    if type(count) ~= 'number' or count <= 0 then return Shared.maxHairColorIndex + 1 end
+    return count
+end
+
+local function clampHairColor(value)
+    local index = Shared.clampHairColor(value)
+    if index >= hairColorCount() then return 0 end
+    return index
+end
+
+local function applyHairColor(ped, color, highlight)
+    previewHair.color, previewHair.highlight = clampHairColor(color), clampHairColor(highlight)
+    SetPedHairColor(ped, previewHair.color, previewHair.highlight)
+end
+
+-- The palette the NUI renders as swatch grids. GTA's hair colouring is
+-- INDEXED: SetPedHairColor(ped, colorId, highlightColorId) takes two entries
+-- from this fixed palette and there is no native that accepts an RGB triple --
+-- so do NOT "fix" the swatch grids into a free colour picker, because there is
+-- nothing to send an arbitrary colour to. What CAN be done is show the player
+-- the real colour sitting behind each index, which is exactly what
+-- GetPedHairRgbColor returns: the grid then looks like a colour picker while
+-- every value crossing the wire stays a legal palette index. Built once per
+-- session -- the palette does not change while a ped is alive.
+local function buildHairPalette()
+    local palette = {}
+    for index = 0, hairColorCount() - 1 do
+        local r, g, b = GetPedHairRgbColor(index)
+        palette[#palette + 1] = {
+            index = index,
+            r = math.floor(tonumber(r) or 0),
+            g = math.floor(tonumber(g) or 0),
+            b = math.floor(tonumber(b) or 0),
+        }
+    end
+    return palette
 end
 
 -- SetPedComponentVariation/SetPedPropIndex fault inside the game's own
@@ -86,11 +138,15 @@ local function applySkin(ped, skin, model)
             ClearPedProp(ped, id)
         end
     end
+    applyHairColor(ped, skin.hairColor, skin.hairHighlight)
     applyTattoos(ped, model, skin.tattoos)
 end
 
 local function currentSkinSnapshot(ped)
-    local skin = { components = {}, props = {}, tattoos = previewTattoos }
+    local skin = {
+        components = {}, props = {}, tattoos = previewTattoos,
+        hairColor = previewHair.color, hairHighlight = previewHair.highlight,
+    }
     for id in pairs(Shared.components) do
         skin.components[tostring(id)] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
     end
@@ -103,16 +159,32 @@ local function currentSkinSnapshot(ped)
     return skin
 end
 
+local function servicePolicy(service)
+    return Config.services[service] or Config.services.clothing
+end
+
+local function policyAllows(policy, ids, id)
+    if policy.all then return true end
+    for _, candidate in ipairs(ids or {}) do if candidate == id then return true end end
+    return false
+end
+
+-- Hair colour is only offered where the hair component itself is editable --
+-- barber, hairdresser, character creation and the admin session. An ordinary
+-- clothing shop gets no palette at all, so the NUI has nothing to render there
+-- and cannot show a control the server would refuse anyway (mergeServiceSkin
+-- keeps hair colour on the same whitelist as component 2).
+local function hairPayload(service)
+    local policy = servicePolicy(service)
+    if not policyAllows(policy, policy.components, 2) then return nil end
+    return { palette = buildHairPalette(), color = previewHair.color, highlight = previewHair.highlight }
+end
+
 local function buildCategoryPayload(ped, service)
     local categories = {}
-    local policy = Config.services[service] or Config.services.clothing
-    local function allowed(ids, id)
-        if policy.all then return true end
-        for _, candidate in ipairs(ids or {}) do if candidate == id then return true end end
-        return false
-    end
+    local policy = servicePolicy(service)
     for id, meta in pairs(Shared.components) do
-        if allowed(policy.components, id) then
+        if policyAllows(policy, policy.components, id) then
             local drawable = GetPedDrawableVariation(ped, id)
             categories[#categories + 1] = {
             kind = 'component',
@@ -127,7 +199,7 @@ local function buildCategoryPayload(ped, service)
         end
     end
     for id, meta in pairs(Shared.props) do
-        if allowed(policy.props, id) then
+        if policyAllows(policy, policy.props, id) then
             local drawable = GetPedPropIndex(ped, id)
             categories[#categories + 1] = {
             kind = 'prop',
@@ -290,6 +362,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             -- reflect what the player is actually wearing, not what was asked for.
             model = currentModelName(ped),
             categories = buildCategoryPayload(ped, activeSession.service),
+            hair = hairPayload(activeSession.service),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
             outfits = payload.outfits or {},
@@ -389,6 +462,16 @@ RegisterNUICallback('qbclothing:nui:setTattoos', function(data, cb)
     cb({ ok = true, tattoos = previewTattoos })
 end)
 
+RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
+    if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
+    -- Same gate the server applies at confirm time, so the preview can never
+    -- show a recolour a clothing shop's merge would silently throw away.
+    local policy = servicePolicy(activeSession.service)
+    if not policyAllows(policy, policy.components, 2) then cb({ ok = false }); return end
+    applyHairColor(PlayerPedId(), data.color, data.highlight)
+    cb({ ok = true, color = previewHair.color, highlight = previewHair.highlight })
+end)
+
 RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
     if type(data) == 'table' and data.zone then Camera.setZone(data.zone) end
     cb({})
@@ -399,13 +482,24 @@ RegisterNUICallback('qbclothing:nui:rotate', function(data, cb)
     cb({})
 end)
 
+RegisterNUICallback('qbclothing:nui:zoom', function(data, cb)
+    if type(data) == 'table' then Camera.zoom(data.delta) end
+    cb({})
+end)
+
 RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local model, skin = QB.callback.trigger('qbclothing:server:getOutfitSkin', tonumber(data.id))
     if not model then cb({ ok = false }); return end
     applyModel(model, skin)
     local ped = PlayerPedId()
-    cb({ ok = true, model = currentModelName(ped), categories = buildCategoryPayload(ped, activeSession.service), selectedTattoos = previewTattoos })
+    cb({
+        ok = true,
+        model = currentModelName(ped),
+        categories = buildCategoryPayload(ped, activeSession.service),
+        hair = hairPayload(activeSession.service),
+        selectedTattoos = previewTattoos,
+    })
 end)
 
 -- These four fire the tokenised QB.events gateway (server/server.lua) rather
@@ -653,20 +747,55 @@ exports('ApplyAppearanceToPed', function(ped, model, skin)
     return true
 end)
 
--- --- shop peds ---
+-- --- shop targets ---
 
+-- The target is the storefront itself, not a clerk. A ped-bound target dies
+-- with the ped: an unstreamed model, a player shoving the clerk out of place,
+-- or another resource deleting stray peds all leave the shop silently
+-- unopenable, and the entity has to exist at all before anything can be
+-- attached to it. A zone is geometry -- it is where the config says it is,
+-- always. The optional ped (Config.shopPeds) is therefore pure set dressing
+-- and deliberately carries no options of its own.
+--
+-- Note the shape difference against addEntity/addModel: the zone APIs take ONE
+-- opts table with `options` INSIDE it, where addEntity takes the options array
+-- as its own positional argument (see qbtarget/client/state.lua).
 CreateThread(function()
     for index, shop in ipairs(Config.shops) do
-        local ped = QB.entities.create(shop.ped, shop.coords, { freeze = true, blockNonTempEvents = true })
-        if ped then
-            exports.qbtarget:addEntity(ped, {
-                {
-                    label = ('Open %s'):format(shop.label),
-                    icon = 'Shirt',
-                    distance = Config.interactDistance,
-                    onSelect = function() openSession('shop', { shopId = index }) end,
-                },
-            }, Config.interactDistance)
+        local options = {
+            {
+                label = ('Open %s'):format(shop.label),
+                icon = 'Shirt',
+                distance = Config.interactDistance,
+                onSelect = function() openSession('shop', { shopId = index }) end,
+            },
+        }
+        local zone = shop.zone or Config.shopZoneDefault
+
+        if zone.points then
+            exports.qbtarget:addPolyZone({
+                points = zone.points,
+                thickness = zone.thickness,
+                minZ = zone.minZ,
+                maxZ = zone.maxZ,
+                options = options,
+                distance = Config.interactDistance,
+            })
+        else
+            exports.qbtarget:addBoxZone({
+                -- shop.coords is a vector4 (heading in .w) and addBoxZone only
+                -- reads x/y/z off it, so the heading is passed separately as
+                -- the box's own rotation rather than being read from coords.
+                coords = shop.coords,
+                size = zone.size or Config.shopZoneDefault.size,
+                rotation = zone.rotation or shop.coords.w,
+                options = options,
+                distance = Config.interactDistance,
+            })
+        end
+
+        if Config.shopPeds then
+            QB.entities.create(shop.ped, shop.coords, { freeze = true, blockNonTempEvents = true })
         end
 
         if shop.blip and shop.blip.enabled then

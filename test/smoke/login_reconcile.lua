@@ -59,6 +59,9 @@ _G.SetPedComponentVariation = function(_, id, drawable, texture)
 end
 _G.SetPedPropIndex = function() end
 _G.ClearPedProp = function() end
+_G.SetPedHairColor = function() end
+_G.GetNumHairColors = function() return 64 end
+_G.GetPedHairRgbColor = function() return 0, 0, 0 end
 _G.ClearPedDecorations = function() end
 _G.AddPedDecorationFromHashes = function() end
 _G.GetNumberOfPedDrawableVariations = function() return 5 end

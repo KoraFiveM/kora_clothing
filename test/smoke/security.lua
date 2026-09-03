@@ -17,6 +17,7 @@ local client = read('client/client.lua')
 local camera = read('client/camera.lua')
 local manifest = read('fxmanifest.lua')
 local config = read('config.lua')
+local shared = read('shared/components.lua')
 
 -- No stray backtick hash-literal syntax (a CFX-only Lua extension) anywhere in
 -- the resource -- a real occurrence silently breaks stock lua/luac-based
@@ -173,7 +174,7 @@ H.ok(client:find('if not model or activeSession then return end', 1, true), 'a l
 -- stream in time (RequestModel can legitimately time out).
 H.ok(client:find('local function currentModelName(ped)', 1, true), 'current model is derived from the live ped, not trusted from a request')
 H.ok(client:find('model = currentModelName(ped),', 1, true), 'session-open payload reports the actual applied model')
-H.ok(client:find('model = currentModelName(ped), categories = buildCategoryPayload(ped, activeSession.service)', 1, true), 'loadOutfit response reports the actual applied model and service-filtered categories')
+H.ok(client:find('model = currentModelName(ped),\n        categories = buildCategoryPayload(ped, activeSession.service),', 1, true), 'loadOutfit response reports the actual applied model and service-filtered categories')
 H.ok(client:find('model = currentModelName(ped),\n        skin = currentSkinSnapshot(ped),', 1, true), 'confirm submits the actual applied model')
 
 -- NUI is this resource's own frame -- raw natives only, never qblib's QB.nui.*
@@ -187,6 +188,51 @@ do
     H.ok(not codeOnly:find('QB.nui.', 1, true), 'client never routes its own NUI through qblib\'s proxy')
 end
 H.ok(not server:find('SendNUIMessage', 1, true) and not server:find('RegisterNUICallback', 1, true), 'server has no NUI authority')
+
+-- The preview camera must never accept a position with world geometry between
+-- it and the ped -- a shop counter, a parked car or a passing ped otherwise
+-- sits in shot. Ported from qbmultichar's scene.lua: capsule (not ray) trace,
+-- fan around the obstruction at the same distance first, pull in only as a
+-- last resort. Re-resolved on every zone/zoom change, not just at start.
+H.ok(camera:find('local function traceCameraPath(subject, candidate)', 1, true), 'the camera capsule-traces its own path to the ped')
+H.ok(camera:find('StartShapeTestCapsule(', 1, true), 'a capsule, not a zero-width ray -- the camera must not graze a wall or column edge')
+H.ok(camera:find('local CAMERA_FAN_ANGLES = { 0.0, 28.0, -28.0, 55.0, -55.0, 82.0, -82.0, 180.0 }', 1, true), 'an obstruction is first solved by fanning around the ped at the same distance')
+H.ok(camera:find('occlusion.radiusScale = clamp((distance - 0.25) / radius', 1, true), 'pulling the camera in towards the ped is the last resort, not the first')
+H.ok(camera:find('occlusionDirty = true', 1, true) and camera:find('if occlusionDirty then', 1, true), 'the resolve is re-run on zone/zoom changes, coalesced rather than per-frame')
+
+-- Free wheel zoom must not fight the zone lerp for ownership of state.radius:
+-- it moves the GOAL the lerp is already chasing.
+H.ok(camera:find('function Camera.zoom(delta)', 1, true), 'the camera exposes a continuous zoom')
+H.ok(camera:find('local function goalRadius(zoneCfg)', 1, true) and camera:find('lerp(state.radius, goalRadius(zoneCfg), zoomRate)', 1, true),
+    'free zoom is folded into the zone lerp goal, not written onto the live camera radius')
+H.ok(config:find('zoom = {', 1, true) and config:find('step = 0.12,', 1, true), 'zoom bounds and step are configurable')
+H.ok(client:find("RegisterNUICallback('qbclothing:nui:zoom'", 1, true), 'the NUI can request a continuous zoom')
+H.ok(camera:find('target.zoomOffset = 0.0\n    occlusionDirty = true', 1, true), 'a zone preset is a jump-to: it discards the accumulated free-zoom offset')
+
+-- Hair colour is a pair of PALETTE INDICES, never RGB -- SetPedHairColor
+-- accepts nothing else. Server clamps coarsely, client re-clamps against the
+-- live palette, and the NUI paints swatches from GetPedHairRgbColor so the
+-- indexed native is never fronted by a fake free colour picker.
+H.ok(shared:find('function Shared.clampHairColor(value)', 1, true), 'hair colour indices are validated by one shared clamp')
+H.ok(server:find('skin.hairColor = Shared.clampHairColor(rawSkin.hairColor)', 1, true), 'submitted hair colour is clamped server-side like every other index')
+H.ok(server:find('local hairSource = idAllowed(policy.components, 2) and requested or before', 1, true), 'hair colour is gated by the same whitelist as the hair component itself')
+H.ok(server:find('touchedCategories[Shared.components[2].category] = true', 1, true), 'a recolour-only barber visit is still priced')
+H.ok(server:find('local function hairOf(skin) return (skin.hairColor or 0), (skin.hairHighlight or 0) end', 1, true), 'outfits saved before hair colour existed still match as owned')
+H.ok(client:find('local function buildHairPalette()', 1, true) and client:find('GetPedHairRgbColor(index)', 1, true), 'the palette the NUI paints is read from the game, not hardcoded')
+H.ok(client:find('SetPedHairColor(ped, previewHair.color, previewHair.highlight)', 1, true), 'hair colour reaches the ped through the indexed native')
+H.ok(client:find("RegisterNUICallback('qbclothing:nui:setHairColor'", 1, true), 'the NUI can preview a hair recolour')
+H.ok(client:find('hair = hairPayload(activeSession.service),', 1, true), 'the palette is sent once with the session payload')
+H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return nil end', 1, true), 'a clothing shop is sent no palette at all')
+
+-- Shop interaction is geometry, not a ped: a ped-bound target dies with the
+-- ped (unstreamed model, shoved out of place, deleted by another resource) and
+-- leaves the shop silently unopenable.
+H.ok(not client:find('exports.qbtarget:addEntity', 1, true), 'shops are no longer targeted through a spawned clerk entity')
+H.ok(client:find('exports.qbtarget:addBoxZone({', 1, true) and client:find('exports.qbtarget:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
+H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
+H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
+H.ok(client:find('if Config.shopPeds then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
+H.ok(client:find('QB.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')
 
 -- Camera never leaks a render-cams state or a stuck control lock.
 H.ok(camera:find('function Camera.stop()', 1, true), 'camera exposes an explicit stop')

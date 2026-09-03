@@ -14,9 +14,10 @@ description 'Clothing, appearance and outfit wardrobe with a private fitting-roo
 -- shop, a barber, a job-uniform script) keeps working unmodified.
 provide 'qb-clothing'
 
--- Shop peds use qbtarget zones; FXServer's `dependency` keyword creates a
--- start-order edge regardless of server.cfg `ensure` position, so this is
--- guaranteed running before client.lua registers zones on resource start.
+-- Shops are targeted through qbtarget zones; FXServer's `dependency` keyword
+-- creates a start-order edge regardless of server.cfg `ensure` position, so
+-- this is guaranteed running before client.lua registers zones on resource
+-- start.
 dependency 'qblib'
 dependency 'qbsql'
 dependency 'qbcore'

@@ -110,8 +110,17 @@ local function clampIndex(value)
 end
 
 local function sanitiseSkin(rawSkin, model)
-    local skin = { components = {}, props = {}, tattoos = {} }
+    -- hairColor/hairHighlight are palette indices, not drawable/texture pairs,
+    -- so they get Shared.clampHairColor rather than clampIndex: clampIndex's
+    -- -1 sentinel means "no prop" and is a legal value there, while a -1 (or a
+    -- 500) handed to SetPedHairColor is not "no hair colour" -- it is an
+    -- out-of-palette read. Always present, defaulting to index 0, so every
+    -- downstream diff/equality check can compare them unconditionally.
+    local skin = { components = {}, props = {}, tattoos = {}, hairColor = 0, hairHighlight = 0 }
     if type(rawSkin) ~= 'table' then return skin end
+
+    skin.hairColor = Shared.clampHairColor(rawSkin.hairColor)
+    skin.hairHighlight = Shared.clampHairColor(rawSkin.hairHighlight)
 
     local components = type(rawSkin.components) == 'table' and rawSkin.components or {}
     for id in pairs(Shared.components) do
@@ -173,6 +182,11 @@ local function mergeServiceSkin(before, requested, service, model)
         local key = tostring(id)
         merged.props[key] = idAllowed(policy.props, id) and requested.props[key] or before.props[key]
     end
+    -- Hair colour rides on the hair component's own whitelist entry: whoever
+    -- may change component 2 may recolour it, and nobody else can. Without
+    -- this a clothing shop could recolour hair a barber charges for.
+    local hairSource = idAllowed(policy.components, 2) and requested or before
+    merged.hairColor, merged.hairHighlight = hairSource.hairColor, hairSource.hairHighlight
     merged.tattoos = policy.tattoos and requested.tattoos or before.tattoos
     return sanitiseSkin(merged, model)
 end
@@ -197,6 +211,13 @@ local function priceDiff(previousSkin, newSkin, prices)
 
     markIfChanged(Shared.components, previousSkin.components or {}, newSkin.components or {})
     markIfChanged(Shared.props, previousSkin.props or {}, newSkin.props or {})
+
+    -- Hair colour belongs to the hair component but is not a drawable/texture
+    -- pair, so markIfChanged cannot see it -- without this a barber visit that
+    -- only recoloured the hair would be free.
+    if previousSkin.hairColor ~= newSkin.hairColor or previousSkin.hairHighlight ~= newSkin.hairHighlight then
+        touchedCategories[Shared.components[2].category] = true
+    end
 
     local total = 0
     for category in pairs(touchedCategories) do
@@ -242,6 +263,15 @@ local function skinsMatch(a, b)
         for id in pairs(entriesB) do if not entriesA[id] then return false end end
         return true
     end
+
+    -- `b` here can be a RAW decoded playeroutfits row, and rows saved before
+    -- hair colour existed carry neither field, while every sanitised skin now
+    -- carries index 0. Defaulting both sides keeps those legacy outfits
+    -- recognised as owned instead of quietly re-pricing them.
+    local function hairOf(skin) return (skin.hairColor or 0), (skin.hairHighlight or 0) end
+    local aColor, aHighlight = hairOf(a)
+    local bColor, bHighlight = hairOf(b)
+    if aColor ~= bColor or aHighlight ~= bHighlight then return false end
 
     return bagsMatch(Shared.components, a.components or {}, b.components or {})
         and bagsMatch(Shared.props, a.props or {}, b.props or {})

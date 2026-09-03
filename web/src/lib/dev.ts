@@ -1,4 +1,15 @@
-import type { NuiWireMessage, OpenPayload } from "./types"
+import type { HairSwatch, NuiWireMessage, OpenPayload } from "./types"
+
+// Stand-in for what GetPedHairRgbColor reports index by index in-game. Only
+// the browser harness ever sees these -- a real session gets the game's own
+// palette, which is why the grid paints from the payload rather than from a
+// hardcoded list of colours.
+const hairPalette: HairSwatch[] = [
+    [26, 22, 20], [58, 41, 30], [86, 60, 39], [120, 86, 54], [156, 118, 74], [193, 160, 110],
+    [214, 190, 148], [232, 220, 190], [151, 61, 34], [178, 92, 46], [120, 44, 44], [92, 46, 62],
+    [64, 64, 72], [110, 112, 120], [160, 162, 170], [206, 208, 214], [78, 52, 96], [40, 66, 110],
+    [36, 100, 96], [110, 130, 58], [186, 150, 40], [190, 96, 130], [58, 30, 46], [30, 30, 34],
+].map(([r, g, b], index) => ({ index, r, g, b }))
 
 const sample: OpenPayload = {
     mode: "shop",
@@ -29,6 +40,7 @@ const sample: OpenPayload = {
         { id: "airraces_turbulence", label: "Turbulence", group: "Torso", price: 125 },
         { id: "hipster_anchor", label: "Anchor", group: "Arms", price: 130 },
     ],
+    hair: { palette: hairPalette, color: 2, highlight: 8 },
     selectedTattoos: [],
     outfits: [
         { id: 1, outfitname: "Interview fit", model: "mp_m_freemode_01" },

@@ -42,6 +42,25 @@ export interface TattooItem {
     price: number
 }
 
+/** One entry of GTA's fixed hair palette: the index SetPedHairColor actually
+ * accepts, plus the RGB the game reports for it (GetPedHairRgbColor) purely so
+ * the swatch can be painted. The index is what travels back over the wire --
+ * there is no RGB form the native would take. */
+export interface HairSwatch {
+    index: number
+    r: number
+    g: number
+    b: number
+}
+
+/** Absent (null) for services that cannot edit the hair component at all --
+ * an ordinary clothing shop gets no palette, so the UI shows no grids. */
+export interface HairPayload {
+    palette: HairSwatch[]
+    color: number
+    highlight: number
+}
+
 export interface OpenPayload {
     mode: ClothingMode
     service: string
@@ -50,6 +69,7 @@ export interface OpenPayload {
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]
+    hair?: HairPayload | null
     tattoos: TattooItem[]
     selectedTattoos: string[]
     outfits: OutfitSummary[]
@@ -81,6 +101,22 @@ export interface CameraPayload {
     zone: "full" | "face" | "torso" | "legs" | "shoes"
 }
 
+/** Wheel notches, not pixels -- see the comment on useZoom in App.tsx. */
+export interface ZoomPayload {
+    delta: number
+}
+
+export interface SetHairColorPayload {
+    color: number
+    highlight: number
+}
+
+export interface SetHairColorResponse {
+    ok: boolean
+    color?: number
+    highlight?: number
+}
+
 export interface RotatePayload {
     deltaDeg: number
 }
@@ -89,6 +125,7 @@ export interface LoadOutfitResponse {
     ok: boolean
     model?: string
     categories?: ClothingCategoryItem[]
+    hair?: HairPayload | null
     selectedTattoos?: string[]
 }
 

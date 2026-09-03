@@ -44,6 +44,15 @@ _G.SetPedPropIndex = function(ped, id, drawable, texture, attach)
     propCalls[#propCalls + 1] = { id = id, drawable = drawable, texture = texture, attach = attach }
 end
 _G.ClearPedProp = function(ped, id) clearedProps[#clearedProps + 1] = id end
+local hairCalls = {}
+_G.SetPedHairColor = function(_, color, highlight)
+    hairCalls[#hairCalls + 1] = { color = color, highlight = highlight }
+end
+-- A deliberately SHORT palette, for the same reason the drawable counts below
+-- are small: it makes an index of 40 unambiguously out of the model's real
+-- palette even though Shared.clampHairColor's coarse [0, 63] bound accepts it.
+_G.GetNumHairColors = function() return 8 end
+_G.GetPedHairRgbColor = function(index) return index * 10, index * 10 + 1, index * 10 + 2 end
 _G.ClearPedDecorations = function() end
 _G.AddPedDecorationFromHashes = function() end
 _G.GetHashKey = function(v) return v end
@@ -154,5 +163,41 @@ H.ok(ok, 'garbage (non-numeric) index values do not error')
 H.equal(componentCalls[1].drawable, 0, 'a non-numeric drawable falls back to 0')
 H.equal(componentCalls[1].texture, 0, 'a non-numeric texture falls back to 0')
 H.equal(#propCalls, 0, 'a non-numeric prop drawable never reaches SetPedPropIndex')
+
+-- --- hair colour: a pair of PALETTE INDICES, not RGB ---
+--
+-- SetPedHairColor takes entries from the model's own fixed hair palette, so an
+-- index past its end is an out-of-palette read, not a "no colour" sentinel the
+-- way prop drawable -1 is. Shared.clampHairColor is the coarse bound the
+-- server can enforce without a live ped; applySkin has to narrow that to the
+-- palette this model actually has (GetNumHairColors), exactly as it already
+-- narrows drawable indices to GetNumberOfPedDrawableVariations.
+H.equal(Shared.clampHairColor(3), 3, 'an in-range hair colour index is preserved')
+H.equal(Shared.clampHairColor(-1), 0, 'a negative hair colour index is not a sentinel -- it clamps to 0')
+H.equal(Shared.clampHairColor(999), Shared.maxHairColorIndex, 'an index past the palette clamps to the last entry, never wraps')
+H.equal(Shared.clampHairColor('not-a-number'), 0, 'garbage never reaches SetPedHairColor as a non-index')
+H.equal(Shared.clampHairColor(nil), 0, 'a missing hair colour defaults to index 0')
+H.equal(Shared.clampHairColor(4.7), 4, 'a fractional index is floored, not rounded up past the palette')
+H.equal(Shared.clampHairColor(0 / 0), 0, 'NaN survives math.floor, so it is rejected before the clamp')
+
+hairCalls = {}
+runtime.applySkin(1, { hairColor = 3, hairHighlight = 5 }, 'mp_m_freemode_01')
+H.equal(#hairCalls, 1, 'applySkin always sets a hair colour, so a saved look cannot inherit the previous ped\'s')
+H.equal(hairCalls[1].color, 3, 'an in-palette primary hair colour is applied unchanged')
+H.equal(hairCalls[1].highlight, 5, 'an in-palette highlight is applied unchanged')
+
+-- 40 passes Shared.clampHairColor's [0, 63] bound but this model has only 8
+-- palette entries -- exactly the shape of a skin row saved against a model
+-- with a longer palette.
+hairCalls = {}
+runtime.applySkin(1, { hairColor = 40, hairHighlight = 7 }, 'mp_m_freemode_01')
+H.equal(hairCalls[1].color, 0, 'an index inside the shared bound but outside THIS palette falls back to 0')
+H.equal(hairCalls[1].highlight, 7, 'the last real palette entry is still usable')
+
+hairCalls = {}
+local hairOk = pcall(runtime.applySkin, 1, { hairColor = {}, hairHighlight = 'brown' }, 'mp_m_freemode_01')
+H.ok(hairOk, 'garbage hair colour values do not error')
+H.equal(hairCalls[1].color, 0, 'a table hair colour falls back to index 0')
+H.equal(hairCalls[1].highlight, 0, 'a string highlight falls back to index 0')
 
 H.finish()

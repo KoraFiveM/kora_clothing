@@ -77,29 +77,36 @@ button { color: inherit; }
    letting it sit flush against the border. */
 .item-list,
 .outfits-body,
+.hair-panel,
 .tattoo-panel { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
 
 .item-list::-webkit-scrollbar,
 .outfits-body::-webkit-scrollbar,
+.hair-panel::-webkit-scrollbar,
 .tattoo-panel::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
 
 .item-list::-webkit-scrollbar-track,
 .outfits-body::-webkit-scrollbar-track,
+.hair-panel::-webkit-scrollbar-track,
 .tattoo-panel::-webkit-scrollbar-track,
 .item-list::-webkit-scrollbar-corner,
 .outfits-body::-webkit-scrollbar-corner,
+.hair-panel::-webkit-scrollbar-corner,
 .tattoo-panel::-webkit-scrollbar-corner { background: transparent; }
 
 .item-list::-webkit-scrollbar-button,
 .outfits-body::-webkit-scrollbar-button,
+.hair-panel::-webkit-scrollbar-button,
 .tattoo-panel::-webkit-scrollbar-button { width: 0; height: 0; display: none; }
 
 .item-list::-webkit-scrollbar-thumb,
 .outfits-body::-webkit-scrollbar-thumb,
+.hair-panel::-webkit-scrollbar-thumb,
 .tattoo-panel::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: hsl(var(--border)); background-clip: content-box; transition: background-color 160ms cubic-bezier(0.16,1,0.3,1); }
 
 .item-list::-webkit-scrollbar-thumb:hover,
 .outfits-body::-webkit-scrollbar-thumb:hover,
+.hair-panel::-webkit-scrollbar-thumb:hover,
 .tattoo-panel::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / .75); background-clip: content-box; }
 
 .item-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow: auto; }
@@ -185,3 +192,21 @@ button { color: inherit; }
   .bottom-bar { flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; } }
+
+/* --- hair colour swatch grids --- */
+
+/* One grid per palette (primary + highlight). Fixed columns rather than
+   auto-fill so a ~64-entry palette lands on a predictable number of rows and
+   the panel height does not jump between models with different palette
+   lengths. */
+.hair-panel { max-height: 300px; overflow: auto; }
+.swatch-block + .swatch-block { margin-top: 12px; }
+.swatch-label { margin: 0 0 6px; padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.swatch-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+/* No background/border of its own: the inline style IS the swatch (the colour
+   is only known at runtime, from the game's palette). */
+.swatch { aspect-ratio: 1; border: 1px solid hsl(0 0% 100% / .14); border-radius: 6px; padding: 0; cursor: pointer; transition: transform 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms cubic-bezier(0.16,1,0.3,1); }
+.swatch:hover { transform: scale(1.12); }
+/* Ring drawn with a shadow rather than a border so the selected swatch does
+   not change size (a thicker border would shrink the colour it is showing). */
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px hsl(var(--primary)), 0 0 0 3px hsl(var(--background)); }

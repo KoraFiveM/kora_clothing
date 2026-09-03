@@ -60,52 +60,121 @@ Config.clothingItem = {
     description = 'A saved outfit. Use it to put it on.',
 }
 
--- Fixed service locations. Each entry spawns a clerk and target zone. `free`
--- is resolved only by the server from this config; callers cannot forge it.
+-- Decorative shop clerks. Off by default: the target is a zone on the
+-- storefront itself (see Config.shops[n].zone), so the ped is pure set
+-- dressing -- and a ped costs a networked entity per shop, wanders into the
+-- zone geometry, and is the one thing here that can fail to spawn at all if
+-- its model does not stream. Turn it on if the empty counters look wrong on
+-- this server's map; nothing else changes when you do.
+Config.shopPeds = false
+
+-- Fixed service locations. Each entry creates a qbtarget zone; `free` is
+-- resolved only by the server from this config, so callers cannot forge it.
+--
+-- `coords` is the interaction/blip point (heading in `.w`, used for the clerk
+-- when Config.shopPeds is on). `zone` is the target geometry: either a
+-- `{ size, rotation }` box centred on `coords`, or `{ points, minZ, maxZ }`
+-- for a genuinely irregular shape. A storefront counter is a box -- points
+-- would be six identical rectangles written the long way round.
+--
+-- Every blip in one service shares an IDENTICAL `label` plus `category = 11`
+-- so the pause-map legend collapses the whole set under a single heading
+-- instead of listing six near-identical rows; the label IS the heading, so a
+-- differing label splits the group (see qblib/modules/blips/docs.md). The
+-- shop's own `label` above stays brand-specific -- that one is the target
+-- prompt ("Open Suburban"), not the legend.
 Config.shops = {
     {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_02',
         coords = vector4(127.02, -223.29, 53.56, 70.0),
-        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 70.0 },
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_04',
         coords = vector4(72.32, -1399.2, 28.38, 0.0),
-        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Suburban' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 0.0 },
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_m_y_business_03',
         coords = vector4(-708.61, -152.85, 36.42, 30.0),
-        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 30.0 },
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_f_y_business_01',
         coords = vector4(-167.79, -299.05, 38.73, 250.0),
-        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Ponsonbys' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 250.0 },
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_m_y_business_02',
         coords = vector4(-1193.44, -772.12, 16.32, 130.0),
-        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_f_y_hipster_02',
         coords = vector4(-827.86, -1073.75, 9.33, 130.0),
-        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Binco' },
+        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
-    { service = 'tattoo', free = false, label = 'Tattoo Artist', ped = 'u_m_y_tattoo_01', coords = vector4(1322.6, -1651.9, 52.28, 130.0), blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist' } },
-    { service = 'tattoo', free = false, label = 'Tattoo Artist', ped = 'u_m_y_tattoo_01', coords = vector4(-1153.6, -1425.7, 4.95, 120.0), blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist' } },
-    { service = 'barber', free = false, label = 'Barber', ped = 's_m_m_hairdress_01', coords = vector4(-814.3, -183.8, 36.57, 120.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber' } },
-    { service = 'barber', free = false, label = 'Barber', ped = 's_m_m_hairdress_01', coords = vector4(1211.0, -470.9, 65.21, 75.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber' } },
-    { service = 'hairdresser', free = false, label = 'Hairdresser', ped = 's_f_m_fembarber', coords = vector4(136.8, -1708.4, 28.29, 50.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser' } },
-    { service = 'hairdresser', free = false, label = 'Hairdresser', ped = 's_f_m_fembarber', coords = vector4(-1282.6, -1116.8, 5.99, 90.0), blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser' } },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(1322.6, -1651.9, 52.28, 130.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 130.0 },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist', category = 11 },
+    },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(-1153.6, -1425.7, 4.95, 120.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 120.0 },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist', category = 11 },
+    },
+    {
+        service = 'barber', free = false, label = 'Barber',
+        ped = 's_m_m_hairdress_01',
+        coords = vector4(-814.3, -183.8, 36.57, 120.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 120.0 },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber', category = 11 },
+    },
+    {
+        service = 'barber', free = false, label = 'Barber',
+        ped = 's_m_m_hairdress_01',
+        coords = vector4(1211.0, -470.9, 65.21, 75.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 75.0 },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber', category = 11 },
+    },
+    {
+        service = 'hairdresser', free = false, label = 'Hairdresser',
+        ped = 's_f_m_fembarber',
+        coords = vector4(136.8, -1708.4, 28.29, 50.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 50.0 },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser', category = 11 },
+    },
+    {
+        service = 'hairdresser', free = false, label = 'Hairdresser',
+        ped = 's_f_m_fembarber',
+        coords = vector4(-1282.6, -1116.8, 5.99, 90.0),
+        zone = { size = vector3(2.0, 1.6, 2.2), rotation = 90.0 },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser', category = 11 },
+    },
 }
+
+-- Fallback box for a shop entry a server owner added without its own `zone`.
+-- Better than skipping the target entirely: an unreachable shop reads as a
+-- broken resource, and a 2m counter box is right often enough to be a usable
+-- default at the coords they already had to supply.
+Config.shopZoneDefault = { size = vector3(2.0, 1.6, 2.2) }
 
 -- The catalogue is config-owned: server owners can remove entries or alter
 -- their individual price without changing code. Each overlay is native GTA
@@ -168,6 +237,17 @@ Config.camera = {
         torso = { boneOffset = vector3(0.0, 0.0, 0.42), camOffset = vector3(0.0, 1.1, 0.05),  fov = 35.0 },
         legs  = { boneOffset = vector3(0.0, 0.0, -0.2), camOffset = vector3(0.0, 1.3, 0.05),  fov = 35.0 },
         shoes = { boneOffset = vector3(0.0, 0.0, -0.85),camOffset = vector3(0.0, 1.1, -0.15), fov = 35.0 },
+    },
+    -- Free mouse-wheel zoom, applied as an OFFSET on top of whichever zone
+    -- preset is selected (the presets stay jump-to shortcuts). `step` is
+    -- metres of radius per wheel notch; `min`/`max` bound the resulting
+    -- radius, not the offset. `min` is deliberately not near zero -- inside
+    -- roughly 0.4m the camera is inside the ped's own head and renders the
+    -- inside of the face mesh.
+    zoom = {
+        min = 0.45,
+        max = 4.5,
+        step = 0.12,
     },
     -- Orbit rotation and zoom-transition speeds, tuned for the "smooth, not a
     -- jump-cut" illenium-style feel called for by UX.

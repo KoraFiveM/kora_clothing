@@ -68,3 +68,26 @@ function Shared.tattooById(model, id)
     end
     return nil
 end
+
+-- GTA's hair colouring is INDEXED, never RGB: SetPedHairColor takes two
+-- entries from the model's own fixed hair palette and accepts nothing else, so
+-- a hair colour is stored as a pair of palette indices (see buildHairPalette
+-- in client/client.lua for why there is no free colour picker to be had here).
+-- This cap is the coarse anti-garbage bound the SERVER can enforce -- the true
+-- palette length is a live-ped query (GetNumHairColors), so the client
+-- re-clamps against the real thing before the native call, exactly like it
+-- already does for drawable/texture indices.
+Shared.maxHairColorIndex = 63
+
+---@param value any
+---@return integer -- always a palette index inside [0, Shared.maxHairColorIndex]
+function Shared.clampHairColor(value)
+    value = tonumber(value)
+    -- `value ~= value` is the NaN test: math.floor(NaN) stays NaN and would
+    -- reach SetPedHairColor as a non-index.
+    if not value or value ~= value then return 0 end
+    value = math.floor(value)
+    if value < 0 then return 0 end
+    if value > Shared.maxHairColorIndex then return Shared.maxHairColorIndex end
+    return value
+end

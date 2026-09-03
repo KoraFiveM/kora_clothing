@@ -7,7 +7,8 @@ Illenium-style clothing, appearance and outfit wardrobe for FiveM. A player
 trying on clothes at a shop, barber, hairdresser or tattoo parlour is moved
 into a **private fitting-room routing bucket** (`Config.bucket.base + source`)
 so nobody else can see or interact with them mid-session, with a live-orbit
-camera and smooth zoom presets around the ped. Outfits are saved per citizen
+camera that free-zooms on the mouse wheel and traces its own path so a wall or
+counter never lands in shot. Outfits are saved per citizen
 (`playerskins` for the current look, `playeroutfits` for up to
 `Config.wardrobe.maxOutfits` named presets) via
 [qbsql](https://qbcore2.github.io/qbsql/)'s migration runner. Purchases are
@@ -24,7 +25,7 @@ scripts built against it keep working unmodified.
 - [qblib](https://qbcore2.github.io/qblib/)
 - [qbsql](https://qbcore2.github.io/qbsql/)
 - [qbcore](https://qbcore2.github.io/qbcore/)
-- [qbtarget](https://qbcore2.github.io/qbtarget/) — shop peds are targeted through qbtarget zones
+- [qbtarget](https://qbcore2.github.io/qbtarget/) — shops are targeted through qbtarget zones
 
 ## Installation
 
@@ -121,6 +122,56 @@ appearance is returned. Foreign and soft-deleted citizen IDs are rejected;
 successful results are sanitized, rate-limited, and cached for that source's
 selection session.
 
+### The fitting-room camera
+
+The preview camera orbits the ped and lerps between the five body-region zoom
+presets in `Config.camera.zones` (full body / face / torso / legs / shoes).
+
+**Free zoom.** The mouse wheel zooms continuously, as an offset on top of
+whichever preset is selected — `Config.camera.zoom` sets the step per wheel
+notch and the radius bounds it is clamped to. The presets remain jump-to
+shortcuts: picking one discards the accumulated wheel offset and returns to its
+authored framing. The NUI sends wheel *notches* rather than pixel deltas
+(`qbclothing:nui:zoom`), because `deltaY` magnitude is not comparable between a
+mouse, a trackpad and CEF's line/page delta modes.
+
+**No obstructions.** Before the camera settles at a framing, a capsule shape
+test is run from the point it is aimed at to the point it would sit. If
+anything — world geometry, a prop, a parked car, foliage — is in the way, the
+camera fans around the ped at the same distance (±28°, ±55°, ±82°, then behind,
+the wider angles also lifted) and takes the first clear angle, so the authored
+framing is preserved. Only if no angle is clear at all does it pull in to just
+short of the obstruction, and never nearer than `Config.camera.zoom.min`. This
+is re-resolved whenever the zone or the zoom changes, on its own coalescing
+thread — the shape test has to yield for its result, so running it on the frame
+the camera is positioned would stall that frame.
+
+Barber and hairdresser are `service` values inside this same session, not
+separate UIs, so both get free zoom and the unobstructed camera with no
+per-service configuration.
+
+### Hair colour
+
+Barber, hairdresser, character-creation and admin sessions can set a **primary
+and a secondary (highlight) hair colour**, persisted with the rest of the
+appearance as `hairColor` / `hairHighlight`.
+
+These are **palette indices, not RGB.** GTA's `SetPedHairColor(ped, colorId,
+highlightColorId)` takes two entries from the model's own fixed hair palette
+(~64 on the freemode models) and there is no native that accepts a colour
+value, so a free RGB picker would have nothing to send. Instead the client
+reads the real colour behind every index with `GetPedHairRgbColor`, sends that
+palette once with the session payload, and the NUI renders it as two swatch
+grids — the look of a colour picker, with only legal indices ever crossing the
+wire. Indices are clamped server-side against `Shared.maxHairColorIndex` and
+again client-side against the live `GetNumHairColors()` before the native call.
+
+The controls appear only while the hair component is selected; a clothing shop
+is sent no palette at all, matching the server-side merge, which gates hair
+colour on the same whitelist as component `2` (so a clothing shop cannot apply
+a recolour a barber charges for). A recolour-only visit is priced as a change
+to the hair component's category.
+
 ### Session net events
 ```lua
 -- client -> server (qblib's tokenised QB.events gateway, not a raw
@@ -144,8 +195,8 @@ A session is entered by `requestSession` (shop sessions require standing
 within `Config.interactDistance` of the shop's `coords`), finalised by
 `confirmSession` (server re-diffs, prices and persists — never trusts the
 client's price), and torn down by `cancelSession` or `closeSession`. Shop
-sessions are also reachable via qbtarget zones attached to each configured
-shop ped, and `qbclothing:client:openNearestShop(service)` opens the closest
+sessions are also reachable via qbtarget zones placed on each configured
+shop, and `qbclothing:client:openNearestShop(service)` opens the closest
 shop by proximity for the given service (`'clothing'` by default, or
 `'barber'`/`'tattoo'`) — used by qbadmin's self-service clothing/barber/tattoo
 entries. `qbclothing:client:openAdminSession` opens a free, unrestricted
@@ -171,10 +222,25 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.services` — per-service (`clothing`/`barber`/`hairdresser`/`tattoo`/`creation`) component/prop whitelists, prices and gender restrictions
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen
 - `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/qbinventory/)) instead of equipping directly
-- `Config.shops` — shop ped models, coordinates, blips and which service each one offers
+- `Config.shops` — per-shop service, coordinates, target zone geometry (`zone = { size, rotation }`, or `{ points, minZ, maxZ }` for an irregular shape), blip and optional clerk model
+- `Config.shopPeds` (default `false`) — spawn a decorative clerk per shop. The interaction target is the storefront zone either way; a ped-bound target dies with the ped (unstreamed model, shoved out of place, deleted by another resource) and leaves the shop silently unopenable, so the ped is set dressing only
+- `Config.shopZoneDefault` — fallback box for a shop entry added without its own `zone`
 - `Config.tattoos` — the base-game overlay catalogue with per-tattoo pricing
 - `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and qbtarget zone range
-- `Config.camera` — orbit speed and per-zone (`full`/`face`/`torso`/`legs`/`shoes`) zoom presets for the fitting-room camera
+- `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
+- `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
+- `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
+
+## Pause-map blips
+
+Every shop blip uses `category = 11` and an identical `label` per service
+(`Clothing Store`, `Barber`, `Hairdresser`, `Tattoo Artist`), so the pause-map
+legend collapses each set under one heading instead of listing six
+near-identical rows — the label *is* the heading, so a differing label inside a
+set splits the group (see
+[qblib's blips docs](https://qbcore2.github.io/qblib/)). Each shop's own
+`label` stays brand-specific (`Suburban`, `Ponsonbys`, `Binco`) because that
+one is the qbtarget interaction prompt, not the legend heading.
 
 ## Related resources
 

@@ -11,16 +11,21 @@ import type {
     ConfirmPayload,
     ConfirmResponse,
     ErrorPayload,
+    HairPayload,
+    HairSwatch,
     LoadOutfitResponse,
     OpenPayload,
     OutfitSummary,
     PriceTable,
     RotatePayload,
+    SetHairColorPayload,
+    SetHairColorResponse,
     SetVariationPayload,
     SetVariationResponse,
     SetTattoosResponse,
     TattooItem,
     ThemeTokens,
+    ZoomPayload,
 } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
@@ -41,6 +46,10 @@ const ZONES: { zone: Zone; label: string; icon: typeof Maximize2 }[] = [
 // group without a dedicated zoom (Arms, Back) falls back to the closest
 // available framing rather than staying wherever the toolbar was last left.
 const TATTOO_ZONE: Record<string, Zone> = { Head: "face", Torso: "torso", Back: "torso", Arms: "torso", Legs: "legs" }
+
+// Component 2 (shared/components.lua). The hair-colour grids belong to this
+// one component and nothing else, so they are shown only while it is selected.
+const HAIR_COMPONENT_ID = 2
 
 function itemKey(item: Pick<ClothingCategoryItem, "kind" | "id">) {
     return `${item.kind}:${item.id}`
@@ -79,7 +88,29 @@ function useRotate() {
     }, [flush])
 }
 
-function Viewport({ onRotate }: { onRotate: (deltaDeg: number) => void }) {
+/** Free zoom on the wheel, coalesced per frame like the drag above. Only the
+ * SIGN of deltaY is used: its magnitude is meaningless across inputs (a mouse
+ * notch reports ~100px in CEF, a trackpad reports single-digit pixels per
+ * event, and deltaMode can report lines or pages instead), so forwarding it
+ * raw would make one notch of the same gesture worth ten of another. Lua turns
+ * a notch into metres via Config.camera.zoom.step. */
+function useZoom() {
+    const pending = useRef(0)
+    const frame = useRef<number | null>(null)
+    const flush = useCallback(() => {
+        frame.current = null
+        if (pending.current === 0) return
+        const delta = pending.current
+        pending.current = 0
+        void sendIntent<ZoomPayload, object>("qbclothing:nui:zoom", { delta })
+    }, [])
+    return useCallback((notches: number) => {
+        pending.current += notches
+        if (frame.current === null) frame.current = requestAnimationFrame(flush)
+    }, [flush])
+}
+
+function Viewport({ onRotate, onZoom }: { onRotate: (deltaDeg: number) => void; onZoom: (notches: number) => void }) {
     const dragging = useRef(false)
     return <div
         className="clothing-viewport"
@@ -87,6 +118,7 @@ function Viewport({ onRotate }: { onRotate: (deltaDeg: number) => void }) {
         onPointerUp={(event) => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId) }}
         onPointerCancel={() => { dragging.current = false }}
         onPointerMove={(event) => { if (dragging.current) onRotate(-event.movementX * 0.3) }}
+        onWheel={(event) => onZoom(Math.sign(event.deltaY))}
         aria-hidden="true"
     />
 }
@@ -162,6 +194,51 @@ function VariationDetail({ item, onChange, onClear }: {
     </div>
 }
 
+/** A swatch grid, not a colour picker, and deliberately so: GTA's
+ * SetPedHairColor takes a palette INDEX and there is no native that accepts an
+ * RGB triple, so a free picker would have nothing to send. Each swatch is
+ * painted with the RGB the game reports for its own index
+ * (GetPedHairRgbColor, read client-side and sent with the session payload) --
+ * that gives the look of a picker while every value posted back stays a legal
+ * index. The colours come from the game at runtime, which is why these are
+ * inline styles rather than classes. */
+function HairColorGrid({ label, palette, value, onSelect }: {
+    label: string
+    palette: HairSwatch[]
+    value: number
+    onSelect: (index: number) => void
+}) {
+    return <div className="swatch-block">
+        <p className="swatch-label">{label}</p>
+        <div className="swatch-grid" role="radiogroup" aria-label={label}>
+            {palette.map((swatch) => (
+                <button
+                    key={swatch.index}
+                    type="button"
+                    role="radio"
+                    className="swatch"
+                    aria-checked={value === swatch.index}
+                    aria-label={`${label} ${swatch.index + 1}`}
+                    style={{ background: `rgb(${swatch.r} ${swatch.g} ${swatch.b})` }}
+                    onClick={() => onSelect(swatch.index)}
+                />
+            ))}
+        </div>
+    </div>
+}
+
+function HairColorPanel({ hair, onChange }: {
+    hair: HairPayload
+    onChange: (next: { color: number; highlight: number }) => void
+}) {
+    if (hair.palette.length === 0) return null
+    return <div className="panel panel-pad hair-panel">
+        <p className="section-title">Hair Color</p>
+        <HairColorGrid label="Primary" palette={hair.palette} value={hair.color} onSelect={(index) => onChange({ color: index, highlight: hair.highlight })} />
+        <HairColorGrid label="Highlight" palette={hair.palette} value={hair.highlight} onSelect={(index) => onChange({ color: hair.color, highlight: index })} />
+    </div>
+}
+
 function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
     outfits: OutfitSummary[]
     expanded: boolean
@@ -215,6 +292,11 @@ export default function App() {
     const [open, setOpen] = useState<OpenPayload | null>(null)
     const [categories, setCategories] = useState<ClothingCategoryItem[]>([])
     const [selectedTattoos, setSelectedTattoos] = useState<string[]>([])
+    const [hair, setHair] = useState<HairPayload | null>(null)
+    // Held separately from `hair` for the same reason `baseline` is held apart
+    // from `categories`: the price shown has to be a diff against what the
+    // player walked in with, and `hair` moves with every swatch click.
+    const [baselineHair, setBaselineHair] = useState<{ color: number; highlight: number } | null>(null)
     const [baselineTattoos, setBaselineTattoos] = useState<string[]>([])
     const [baseline, setBaseline] = useState<Map<string, { drawable: number; texture: number }>>(new Map())
     // Set right after loading a saved outfit via "Wear", cleared on any
@@ -234,9 +316,11 @@ export default function App() {
     const [confirmPending, setConfirmPending] = useState(false)
 
     const rotate = useRotate()
+    const zoom = useZoom()
 
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
+        setHair(null); setBaselineHair(null)
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
     }, [])
@@ -254,6 +338,8 @@ export default function App() {
         setCategories(payload.categories)
         setSelectedTattoos(payload.selectedTattoos ?? [])
         setBaselineTattoos(payload.selectedTattoos ?? [])
+        setHair(payload.hair ?? null)
+        setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
         const groups = new Set(payload.categories.map((item) => item.category))
@@ -278,6 +364,13 @@ export default function App() {
             const base = baseline.get(itemKey(item))
             if (!base || base.drawable !== item.drawable || base.texture !== item.texture) changedGroups.add(item.category)
         }
+        // Hair colour is priced as part of the hair component's own category,
+        // exactly as the server's priceDiff marks it -- a barber visit that
+        // only recoloured must not read as free here and then charge on
+        // confirm.
+        if (baselineHair && hair && (hair.color !== baselineHair.color || hair.highlight !== baselineHair.highlight)) {
+            changedGroups.add("body")
+        }
         let total = 0
         for (const group of changedGroups) total += priceOf(open.prices, group)
         const baselineTattooSet = new Set(baselineTattoos)
@@ -285,7 +378,7 @@ export default function App() {
             if (!baselineTattooSet.has(id)) total += open.tattoos.find((tattoo) => tattoo.id === id)?.price ?? 0
         }
         return total
-    }, [baseline, baselineTattoos, categories, open, selectedTattoos])
+    }, [baseline, baselineHair, baselineTattoos, categories, hair, open, ownedSnapshot, selectedTattoos])
 
     const selectGroup = useCallback((group: CategoryGroup) => {
         setActiveGroup(group)
@@ -314,6 +407,17 @@ export default function App() {
         applyVariationResponse(target, response)
     }, [applyVariationResponse])
 
+    const setHairColor = useCallback(async (next: { color: number; highlight: number }) => {
+        const response = await sendIntent<SetHairColorPayload, SetHairColorResponse>("qbclothing:nui:setHairColor", next)
+        if (!response.ok) return
+        setOwnedSnapshot(false)
+        setHair((current) => current && {
+            ...current,
+            color: response.color ?? current.color,
+            highlight: response.highlight ?? current.highlight,
+        })
+    }, [])
+
     const changeZone = useCallback((next: Zone) => {
         setZone(next)
         void sendIntent<CameraPayload, object>("qbclothing:nui:camera", { zone: next })
@@ -324,6 +428,7 @@ export default function App() {
         if (response.ok && response.categories) {
             setCategories(response.categories)
             setSelectedTattoos(response.selectedTattoos ?? [])
+            if (response.hair) setHair(response.hair)
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -378,7 +483,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport onRotate={rotate} />
+        <Viewport onRotate={rotate} onZoom={zoom} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}
@@ -425,6 +530,13 @@ export default function App() {
                     onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
                 />
             </div>
+            {/* Hair colour is a property of the hair component, so it appears
+                with that component and nowhere else. `hair` itself is already
+                null for any service that cannot edit component 2, so a
+                clothing shop never renders these at all. */}
+            {hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
+                <HairColorPanel hair={hair} onChange={(next) => void setHairColor(next)} />
+            )}
         </div>}
 
         <div className="bottom-bar">
