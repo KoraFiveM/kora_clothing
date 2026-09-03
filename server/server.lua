@@ -89,10 +89,74 @@ local function dbDeleteOutfit(citizenid, id)
     return ok and result ~= nil
 end
 
+-- The client target is a shop's configured zone, not necessarily the single
+-- `coords` point retained for its blip/decorative clerk.  Keep the server
+-- authority aligned with that geometry: otherwise a player can see and select
+-- a polygon target across a shop floor, only for requestSession to reject it
+-- because they are more than Config.interactDistance from the old counter.
+local function pointInPolygon(x, y, points)
+    local inside = false
+    local previous = points[#points]
+
+    for _, point in ipairs(points) do
+        if (point.y > y) ~= (previous.y > y) then
+            local crossingX = (previous.x - point.x) * (y - point.y) / (previous.y - point.y) + point.x
+            if x < crossingX then inside = not inside end
+        end
+        previous = point
+    end
+
+    return inside
+end
+
+local function withinShopZone(pos, zone, shopCoords)
+    if not zone then return false end
+
+    if zone.points then
+        local minZ, maxZ
+        if type(zone.minZ) == 'number' and type(zone.maxZ) == 'number' then
+            minZ, maxZ = zone.minZ, zone.maxZ
+        elseif type(zone.thickness) == 'number' then
+            minZ = zone.points[1].z
+            for _, point in ipairs(zone.points) do minZ = math.min(minZ, point.z) end
+            maxZ = minZ + zone.thickness
+        else
+            return false
+        end
+
+        return pos.z >= minZ and pos.z <= maxZ and pointInPolygon(pos.x, pos.y, zone.points)
+    end
+
+    local size = zone.size
+    if not size then return false end
+
+    -- qblib box zones rotate their XY footprint around shop.coords and use a
+    -- vertical band centred on its Z coordinate.
+    local rotation = math.rad(zone.rotation or shopCoords.w or 0.0)
+    local dx, dy = pos.x - shopCoords.x, pos.y - shopCoords.y
+    local localX = dx * math.cos(rotation) + dy * math.sin(rotation)
+    local localY = -dx * math.sin(rotation) + dy * math.cos(rotation)
+    local halfZ = size.z / 2
+
+    return math.abs(localX) <= size.x / 2
+        and math.abs(localY) <= size.y / 2
+        and pos.z >= shopCoords.z - halfZ
+        and pos.z <= shopCoords.z + halfZ
+end
+
 local function nearShop(src, shop)
     local ped = GetPlayerPed(src)
     if ped == 0 or not DoesEntityExist(ped) then return false end
     local pos = GetEntityCoords(ped)
+
+    local zone = shop.zone or Config.shopZoneDefault
+    if withinShopZone(pos, zone, shop.coords) then return true end
+
+    -- Keep the historical counter-radius fallback for legacy locations that
+    -- have no zone data. Configured zones are deliberately not widened here:
+    -- target visibility already enforces their client-side distance, while
+    -- this check remains the authoritative server-side boundary.
+    if zone then return false end
     local dx, dy, dz = pos.x - shop.coords.x, pos.y - shop.coords.y, pos.z - shop.coords.z
     return (dx * dx + dy * dy + dz * dz) <= (Config.interactDistance + 1.0) ^ 2
 end

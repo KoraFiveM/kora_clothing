@@ -73,9 +73,18 @@ Config.shopPeds = false
 --
 -- `coords` is the interaction/blip point (heading in `.w`, used for the clerk
 -- when Config.shopPeds is on). `zone` is the target geometry: either a
--- `{ size, rotation }` box centred on `coords`, or `{ points, minZ, maxZ }`
--- for a genuinely irregular shape. A storefront counter is a box -- points
--- would be six identical rectangles written the long way round.
+-- `{ points, thickness }` / `{ points, minZ, maxZ }` polygon, or a
+-- `{ size, rotation }` box centred on `coords`.
+--
+-- Clothing stores are POLYGONS covering the walkable shop interior, not a
+-- counter box: the player browses the whole floor, so anywhere inside the
+-- store should open the shop rather than one 2m spot by the till. Polys are
+-- captured in-game with qblib's zone creator (`QB.zones.poly` output pasted
+-- verbatim), so the shape matches the real map geometry. `thickness` is
+-- measured UPWARD from the lowest point, not centred on the average -- see
+-- qblib/modules/zones/client.lua -- so 4.0 is one storey of headroom above
+-- the floor the points were traced on. Barbers/tattooists stay boxes: the
+-- interaction there really is a single chair.
 --
 -- Every blip in one service shares an IDENTICAL `label` plus `category = 11`
 -- so the pause-map legend collapses the whole set under a single heading
@@ -88,7 +97,27 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_02',
         coords = vector4(127.02, -223.29, 53.56, 70.0),
-        zone = { size = vector3(2.2, 1.8, 2.2), rotation = 70.0 },
+        zone = {
+            points = {
+                vector3(133.37, -210.23, 53.78),
+                vector3(131.93, -209.57, 53.56),
+                vector3(130.20, -210.37, 53.56),
+                vector3(129.33, -212.63, 53.56),
+                vector3(124.86, -210.91, 53.61),
+                vector3(125.56, -208.61, 53.56),
+                vector3(124.80, -206.68, 53.59),
+                vector3(123.50, -206.37, 53.56),
+                vector3(116.04, -228.30, 53.56),
+                vector3(118.26, -229.34, 53.56),
+                vector3(116.54, -234.23, 53.56),
+                vector3(118.24, -234.85, 53.64),
+                vector3(120.09, -230.02, 53.58),
+                vector3(124.54, -230.75, 55.55),
+                vector3(125.95, -227.58, 55.34),
+                vector3(127.26, -228.03, 56.45),
+            },
+            thickness = 4.00,
+        },
         blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 11 },
     },
     {

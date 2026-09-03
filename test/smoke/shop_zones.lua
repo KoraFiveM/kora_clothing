@@ -46,6 +46,15 @@ for index, shop in ipairs(Config.shops) do
         for pointIndex, point in ipairs(zone.points) do
             H.ok(isCoordsLike(point), ('%s polyzone point %d is a table with numeric x/y/z'):format(where, pointIndex))
         end
+        -- Without one of these qblib falls back to Config.zones.defaultPolyThickness,
+        -- which is a qblib-wide number that has nothing to do with this shop's
+        -- ceiling: a store traced on one floor would silently reach through it.
+        H.ok(type(zone.thickness) == 'number' or (type(zone.minZ) == 'number' and type(zone.maxZ) == 'number'),
+            ('%s polyzone states its own height band (thickness, or minZ+maxZ)'):format(where))
+        if type(zone.thickness) == 'number' then
+            H.ok(zone.thickness > 0 and zone.thickness <= 10.0,
+                ('%s poly thickness is one storey of headroom, not a column through the map'):format(where))
+        end
     else
         H.ok(isCoordsLike(zone.size), ('%s box size is a table with numeric x/y/z'):format(where))
         H.ok(zone.size.x > 0 and zone.size.y > 0 and zone.size.z > 0, ('%s box has real extents -- a zero extent can never be entered'):format(where))

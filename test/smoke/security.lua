@@ -61,6 +61,10 @@ H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-su
 -- (wardrobe shares the same live editor as shop), not just 'shop'.
 H.ok(server:find("if mode == 'firstCharacter' and saved then return end", 1, true), 'firstCharacter cannot be replayed once a skin is already saved')
 H.ok(server:find('if not nearShop(src, shop) then return end', 1, true), 'shop sessions require server-measured proximity')
+H.ok(server:find('local function withinShopZone(pos, zone, shopCoords)', 1, true),
+    'shop-session proximity uses the configured target geometry, not only the blip/counter point')
+H.ok(server:find('pointInPolygon(pos.x, pos.y, zone.points)', 1, true),
+    'polygon storefront targets are server-validated against their actual footprint')
 H.ok(server:find('if not session.free and session.mode ~= \'firstCharacter\' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then', 1, true), 'configured free shops bypass pricing while paid sessions remain server-priced')
 H.ok(server:find('local beforeSkin = sanitiseSkin((before and before.skin) or {}, model)', 1, true), 'the saved baseline is sanitised before pricing and persistence')
 H.ok(server:find('return ok and added == true', 1, true), "boxing an outfit checks addItem's actual return value, not just that the export call didn't throw")
