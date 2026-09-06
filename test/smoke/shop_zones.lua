@@ -6,9 +6,8 @@
 -- that simply never opens. Checking the config's shape here is what turns that
 -- into a test failure instead.
 --
--- Also guards map-legend visibility: category 2 lists each service label,
--- keeping clothing, tattoo, and barber blips out of GTA's "Owned Property"
--- category (see qblib/modules/blips/docs.md).
+-- Also guards map-legend grouping: matching named categories collapse every
+-- branch of a service beneath one heading (see qblib/modules/blips/docs.md).
 local H = dofile('test/harness.lua')
 
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
@@ -65,8 +64,8 @@ for index, shop in ipairs(Config.shops) do
 
     local blip = shop.blip
     if blip and blip.enabled then
-        H.equal(blip.category, 2, ('%s blip uses the labelled legend category'):format(where))
         H.ok(type(blip.label) == 'string' and #blip.label > 0, ('%s blip has a service label'):format(where))
+        H.equal(blip.category, blip.label, ('%s blip groups under its service label'):format(where))
         labelsByService[shop.service] = labelsByService[shop.service] or {}
         labelsByService[shop.service][blip.label] = true
     end
@@ -89,5 +88,15 @@ end
 local brands = 0
 for _ in pairs(shopLabels) do brands = brands + 1 end
 H.ok(brands > 1, 'clothing shops keep their individual brand labels for the interaction prompt')
+
+-- Styling chairs are deliberately polygon zones. This keeps their target
+-- registration consistent with the rest of the shop system while retaining a
+-- small, chair-sized footprint.
+for index, shop in ipairs(Config.shops) do
+    if shop.service == 'barber' or shop.service == 'tattoo' then
+        H.ok(shop.zone and shop.zone.points,
+            ('Config.shops[%d] (%s) uses a polyzone rather than a box zone'):format(index, shop.label))
+    end
+end
 
 H.finish()

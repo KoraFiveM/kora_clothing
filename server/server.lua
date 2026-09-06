@@ -9,6 +9,7 @@
 
 local sessions = {} -- [src] = { mode, mandatory, previousBucket, citizenid, shopIndex }
 local previewCache = {} -- [src][citizenid] = { model, skin }; pre-login selection-session cache
+local pendingAdminSessions = {} -- [src] = { service, expiresAt }; minted only by qbadmin's server export
 
 local function citizenIdFor(src)
     local ok, citizenid = pcall(function() return exports.qbcore:getPlayerData(src, { 'citizenid' }) end)
@@ -455,6 +456,28 @@ end
 
 -- --- session lifecycle ---
 
+-- Server-to-server entry point used by qbadmin after its own command has
+-- resolved a target and passed the admin gate. The short-lived grant is
+-- consumed by requestSession on the target's token-authenticated client flow;
+-- a player cannot manufacture one by firing a public net event.
+exports('OpenAdminSession', function(targetSrc, service)
+    if GetInvokingResource() ~= 'qbadmin' then return false, 'only qbadmin may open a remote admin session' end
+    targetSrc = tonumber(targetSrc)
+    if not targetSrc or targetSrc < 1 or not citizenIdFor(targetSrc) then return false, 'target is not online' end
+    if sessions[targetSrc] then return false, 'that player already has a clothing session open' end
+    if service ~= 'clothing' and service ~= 'barber' and service ~= 'tattoo' and service ~= 'creation' then
+        return false, 'invalid appearance service'
+    end
+
+    local grant = { service = service, expiresAt = os.time() + 10 }
+    pendingAdminSessions[targetSrc] = grant
+    SetTimeout(10000, function()
+        if pendingAdminSessions[targetSrc] == grant then pendingAdminSessions[targetSrc] = nil end
+    end)
+    TriggerClientEvent('qbclothing:client:openAdminSession', targetSrc, service)
+    return true
+end)
+
 -- Session open/confirm move real money (confirmSession) and gate an
 -- admin-only free fitting (requestSession's 'admin' mode) -- routed through
 -- qblib's tokenised QB.events instead of a raw RegisterNetEvent so a static
@@ -493,11 +516,14 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
         service = 'creation'
         free = true
     elseif mode == 'admin' then
-        -- Re-check here even though qbadmin already greys this out for
-        -- non-admins client-side -- that gate is cosmetic, this one is
-        -- authoritative.
-        if not exports.qbcore:hasPermission(src, 'admin') then return end
-        service = 'creation'
+        local requested = type(extra) == 'table' and extra.service or nil
+        local grant = pendingAdminSessions[src]
+        local selfAuthorized = exports.qbcore:hasPermission(src, 'admin')
+        if not selfAuthorized then
+            if not grant or grant.expiresAt < os.time() or grant.service ~= requested then return end
+            pendingAdminSessions[src] = nil
+        end
+        service = requested or 'creation'
         free = true
     else
         -- Wardrobes can manage clothing looks but must not bypass specialist
@@ -508,6 +534,9 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
     if not Config.services[service] then return end
 
     local model = (saved and saved.model) or defaultModelFor(src)
+    -- "Barber" is the staff-facing action name; route female freemode models
+    -- through the matching hairdresser policy automatically.
+    if mode == 'admin' and service == 'barber' and Shared.modelGender(model) == 'female' then service = 'hairdresser' end
     if not serviceAllowsModel(service, model) then
         TriggerClientEvent('qbclothing:client:sessionError', src,
             service == 'barber' and 'Barbers are available to male freemode models only.' or 'Hairdressers are available to female freemode models only.')
@@ -543,6 +572,10 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
         currency = Config.shop.currency,
         money = moneyOk and money or nil,
     })
+end)
+
+AddEventHandler('playerDropped', function()
+    pendingAdminSessions[source] = nil
 end)
 
 QB.callback.register('qbclothing:server:getOutfitSkin', function(src, id)

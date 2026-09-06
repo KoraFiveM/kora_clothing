@@ -204,6 +204,14 @@ clothing+hair+tattoo session (the same `creation` service policy used for
 first-character fittings); the server re-checks `admin` permission before
 granting it regardless of what qbadmin's menu shows client-side.
 
+qbadmin can also open a single free `clothing`, `barber`/`hairdresser`, or
+`tattoo` service for another player through qbclothing's server-only
+`OpenAdminSession(targetSrc, service)` integration. The export accepts calls
+only from the `qbadmin` resource, creates a ten-second one-use authorization,
+and the target consumes it through the normal token-authenticated session
+request. A female freemode model selected through the barber action is routed
+to the hairdresser policy automatically.
+
 ### First-character fitting
 
 `qb-multicharacter:client:closeNUIdefault` (fired by qbcore only on successful
@@ -233,10 +241,9 @@ behaviour applies: wait for the ped to be active and alive, then open.
 
 ## Pause-map blips
 
-Every shop blip uses `category = 2`, which displays its service label in the
-pause-map legend. Clothing Store, Barber, Hairdresser, and Tattoo Artist are
-therefore separate entries instead of appearing under GTA's `Owned Property`
-category. Each shop's own `label` stays brand-specific (`Suburban`,
+Every shop blip uses its service label as a named category. All Clothing Store,
+Barber, Hairdresser, and Tattoo Artist locations are therefore grouped beneath
+their respective pause-map legend headings. Each shop's own `label` stays brand-specific (`Suburban`,
 `Ponsonbys`, `Binco`) because that one is the qbtarget interaction prompt, not
 the map label.
 

@@ -716,8 +716,8 @@ end)
 -- and with no shop/model restrictions (mirrors the character-creation
 -- service policy). Permission is re-checked server-side in requestSession --
 -- this event is just the trigger.
-RegisterNetEvent('qbclothing:client:openAdminSession', function()
-    openSession('admin')
+RegisterNetEvent('qbclothing:client:openAdminSession', function(service)
+    openSession('admin', service and { service = service } or nil)
 end)
 
 RegisterNetEvent('qb-clothing:client:loadOutfit', function(outfit)
