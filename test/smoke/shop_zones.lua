@@ -6,10 +6,9 @@
 -- that simply never opens. Checking the config's shape here is what turns that
 -- into a test failure instead.
 --
--- Also guards the pause-map blip grouping: category 11 groups blips under a
--- heading taken from their own NAME, so a single differing label inside one
--- service splits the group back into individual rows (see
--- qblib/modules/blips/docs.md).
+-- Also guards map-legend visibility: category 2 lists each service label,
+-- keeping clothing, tattoo, and barber blips out of GTA's "Owned Property"
+-- category (see qblib/modules/blips/docs.md).
 local H = dofile('test/harness.lua')
 
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
@@ -66,23 +65,22 @@ for index, shop in ipairs(Config.shops) do
 
     local blip = shop.blip
     if blip and blip.enabled then
-        H.equal(blip.category, 11, ('%s blip uses the grouped legend category'):format(where))
-        H.ok(type(blip.label) == 'string' and #blip.label > 0, ('%s blip has a label -- it IS the legend heading'):format(where))
+        H.equal(blip.category, 2, ('%s blip uses the labelled legend category'):format(where))
+        H.ok(type(blip.label) == 'string' and #blip.label > 0, ('%s blip has a service label'):format(where))
         labelsByService[shop.service] = labelsByService[shop.service] or {}
         labelsByService[shop.service][blip.label] = true
     end
 end
 
--- The whole point of category 11 here: one heading per service, not one row
--- per branch. Two labels inside a service means two headings.
+-- The service label must remain stable across each service's branches.
 for service, labels in pairs(labelsByService) do
     local count = 0
     for _ in pairs(labels) do count = count + 1 end
-    H.equal(count, 1, ('every %s blip shares one identical label, so the legend collapses to a single heading'):format(service))
+    H.equal(count, 1, ('every %s blip shares one identical service label'):format(service))
 end
 
 -- The shop's own `label` stays brand-specific: it is the qbtarget prompt
--- ("Open Suburban"), not the legend heading, so the blip regrouping must not
+-- ("Open Suburban"), not the map label, so the blip configuration must not
 -- have flattened it.
 local shopLabels = {}
 for _, shop in ipairs(Config.shops) do

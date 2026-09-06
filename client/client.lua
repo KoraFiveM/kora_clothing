@@ -348,7 +348,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     startControlLock()
     Camera.start(ped)
 
-    SendNUIMessage({ action = 'qbclothing:nui:theme', data = QB.theme.tokens() })
+    QBTheme.refresh()
     SendNUIMessage({
         action = 'qbclothing:nui:open',
         data = {

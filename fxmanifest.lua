@@ -18,6 +18,7 @@ provide 'qb-clothing'
 -- creates a start-order edge regardless of server.cfg `ensure` position, so
 -- this is guaranteed running before client.lua registers zones on resource
 -- start.
+dependency 'qbtheme'
 dependency 'qblib'
 dependency 'qbsql'
 dependency 'qbcore'
@@ -37,6 +38,7 @@ server_scripts {
 }
 
 client_scripts {
+    '@qbtheme/client/bridge.lua',
     'client/camera.lua',
     'client/client.lua',
 }

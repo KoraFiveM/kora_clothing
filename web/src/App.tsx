@@ -24,7 +24,6 @@ import type {
     SetVariationResponse,
     SetTattoosResponse,
     TattooItem,
-    ThemeTokens,
     ZoomPayload,
 } from "@/lib/types"
 import { useNuiEvent } from "@/lib/useNuiEvent"
@@ -69,6 +68,8 @@ function confirmLabel(mode: ClothingMode, total: number) {
     if (mode === "shop") return total > 0 ? `Buy & Wear · $${total.toLocaleString()}` : "Wear · Free"
     return "Save & Wear"
 }
+
+const DRAG_ROTATION_DEG_PER_PIXEL = 0.15
 
 /** Drag-to-rotate needs to feel continuous but must not spam the NUI
  * callback on every pointermove -- coalesce into at most one call per frame. */
@@ -117,7 +118,7 @@ function Viewport({ onRotate, onZoom }: { onRotate: (deltaDeg: number) => void; 
         onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }}
         onPointerUp={(event) => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId) }}
         onPointerCancel={() => { dragging.current = false }}
-        onPointerMove={(event) => { if (dragging.current) onRotate(-event.movementX * 0.3) }}
+        onPointerMove={(event) => { if (dragging.current) onRotate(-event.movementX * DRAG_ROTATION_DEG_PER_PIXEL) }}
         onWheel={(event) => onZoom(Math.sign(event.deltaY))}
         aria-hidden="true"
     />
@@ -324,10 +325,6 @@ export default function App() {
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
     }, [])
-
-    useNuiEvent<ThemeTokens>("qbclothing:nui:theme", (tokens) => {
-        for (const [key, value] of Object.entries(tokens ?? {})) document.documentElement.style.setProperty(`--${key}`, value)
-    })
 
     useNuiEvent<OpenPayload>("qbclothing:nui:open", (payload) => {
         // Start from the same clean slate as a close, then layer the

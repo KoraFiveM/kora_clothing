@@ -233,14 +233,12 @@ behaviour applies: wait for the ped to be active and alive, then open.
 
 ## Pause-map blips
 
-Every shop blip uses `category = 11` and an identical `label` per service
-(`Clothing Store`, `Barber`, `Hairdresser`, `Tattoo Artist`), so the pause-map
-legend collapses each set under one heading instead of listing six
-near-identical rows — the label *is* the heading, so a differing label inside a
-set splits the group (see
-[qblib's blips docs](https://qbcore2.github.io/qblib/)). Each shop's own
-`label` stays brand-specific (`Suburban`, `Ponsonbys`, `Binco`) because that
-one is the qbtarget interaction prompt, not the legend heading.
+Every shop blip uses `category = 2`, which displays its service label in the
+pause-map legend. Clothing Store, Barber, Hairdresser, and Tattoo Artist are
+therefore separate entries instead of appearing under GTA's `Owned Property`
+category. Each shop's own `label` stays brand-specific (`Suburban`,
+`Ponsonbys`, `Binco`) because that one is the qbtarget interaction prompt, not
+the map label.
 
 ## Related resources
 
