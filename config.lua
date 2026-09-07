@@ -65,11 +65,15 @@ Config.clothingItem = {
 
 -- Decorative shop clerks. Off by default: the target is a zone on the
 -- storefront itself (see Config.shops[n].zone), so the ped is pure set
--- dressing -- and a ped costs a networked entity per shop, wanders into the
--- zone geometry, and is the one thing here that can fail to spawn at all if
--- its model does not stream. Turn it on if the empty counters look wrong on
--- this server's map; nothing else changes when you do.
+-- dressing. It is client-local and scoped below, so distant shops do not
+-- occupy a GTA entity slot or stream their model. Turn it on if the empty
+-- counters look wrong on this server's map; nothing else changes when you do.
 Config.shopPeds = false
+
+-- Local players spawn a decorative clerk on entering this radius and delete it
+-- again on exit. This is independent from Config.interactDistance: the shop
+-- target remains the storefront zone and is always available.
+Config.shopPedScopeRadius = 75.0
 
 -- Fixed service locations. Each entry creates a qbtarget zone; `free` is
 -- resolved only by the server from this config, so callers cannot forge it.

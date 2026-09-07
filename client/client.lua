@@ -61,7 +61,7 @@ local function applyTattoos(ped, model, tattoos)
     ClearPedDecorations(ped)
     for _, id in ipairs(previewTattoos) do
         local tattoo = Shared.tattooById(model, id)
-        if tattoo then AddPedDecorationFromHashes(ped, GetHashKey(tattoo.collection), GetHashKey(tattoo.overlay)) end
+        if tattoo then AddPedDecorationFromHashes(ped, joaat(tattoo.collection), joaat(tattoo.overlay)) end
     end
 end
 
@@ -258,12 +258,12 @@ end
 -- last requested -- the source of truth for what to report to the NUI/server,
 -- since a requested model swap can fail to stream in time (see applyModel).
 local function currentModelName(ped)
-    return GetEntityModel(ped) == GetHashKey(Shared.models.female) and Shared.models.female or Shared.models.male
+    return GetEntityModel(ped) == joaat(Shared.models.female) and Shared.models.female or Shared.models.male
 end
 
 local function applyModel(model, skin)
     local ped = PlayerPedId()
-    local hash = GetHashKey(model)
+    local hash = joaat(model)
     if GetEntityModel(ped) ~= hash then
         RequestModel(hash)
         local timeout = GetGameTimer() + 5000
@@ -795,7 +795,7 @@ exports('ApplyAppearanceToPed', function(ped, model, skin)
     if type(ped) ~= 'number' or ped == 0 or not DoesEntityExist(ped) then
         return false, 'invalid ped'
     end
-    if not Shared.isFreemodeModel(model) or GetEntityModel(ped) ~= GetHashKey(model) then
+    if not Shared.isFreemodeModel(model) or GetEntityModel(ped) ~= joaat(model) then
         return false, 'ped model does not match appearance model'
     end
     applySkin(ped, skin, model)
@@ -850,7 +850,14 @@ CreateThread(function()
         end
 
         if Config.shopPeds then
-            QB.entities.create(shop.ped, shop.coords, { freeze = true, blockNonTempEvents = true })
+            -- The storefront zone above owns the interaction. The clerk is
+            -- cosmetic, so keep it client-local and only create it while this
+            -- player is near the shop rather than at every shop on startup.
+            QB.entities.createScoped(shop.ped, shop.coords, {
+                radius = Config.shopPedScopeRadius,
+                freeze = true,
+                blockNonTempEvents = true,
+            })
         end
 
         if shop.blip and shop.blip.enabled then

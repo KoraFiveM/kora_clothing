@@ -42,6 +42,7 @@ end
 -- applyModel natives: keep the ped already on the target model so it skips
 -- straight to applySkin (same simplification apply_skin_bounds.lua uses).
 _G.GetHashKey = function(v) return v end
+_G.joaat = function(v) return v end
 _G.GetEntityModel = function() return 'mp_m_freemode_01' end
 _G.RequestModel = function() end
 _G.HasModelLoaded = function() return true end

@@ -235,7 +235,8 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen
 - `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/qbinventory/)) instead of equipping directly
 - `Config.shops` — per-shop service, coordinates, target zone geometry (`zone = { size, rotation }`, or `{ points, minZ, maxZ }` for an irregular shape), blip and optional clerk model
-- `Config.shopPeds` (default `false`) — spawn a decorative clerk per shop. The interaction target is the storefront zone either way; a ped-bound target dies with the ped (unstreamed model, shoved out of place, deleted by another resource) and leaves the shop silently unopenable, so the ped is set dressing only
+- `Config.shopPeds` (default `false`) — spawn a decorative clerk per shop only while the local player is near it. The interaction target is the storefront zone either way; a ped-bound target dies with the ped (unstreamed model, shoved out of place, deleted by another resource) and leaves the shop silently unopenable, so the ped is set dressing only
+- `Config.shopPedScopeRadius` (75.0m) — the radius that creates a decorative clerk for the local player; independent of the interaction range
 - `Config.shopZoneDefault` — fallback box for a shop entry added without its own `zone`
 - `Config.tattoos` — the base-game overlay catalogue with per-tattoo pricing
 - `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and qbtarget zone range

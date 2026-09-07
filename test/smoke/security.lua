@@ -253,6 +253,8 @@ H.ok(client:find('exports.qbtarget:addBoxZone({', 1, true) and client:find('expo
 H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
 H.ok(client:find('if Config.shopPeds then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
+H.ok(config:find('Config.shopPedScopeRadius = 75.0', 1, true), 'decorative clerks use a configured local scope radius')
+H.ok(client:find('QB.entities.createScoped(shop.ped', 1, true), 'decorative clerks spawn only while the client is nearby')
 H.ok(client:find('QB.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')
 
 -- Camera never leaks a render-cams state or a stuck control lock.
