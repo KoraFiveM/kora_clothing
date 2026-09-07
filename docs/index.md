@@ -20,6 +20,10 @@ inventory item instead of equipping it directly. `qbclothing` `provide`s
 events, callback names) directly, so third-party barber/tattoo/uniform
 scripts built against it keep working unmodified.
 
+When [qbhud](https://qbcore2.github.io/qbhud/) is running, qbclothing hides it
+for the duration of a fitting-room session and restores it on close. Servers
+using another HUD need no configuration; the integration is optional.
+
 ## Requirements
 
 - [qblib](https://qbcore2.github.io/qblib/)

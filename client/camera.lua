@@ -52,6 +52,18 @@ end
 local CAMERA_TRACE_FLAGS = 273 -- world geometry, objects, and vegetation
 local CAMERA_TRACE_RADIUS = 0.28
 local CAMERA_FAN_ANGLES = { 0.0, 28.0, -28.0, 55.0, -55.0, 82.0, -82.0, 180.0 }
+local MID_SPINE_BONE = 24816 -- SKEL_Spine2
+
+-- Camera-zone offsets are authored from the middle of the torso. Entity
+-- coordinates, however, are at the ped's model origin (near the feet), which
+-- shifts every close-up and puts the shoes frame below the model. Resolve the
+-- anchor from the same spine bone the presets describe. The entity-coordinate
+-- fallback keeps the camera usable for a model with an incomplete skeleton.
+local function cameraAnchor(ped)
+    local anchor = GetPedBoneCoords(ped, MID_SPINE_BONE, 0.0, 0.0, 0.0)
+    if anchor and anchor.x and anchor.y and anchor.z then return anchor end
+    return GetEntityCoords(ped)
+end
 
 local function traceCameraPath(subject, candidate)
     local handle = StartShapeTestCapsule(
@@ -84,7 +96,7 @@ local function resolveOcclusion()
     if not (pedRef and DoesEntityExist(pedRef)) then return end
 
     local zoneCfg = Config.camera.zones[target.zone] or Config.camera.zones.full
-    local pedCoords = GetEntityCoords(pedRef)
+    local pedCoords = cameraAnchor(pedRef)
     local heading = GetEntityHeading(pedRef)
     local radius = goalRadius(zoneCfg)
     local height = zoneCfg.boneOffset.z + zoneCfg.camOffset.z
@@ -173,7 +185,7 @@ function Camera.start(ped)
             state.angle = lerp(state.angle, target.angle, math.min(1.0, dt * 6.0))
 
             if pedRef and DoesEntityExist(pedRef) then
-                local pedCoords = GetEntityCoords(pedRef)
+                local pedCoords = cameraAnchor(pedRef)
                 local heading = GetEntityHeading(pedRef)
                 local targetHeight = pedCoords.z + zoneCfg.boneOffset.z
                 local camPoint = candidatePoint(

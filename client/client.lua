@@ -8,6 +8,24 @@ local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while th
 local disableControlsThread = false
 local previewTattoos = {}
 
+-- qbhud is optional: qbclothing can still run on servers with a different HUD.
+-- Remember whether this session actually hid a visible qbhud instance so its
+-- close path never reveals a HUD another resource (or the player) had hidden.
+local function hideHudForSession()
+    if type(GetResourceState) ~= 'function' or GetResourceState('qbhud') ~= 'started' then return false end
+
+    local ok, visible = pcall(function() return exports['qbhud']:isVisible() end)
+    if not ok or visible ~= true then return false end
+
+    return pcall(function() exports['qbhud']:hide() end)
+end
+
+local function restoreHudForSession(session)
+    if not session or session.hudHidden ~= true then return end
+    if type(GetResourceState) ~= 'function' or GetResourceState('qbhud') ~= 'started' then return end
+    pcall(function() exports['qbhud']:show() end)
+end
+
 -- Session-local mirror of the two hair-palette indices currently on the ped.
 -- Held here rather than read back with GetPedHairColor/GetPedHairHighlightColor
 -- for the same reason previewTattoos is: there is no reliable getter for what
@@ -67,6 +85,25 @@ end
 local function applyHairColor(ped, color, highlight)
     previewHair.color, previewHair.highlight = clampHairColor(color), clampHairColor(highlight)
     SetPedHairColor(ped, previewHair.color, previewHair.highlight)
+end
+
+-- GTA applies a hair tint to the *currently loaded* hair drawable.  A normal
+-- skin application already sets component 2 before applyHairColor, but a
+-- palette click does not change the drawable at all.  Re-applying the current
+-- valid variation first gives the renderer the same component-then-tint order
+-- on a live preview, rather than merely moving the selected ring in the NUI.
+-- Keep the live bounds checks here too: applying an invalid component index
+-- can fault inside the game engine rather than returning a Lua error.
+local function refreshHairVariation(ped)
+    local drawable = GetPedDrawableVariation(ped, 2)
+    local drawableCount = GetNumberOfPedDrawableVariations(ped, 2)
+    if type(drawable) ~= 'number' or drawable < 0 or drawable >= drawableCount then return end
+
+    local texture = GetPedTextureVariation(ped, 2)
+    local textureCount = GetNumberOfPedTextureVariations(ped, 2, drawable)
+    if type(texture) ~= 'number' or texture < 0 or texture >= textureCount then texture = 0 end
+
+    SetPedComponentVariation(ped, 2, drawable, texture, 0)
 end
 
 -- The palette the NUI renders as swatch grids. GTA's hair colouring is
@@ -338,7 +375,13 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         service = payload.service or 'clothing',
         mandatory = payload.mandatory == true,
         shopLabel = payload.shopLabel,
+        -- Every menu edit is a live preview. Keep the exact server-sanitised
+        -- look that was applied when the session started so Cancel can undo
+        -- those previews immediately, rather than waiting for the next menu
+        -- open to re-apply the saved skin.
+        previousAppearance = { model = payload.model, skin = payload.skin },
     }
+    activeSession.hudHidden = hideHudForSession()
 
     -- After the real skin is applied, not before -- this has to override
     -- what the player actually walked in wearing, not whatever the ped's
@@ -410,11 +453,21 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
             notify('Outfit updated.', 'success')
         end
     else
-        -- Cancelled, or the session ended some other way -- still put back
-        -- whatever a tattoo/barber/hairdresser strip removed.
-        restoreTemporaryOverride(PlayerPedId())
+        -- Cancelled (or otherwise interrupted): discard the live preview and
+        -- restore the full appearance from when the session opened. A full
+        -- restore already includes every component/prop a specialist session
+        -- temporarily stripped, so do not layer that override on top of it.
+        local previousAppearance = activeSession.previousAppearance
+        if previousAppearance then
+            temporaryOverride = nil
+            applyModel(previousAppearance.model, previousAppearance.skin)
+        else
+            restoreTemporaryOverride(PlayerPedId())
+        end
     end
+    local session = activeSession
     activeSession = nil
+    restoreHudForSession(session)
 end)
 
 -- --- NUI callbacks ---
@@ -468,7 +521,9 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     -- show a recolour a clothing shop's merge would silently throw away.
     local policy = servicePolicy(activeSession.service)
     if not policyAllows(policy, policy.components, 2) then cb({ ok = false }); return end
-    applyHairColor(PlayerPedId(), data.color, data.highlight)
+    local ped = PlayerPedId()
+    refreshHairVariation(ped)
+    applyHairColor(ped, data.color, data.highlight)
     cb({ ok = true, color = previewHair.color, highlight = previewHair.highlight })
 end)
 
@@ -807,6 +862,7 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if activeSession then
+        restoreHudForSession(activeSession)
         Camera.stop()
         stopControlLock()
         SetNuiFocus(false, false)
@@ -819,5 +875,5 @@ end)
 -- suite exercise applySkin's index bounds-checking without a running client.
 if Config.testMode then
     QBClothing = QBClothing or {}
-    QBClothing._testRuntime = { applySkin = applySkin }
+    QBClothing._testRuntime = { applySkin = applySkin, refreshHairVariation = refreshHairVariation }
 end

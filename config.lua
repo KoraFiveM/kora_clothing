@@ -25,7 +25,10 @@ Config.shop = {
 -- retained from the saved appearance when a specialist session confirms.
 Config.services = {
     clothing = {
-        components = { 1, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+        -- Component 1 is GTA's mask slot; this server's facial-hair assets
+        -- use it, so keeping it out of the general clothing menu prevents
+        -- facial hair from being changed there.
+        components = { 3, 4, 5, 6, 7, 8, 9, 10, 11 },
         props = { 0, 1, 2, 6, 7 },
         prices = { tops = 175, legs = 150, shoes = 120, body = 90, accessories = 60 },
     },

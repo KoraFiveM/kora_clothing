@@ -11,7 +11,7 @@ Shared.components = {
     [0]  = { label = 'Face',       category = 'body' },
     [1]  = { label = 'Mask',       category = 'body' },
     [2]  = { label = 'Hair',       category = 'body' },
-    [3]  = { label = 'Torso',      category = 'tops' },
+    [3]  = { label = 'Arms',       category = 'tops' },
     [4]  = { label = 'Legs',       category = 'legs' },
     [5]  = { label = 'Bag',        category = 'accessories' },
     [6]  = { label = 'Shoes',      category = 'shoes' },
@@ -19,7 +19,7 @@ Shared.components = {
     [8]  = { label = 'Undershirt', category = 'tops' },
     [9]  = { label = 'Kevlar',     category = 'tops' },
     [10] = { label = 'Badge',      category = 'accessories' },
-    [11] = { label = 'Torso 2',    category = 'tops' },
+    [11] = { label = 'Jackets',    category = 'tops' },
 }
 
 -- id -> { label, category, clearable } -- props support "none" (drawable -1),

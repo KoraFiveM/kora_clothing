@@ -63,9 +63,10 @@ _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
 -- (a handful of drawables, not hundreds) so a saved index of, say, 40 is
 -- unambiguously out of range -- exactly the shape of a stale/pre-update skin
 -- row surviving a wardrobe rework.
-local drawableCounts = { [0] = 3, [3] = 5 } -- component 0 = Face, 3 = Torso
+local drawableCounts = { [0] = 3, [2] = 3, [3] = 5 } -- component 0 = Face, 2 = Hair, 3 = Torso
 local textureCounts = {} -- [id][drawable] = count
 textureCounts[0] = { [0] = 2, [1] = 2, [2] = 2 }
+textureCounts[2] = { [0] = 2, [1] = 2, [2] = 2 }
 textureCounts[3] = { [0] = 4, [1] = 4, [2] = 4, [3] = 4, [4] = 4 }
 local propDrawableCounts = { [0] = 4 } -- prop 0 = Hats
 local propTextureCounts = { [0] = { [0] = 2, [1] = 2, [2] = 2, [3] = 2 } }
@@ -74,6 +75,8 @@ _G.GetNumberOfPedDrawableVariations = function(_, id) return drawableCounts[id] 
 _G.GetNumberOfPedTextureVariations = function(_, id, drawable)
     return (textureCounts[id] or {})[drawable] or 0
 end
+_G.GetPedDrawableVariation = function(_, id) return id == 2 and 2 or 0 end
+_G.GetPedTextureVariation = function(_, id) return id == 2 and 1 or 0 end
 _G.GetNumberOfPedPropDrawableVariations = function(_, id) return propDrawableCounts[id] or 0 end
 _G.GetNumberOfPedPropTextureVariations = function(_, id, drawable)
     return (propTextureCounts[id] or {})[drawable] or 0
@@ -95,6 +98,16 @@ local function contains(list, value)
     for _, v in ipairs(list) do if v == value then return true end end
     return false
 end
+
+-- A colour click does not otherwise touch component 2. Re-applying the live
+-- valid hairstyle before its tint is what makes a palette click take effect in
+-- GTA's renderer, while keeping the existing style and texture intact.
+componentCalls = {}
+runtime.refreshHairVariation(1)
+local refreshedHair = callFor(componentCalls, 2)
+H.ok(refreshedHair ~= nil, 'a hair-colour preview refreshes the current hair drawable first')
+H.equal(refreshedHair.drawable, 2, 'the preview refresh keeps the current hair style')
+H.equal(refreshedHair.texture, 1, 'the preview refresh keeps the current hair texture')
 
 -- A stale/malformed skin: component 0 (Face) drawable 40 (only 3 exist),
 -- component 3 (Torso) texture 99 (only 4 exist for its drawable 1), prop 0

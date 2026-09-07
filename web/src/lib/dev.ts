@@ -21,10 +21,10 @@ const sample: OpenPayload = {
     categories: [
         { kind: "component", id: 0, label: "Face", category: "body", drawable: 0, texture: 0, drawableCount: 1, textureCount: 1 },
         { kind: "component", id: 2, label: "Hair", category: "body", drawable: 5, texture: 0, drawableCount: 38, textureCount: 3 },
-        { kind: "component", id: 3, label: "Torso", category: "tops", drawable: 14, texture: 2, drawableCount: 62, textureCount: 8 },
+        { kind: "component", id: 3, label: "Arms", category: "tops", drawable: 14, texture: 2, drawableCount: 62, textureCount: 8 },
         { kind: "component", id: 8, label: "Undershirt", category: "tops", drawable: 15, texture: 0, drawableCount: 34, textureCount: 5 },
         { kind: "component", id: 9, label: "Kevlar", category: "tops", drawable: 0, texture: 0, drawableCount: 2, textureCount: 1 },
-        { kind: "component", id: 11, label: "Torso 2", category: "tops", drawable: 0, texture: 0, drawableCount: 20, textureCount: 4 },
+        { kind: "component", id: 11, label: "Jackets", category: "tops", drawable: 0, texture: 0, drawableCount: 20, textureCount: 4 },
         { kind: "component", id: 4, label: "Legs", category: "legs", drawable: 21, texture: 1, drawableCount: 96, textureCount: 6 },
         { kind: "component", id: 6, label: "Shoes", category: "shoes", drawable: 12, texture: 0, drawableCount: 78, textureCount: 4 },
         { kind: "component", id: 5, label: "Bag", category: "accessories", drawable: 0, texture: 0, drawableCount: 16, textureCount: 2 },

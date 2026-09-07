@@ -235,8 +235,8 @@ function HairColorPanel({ hair, onChange }: {
     if (hair.palette.length === 0) return null
     return <div className="panel panel-pad hair-panel">
         <p className="section-title">Hair Color</p>
-        <HairColorGrid label="Primary" palette={hair.palette} value={hair.color} onSelect={(index) => onChange({ color: index, highlight: hair.highlight })} />
-        <HairColorGrid label="Highlight" palette={hair.palette} value={hair.highlight} onSelect={(index) => onChange({ color: hair.color, highlight: index })} />
+        <HairColorGrid label="Primary (Base)" palette={hair.palette} value={hair.color} onSelect={(index) => onChange({ color: index, highlight: hair.highlight })} />
+        <HairColorGrid label="Secondary (Highlights)" palette={hair.palette} value={hair.highlight} onSelect={(index) => onChange({ color: hair.color, highlight: index })} />
     </div>
 }
 
@@ -497,10 +497,10 @@ export default function App() {
         </div>}
 
         <div className="rail rail-left">
-            <div className="panel panel-pad">
+            {groupsPresent.size > 0 && <div className="panel panel-pad">
                 <p className="section-title">Categories</p>
                 <CategoryTabs active={activeGroup} groups={groupsPresent} onSelect={selectGroup} />
-            </div>
+            </div>}
             <TattooPanel tattoos={open.tattoos} selected={selectedTattoos} onToggle={(id) => void toggleTattoo(id)} />
             <OutfitsPanel
                 outfits={outfits}

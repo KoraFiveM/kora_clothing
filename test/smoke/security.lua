@@ -127,6 +127,23 @@ H.ok(client:find('applyTemporaryStrip(ped, activeSession.service, currentModelNa
 H.ok(client:find('restoreTemporaryOverride(PlayerPedId())', 1, true), 'closing the session restores whatever was temporarily overridden')
 H.ok(client:find('temporaryOverride = nil\n            applyModel(result.revertTo.model, result.revertTo.skin)', 1, true),
     'a boxed-item close reapplies the full pre-session skin instead of double-restoring')
+H.ok(client:find('previousAppearance = { model = payload.model, skin = payload.skin }', 1, true),
+    'the original session appearance is retained so Cancel can undo live previews')
+H.ok(client:find('applyModel(previousAppearance.model, previousAppearance.skin)', 1, true),
+    'cancelling a session immediately restores the appearance from when it opened')
+
+-- qbhud is an optional integration: a fitting-room session removes its own
+-- HUD overlay, but records that it did so and only restores that same HUD on
+-- close. A pre-existing hide (from another resource or the player) remains
+-- intact.
+H.ok(client:find("GetResourceState('qbhud') ~= 'started'", 1, true),
+    'qbhud is checked at runtime so qbclothing remains compatible with other HUDs')
+H.ok(client:find("exports['qbhud']:isVisible()", 1, true) and client:find("exports['qbhud']:hide()", 1, true),
+    'a clothing session hides qbhud only when it was already visible')
+H.ok(client:find('activeSession.hudHidden = hideHudForSession()', 1, true),
+    'the session remembers whether it hid the HUD')
+H.ok(client:find('restoreHudForSession(session)', 1, true) and client:find('restoreHudForSession(activeSession)', 1, true),
+    'the HUD is restored after normal close and resource-stop cleanup')
 
 -- Real qb-clothing / qb-multicharacter wire-protocol compat.
 H.ok(server:find("QB.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
