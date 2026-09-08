@@ -861,7 +861,16 @@ CreateThread(function()
         end
 
         if shop.blip and shop.blip.enabled then
-            QB.blips.create(shop.coords, shop.blip)
+            local blip = QB.blips.create(shop.coords, shop.blip)
+            if blip and not shop.blip.info then
+                QB.blips.setInfo(blip, {
+                    title = shop.label,
+                    rows = {
+                        { kind = 'name', label = 'Service', value = shop.service },
+                        { kind = 'wrappedText', value = shop.free and 'This service is free.' or 'Browse and purchase available customisations.' },
+                    },
+                })
+            end
         end
     end
 end)

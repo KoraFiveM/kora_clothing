@@ -230,6 +230,12 @@ H.ok(config:find('zoom = {', 1, true) and config:find('step = 0.12,', 1, true), 
 H.ok(client:find("RegisterNUICallback('qbclothing:nui:zoom'", 1, true), 'the NUI can request a continuous zoom')
 H.ok(camera:find('target.zoomOffset = 0.0\n    occlusionDirty = true', 1, true), 'a zone preset is a jump-to: it discards the accumulated free-zoom offset')
 
+-- Orbit interpolation must cross 0° on the short arc. A raw lerp from 359°
+-- to 1° instead travels almost a full revolution in the opposite direction.
+H.ok(camera:find('local function lerpAngle(current, goal, rate)', 1, true), 'camera has a dedicated circular-angle interpolation')
+H.ok(camera:find('local delta = (goal - current + 540.0) % 360.0 - 180.0', 1, true), 'camera resolves orbit deltas to the shortest signed arc')
+H.ok(camera:find('state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))', 1, true), 'orbit updates use circular interpolation rather than a raw lerp')
+
 -- Hair colour is a pair of PALETTE INDICES, never RGB -- SetPedHairColor
 -- accepts nothing else. Server clamps coarsely, client re-clamps against the
 -- live palette, and the NUI paints swatches from GetPedHairRgbColor so the

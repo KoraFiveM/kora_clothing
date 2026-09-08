@@ -24,6 +24,15 @@ local function lerp(current, goal, rate)
     return current + (goal - current) * rate
 end
 
+-- Angles wrap at 360 degrees. Interpolating the raw values makes a small
+-- movement across that seam take the long way around (for example, 359° to
+-- 1° would sweep backwards through 358°). Keep the live angle normalized so
+-- every orbit transition follows the shortest arc.
+local function lerpAngle(current, goal, rate)
+    local delta = (goal - current + 540.0) % 360.0 - 180.0
+    return (current + delta * rate) % 360.0
+end
+
 local function clamp(value, minimum, maximum)
     if value < minimum then return minimum end
     if value > maximum then return maximum end
@@ -182,7 +191,7 @@ function Camera.start(ped)
             state.radius = lerp(state.radius, goalRadius(zoneCfg), zoomRate)
             state.height = lerp(state.height, zoneCfg.boneOffset.z + zoneCfg.camOffset.z, zoomRate)
             state.fov = lerp(state.fov, zoneCfg.fov, zoomRate)
-            state.angle = lerp(state.angle, target.angle, math.min(1.0, dt * 6.0))
+            state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))
 
             if pedRef and DoesEntityExist(pedRef) then
                 local pedCoords = cameraAnchor(pedRef)
@@ -264,6 +273,7 @@ end
 if Config.testMode then
     Camera._testRuntime = {
         goalRadius = goalRadius,
+        lerpAngle = lerpAngle,
         zoomOffset = function() return target.zoomOffset end,
         setZoomOffset = function(value) target.zoomOffset = value end,
     }

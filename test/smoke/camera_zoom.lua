@@ -28,6 +28,11 @@ local function approx(actual, expected, message)
     H.ok(math.abs(actual - expected) < 1e-9, ('%s (expected %s, got %s)'):format(message, expected, actual))
 end
 
+-- Orbit angles are circular, not ordinary numbers. Crossing the 0° seam must
+-- take the two-degree arc, not sweep nearly all the way around in reverse.
+approx(runtime.lerpAngle(359.0, 1.0, 0.25), 359.5, 'orbit interpolation crosses 360° on the short clockwise arc')
+approx(runtime.lerpAngle(1.0, 359.0, 0.25), 0.5, 'orbit interpolation crosses 0° on the short counter-clockwise arc')
+
 -- A zone preset with nothing added is the preset, untouched.
 resetZoom()
 approx(runtime.goalRadius(full), full.camOffset.y, 'no wheel input leaves the zone preset radius exactly as authored')
