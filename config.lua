@@ -95,9 +95,9 @@ Config.shopPedScopeRadius = 75.0
 -- same target-zone primitive.
 --
 -- A named category groups every branch of a service beneath one pause-map
--- legend heading. Keep it identical to the shared blip label. The shop's own
--- `label` below stays brand-specific -- that one is the target prompt ("Open
--- Suburban"), not the map label.
+-- legend heading. Clothing shops also supply their storefront name separately,
+-- while generic Tattoo and Grooming services need no duplicate name. The
+-- shop's own `label` below remains the target prompt.
 Config.shops = {
     {
         service = 'clothing', free = false, label = 'Suburban',
@@ -124,42 +124,42 @@ Config.shops = {
             },
             thickness = 4.00,
         },
-        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Suburban' },
     },
     {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_04',
         coords = vector4(72.32, -1399.2, 28.38, 0.0),
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 0.0 },
-        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Suburban' },
     },
     {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_m_y_business_03',
         coords = vector4(-708.61, -152.85, 36.42, 30.0),
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 30.0 },
-        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Ponsonbys' },
     },
     {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_f_y_business_01',
         coords = vector4(-167.79, -299.05, 38.73, 250.0),
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 250.0 },
-        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Ponsonbys' },
     },
     {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_m_y_business_02',
         coords = vector4(-1193.44, -772.12, 16.32, 130.0),
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
-        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Binco' },
     },
     {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_f_y_hipster_02',
         coords = vector4(-827.86, -1073.75, 9.33, 130.0),
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
-        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, label = 'Clothing Store', category = 'Clothing Store' },
+        blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Binco' },
     },
     {
         service = 'tattoo', free = false, label = 'Tattoo Artist',
@@ -174,7 +174,7 @@ Config.shops = {
             },
             minZ = 51.18, maxZ = 53.38,
         },
-        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist', category = 'Tattoo Artist' },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
     },
     {
         service = 'tattoo', free = false, label = 'Tattoo Artist',
@@ -189,7 +189,7 @@ Config.shops = {
             },
             minZ = 3.85, maxZ = 6.05,
         },
-        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, label = 'Tattoo Artist', category = 'Tattoo Artist' },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
     },
     {
         service = 'barber', free = false, label = 'Barber',
@@ -204,7 +204,7 @@ Config.shops = {
             },
             minZ = 35.47, maxZ = 37.67,
         },
-        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber', category = 'Barber' },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, category = 'Grooming' },
     },
     {
         service = 'barber', free = false, label = 'Barber',
@@ -219,21 +219,21 @@ Config.shops = {
             },
             minZ = 64.11, maxZ = 66.31,
         },
-        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Barber', category = 'Barber' },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, category = 'Grooming' },
     },
     {
         service = 'hairdresser', free = false, label = 'Hairdresser',
         ped = 's_f_m_fembarber',
         coords = vector4(136.8, -1708.4, 28.29, 50.0),
         zone = { size = vector3(2.0, 1.6, 2.2), rotation = 50.0 },
-        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser', category = 'Hairdresser' },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, category = 'Grooming' },
     },
     {
         service = 'hairdresser', free = false, label = 'Hairdresser',
         ped = 's_f_m_fembarber',
         coords = vector4(-1282.6, -1116.8, 5.99, 90.0),
         zone = { size = vector3(2.0, 1.6, 2.2), rotation = 90.0 },
-        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, label = 'Hairdresser', category = 'Hairdresser' },
+        blip = { enabled = true, sprite = 71, color = 0, scale = 0.8, shortRange = true, category = 'Grooming' },
     },
 }
 

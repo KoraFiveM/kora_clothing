@@ -246,11 +246,13 @@ behaviour applies: wait for the ped to be active and alive, then open.
 
 ## Pause-map blips
 
-Every shop blip uses its service label as a named category. All Clothing Store,
-Barber, Hairdresser, and Tattoo Artist locations are therefore grouped beneath
-their respective pause-map legend headings. Each shop's own `label` stays brand-specific (`Suburban`,
-`Ponsonbys`, `Binco`) because that one is the qbtarget interaction prompt, not
-the map label.
+Every shop blip uses a canonical named category: `Clothing`, `Tattoo`, or
+`Grooming`. Barber and hairdresser locations deliberately share `Grooming`
+instead of splitting one service across two legend headings. Clothing shops
+also pass their storefront name (`Suburban`, `Ponsonbys`, or `Binco`), so qblib
+renders labels such as `Clothing: Ponsonbys`; generic Tattoo and Grooming
+markers render only the category. The shop's own `label` remains the qbtarget
+interaction prompt.
 
 ## Related resources
 

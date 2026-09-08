@@ -24,7 +24,10 @@ end
 H.ok(Config.shopPeds == false, 'the decorative clerk is off by default -- the target is the storefront, not a ped')
 H.ok(isCoordsLike(Config.shopZoneDefault.size), 'the fallback box for a zone-less shop entry is itself a usable size')
 
-local labelsByService = {}
+local categoryByService = {
+    clothing = 'Clothing', tattoo = 'Tattoo',
+    barber = 'Grooming', hairdresser = 'Grooming',
+}
 
 for index, shop in ipairs(Config.shops) do
     local where = ('Config.shops[%d] (%s)'):format(index, tostring(shop.label))
@@ -64,18 +67,14 @@ for index, shop in ipairs(Config.shops) do
 
     local blip = shop.blip
     if blip and blip.enabled then
-        H.ok(type(blip.label) == 'string' and #blip.label > 0, ('%s blip has a service label'):format(where))
-        H.equal(blip.category, blip.label, ('%s blip groups under its service label'):format(where))
-        labelsByService[shop.service] = labelsByService[shop.service] or {}
-        labelsByService[shop.service][blip.label] = true
+        H.equal(blip.category, categoryByService[shop.service], ('%s uses its canonical map category'):format(where))
+        H.equal(blip.label, nil, ('%s leaves display-label composition to qblib'):format(where))
+        if shop.service == 'clothing' then
+            H.equal(blip.name, shop.label, ('%s supplies its storefront name separately'):format(where))
+        else
+            H.equal(blip.name, nil, ('%s is a generic service marker without a duplicate name'):format(where))
+        end
     end
-end
-
--- The service label must remain stable across each service's branches.
-for service, labels in pairs(labelsByService) do
-    local count = 0
-    for _ in pairs(labels) do count = count + 1 end
-    H.equal(count, 1, ('every %s blip shares one identical service label'):format(service))
 end
 
 -- The shop's own `label` stays brand-specific: it is the qbtarget prompt

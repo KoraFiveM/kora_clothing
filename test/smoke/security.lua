@@ -262,6 +262,15 @@ H.ok(client:find('if Config.shopPeds then', 1, true), 'the clerk is spawned only
 H.ok(config:find('Config.shopPedScopeRadius = 75.0', 1, true), 'decorative clerks use a configured local scope radius')
 H.ok(client:find('QB.entities.createScoped(shop.ped', 1, true), 'decorative clerks spawn only while the client is nearby')
 H.ok(client:find('QB.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')
+H.ok(config:find("category = 'Clothing', name = 'Suburban'", 1, true),
+    'named clothing storefronts provide category and name separately')
+H.ok(config:find("service = 'tattoo'", 1, true) and config:find("category = 'Tattoo'", 1, true),
+    'tattoo shops use the canonical generic category')
+local groomingCategories = select(2, config:gsub("category = 'Grooming'", ''))
+H.equal(groomingCategories, 4, 'barbers and hairdressers share one Grooming category')
+for blip in config:gmatch('blip = ({[^\n]+})') do
+    H.ok(not blip:find('label =', 1, true), 'qblib composes each shop map label from category and optional name')
+end
 
 -- Camera never leaks a render-cams state or a stuck control lock.
 H.ok(camera:find('function Camera.stop()', 1, true), 'camera exposes an explicit stop')
