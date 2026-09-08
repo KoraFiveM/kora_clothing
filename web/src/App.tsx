@@ -12,6 +12,7 @@ import type {
     ConfirmResponse,
     ErrorPayload,
     HairPayload,
+    HeadPayload,
     HairSwatch,
     LoadOutfitResponse,
     OpenPayload,
@@ -20,6 +21,8 @@ import type {
     RotatePayload,
     SetHairColorPayload,
     SetHairColorResponse,
+    SetHeadPayload,
+    SetHeadResponse,
     SetVariationPayload,
     SetVariationResponse,
     SetTattoosResponse,
@@ -240,6 +243,20 @@ function HairColorPanel({ hair, onChange }: {
     </div>
 }
 
+function HeadPanel({ head, onChange }: { head: HeadPayload; onChange: (next: HeadPayload) => void }) {
+    const step = (label: string, value: number, min: number, max: number, set: (value: number) => void) => <div className="stepper">
+        <label>{label}</label>
+        <button type="button" className="step-btn" aria-label={`Previous ${label}`} disabled={value <= min} onClick={() => set(value - 1)}><ChevronLeft size={16} /></button>
+        <span>{value < 0 ? "None" : `${value + 1} / ${max + 1}`}</span>
+        <button type="button" className="step-btn" aria-label={`Next ${label}`} disabled={value >= max} onClick={() => set(value + 1)}><ChevronRight size={16} /></button>
+    </div>
+    return <div className="panel panel-pad head-panel">
+        <p className="section-title">Face & Skin</p>
+        {step("Skin tone", head.skinTone, 0, 45, (skinTone) => onChange({ ...head, skinTone }))}
+        {step("Facial hair", head.beard, -1, 28, (beard) => onChange({ ...head, beard }))}
+    </div>
+}
+
 function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
     outfits: OutfitSummary[]
     expanded: boolean
@@ -294,6 +311,7 @@ export default function App() {
     const [categories, setCategories] = useState<ClothingCategoryItem[]>([])
     const [selectedTattoos, setSelectedTattoos] = useState<string[]>([])
     const [hair, setHair] = useState<HairPayload | null>(null)
+    const [head, setHead] = useState<HeadPayload | null>(null)
     // Held separately from `hair` for the same reason `baseline` is held apart
     // from `categories`: the price shown has to be a diff against what the
     // player walked in with, and `hair` moves with every swatch click.
@@ -321,7 +339,7 @@ export default function App() {
 
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
-        setHair(null); setBaselineHair(null)
+        setHair(null); setHead(null); setBaselineHair(null)
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
     }, [])
@@ -336,6 +354,7 @@ export default function App() {
         setSelectedTattoos(payload.selectedTattoos ?? [])
         setBaselineTattoos(payload.selectedTattoos ?? [])
         setHair(payload.hair ?? null)
+        setHead(payload.head ?? null)
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
@@ -415,6 +434,11 @@ export default function App() {
         })
     }, [])
 
+    const setHeadAppearance = useCallback(async (next: HeadPayload) => {
+        const response = await sendIntent<SetHeadPayload, SetHeadResponse>("qbclothing:nui:setHead", next)
+        if (response.ok) setHead({ skinTone: response.skinTone ?? next.skinTone, beard: response.beard ?? next.beard })
+    }, [])
+
     const changeZone = useCallback((next: Zone) => {
         setZone(next)
         void sendIntent<CameraPayload, object>("qbclothing:nui:camera", { zone: next })
@@ -426,6 +450,7 @@ export default function App() {
             setCategories(response.categories)
             setSelectedTattoos(response.selectedTattoos ?? [])
             if (response.hair) setHair(response.hair)
+            setHead(response.head ?? null)
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -534,6 +559,7 @@ export default function App() {
             {hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
                 <HairColorPanel hair={hair} onChange={(next) => void setHairColor(next)} />
             )}
+            {head && activeGroup === "body" && <HeadPanel head={head} onChange={(next) => void setHeadAppearance(next)} />}
         </div>}
 
         <div className="bottom-bar">

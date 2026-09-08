@@ -33,6 +33,32 @@ end
 -- the only thing that ever changes these, so this IS the authority.
 local previewHair = { color = 0, highlight = 0 }
 
+-- GTA facial features are head data, not drawable components.  Keep them in
+-- the same session-local form as hair so creation previews are persisted with
+-- the rest of the appearance instead of being lost after the menu closes.
+local previewHead = { skinTone = 0, beard = -1 }
+
+local function clampHeadIndex(value, minimum, maximum)
+    value = tonumber(value)
+    if not value then return minimum end
+    return math.min(maximum, math.max(minimum, math.floor(value)))
+end
+
+local function applyHead(ped, head)
+    -- Test harnesses and old FiveM artifacts may not expose the head natives;
+    -- the rest of an appearance must still be applicable in that environment.
+    if type(SetPedHeadBlendData) ~= 'function' or type(SetPedHeadOverlay) ~= 'function' then return end
+    head = type(head) == 'table' and head or {}
+    previewHead.skinTone = clampHeadIndex(head.skinTone, 0, 45)
+    previewHead.beard = clampHeadIndex(head.beard, -1, 28)
+    -- The parent ids are GTA's skin palette entries.  Using the selected entry
+    -- for both parents gives the skin-tone control a predictable, full-strength
+    -- result while leaving facial shape to the selected freemode model.
+    SetPedHeadBlendData(ped, 0, 0, 0, previewHead.skinTone, previewHead.skinTone, 0, 0.0, 0.0, 0.0, false)
+    SetPedHeadOverlay(ped, 1, previewHead.beard, 1.0) -- overlay 1: facial hair/beard
+    if previewHead.beard >= 0 and type(SetPedHeadOverlayColor) == 'function' then SetPedHeadOverlayColor(ped, 1, 1, previewHair.color, previewHair.color) end
+end
+
 -- Session-local, never sent to the server or persisted: what a tattoo/barber/
 -- hairdresser session temporarily overrode (bare skin for tattoos, hat/mask
 -- removed for hair work) so it can be put back exactly as found on close.
@@ -176,6 +202,7 @@ local function applySkin(ped, skin, model)
         end
     end
     applyHairColor(ped, skin.hairColor, skin.hairHighlight)
+    applyHead(ped, skin.head)
     applyTattoos(ped, model, skin.tattoos)
 end
 
@@ -183,6 +210,7 @@ local function currentSkinSnapshot(ped)
     local skin = {
         components = {}, props = {}, tattoos = previewTattoos,
         hairColor = previewHair.color, hairHighlight = previewHair.highlight,
+        head = { skinTone = previewHead.skinTone, beard = previewHead.beard },
     }
     for id in pairs(Shared.components) do
         skin.components[tostring(id)] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
@@ -215,6 +243,11 @@ local function hairPayload(service)
     local policy = servicePolicy(service)
     if not policyAllows(policy, policy.components, 2) then return nil end
     return { palette = buildHairPalette(), color = previewHair.color, highlight = previewHair.highlight }
+end
+
+local function headPayload(service)
+    if not servicePolicy(service).all then return nil end
+    return { skinTone = previewHead.skinTone, beard = previewHead.beard }
 end
 
 local function buildCategoryPayload(ped, service)
@@ -406,6 +439,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             model = currentModelName(ped),
             categories = buildCategoryPayload(ped, activeSession.service),
             hair = hairPayload(activeSession.service),
+            head = headPayload(activeSession.service),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
             outfits = payload.outfits or {},
@@ -524,7 +558,17 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     local ped = PlayerPedId()
     refreshHairVariation(ped)
     applyHairColor(ped, data.color, data.highlight)
+    if previewHead.beard >= 0 and type(SetPedHeadOverlayColor) == 'function' then
+        SetPedHeadOverlayColor(ped, 1, 1, previewHair.color, previewHair.color)
+    end
     cb({ ok = true, color = previewHair.color, highlight = previewHair.highlight })
+end)
+
+RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
+    if not activeSession or type(data) ~= 'table' or not servicePolicy(activeSession.service).all then cb({ ok = false }); return end
+    local ped = PlayerPedId()
+    applyHead(ped, data)
+    cb({ ok = true, skinTone = previewHead.skinTone, beard = previewHead.beard })
 end)
 
 RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
@@ -553,6 +597,7 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
         model = currentModelName(ped),
         categories = buildCategoryPayload(ped, activeSession.service),
         hair = hairPayload(activeSession.service),
+        head = headPayload(activeSession.service),
         selectedTattoos = previewTattoos,
     })
 end)

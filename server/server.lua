@@ -181,11 +181,14 @@ local function sanitiseSkin(rawSkin, model)
     -- 500) handed to SetPedHairColor is not "no hair colour" -- it is an
     -- out-of-palette read. Always present, defaulting to index 0, so every
     -- downstream diff/equality check can compare them unconditionally.
-    local skin = { components = {}, props = {}, tattoos = {}, hairColor = 0, hairHighlight = 0 }
+    local skin = { components = {}, props = {}, tattoos = {}, hairColor = 0, hairHighlight = 0, head = { skinTone = 0, beard = -1 } }
     if type(rawSkin) ~= 'table' then return skin end
 
     skin.hairColor = Shared.clampHairColor(rawSkin.hairColor)
     skin.hairHighlight = Shared.clampHairColor(rawSkin.hairHighlight)
+    local head = type(rawSkin.head) == 'table' and rawSkin.head or {}
+    skin.head.skinTone = QB.util.clamp(math.floor(tonumber(head.skinTone) or 0), 0, 45)
+    skin.head.beard = QB.util.clamp(math.floor(tonumber(head.beard) or -1), -1, 28)
 
     local components = type(rawSkin.components) == 'table' and rawSkin.components or {}
     for id in pairs(Shared.components) do
@@ -252,6 +255,7 @@ local function mergeServiceSkin(before, requested, service, model)
     -- this a clothing shop could recolour hair a barber charges for.
     local hairSource = idAllowed(policy.components, 2) and requested or before
     merged.hairColor, merged.hairHighlight = hairSource.hairColor, hairSource.hairHighlight
+    merged.head = policy.all and requested.head or before.head
     merged.tattoos = policy.tattoos and requested.tattoos or before.tattoos
     return sanitiseSkin(merged, model)
 end
@@ -337,6 +341,8 @@ local function skinsMatch(a, b)
     local aColor, aHighlight = hairOf(a)
     local bColor, bHighlight = hairOf(b)
     if aColor ~= bColor or aHighlight ~= bHighlight then return false end
+    local aHead, bHead = a.head or {}, b.head or {}
+    if (aHead.skinTone or 0) ~= (bHead.skinTone or 0) or (aHead.beard or -1) ~= (bHead.beard or -1) then return false end
 
     return bagsMatch(Shared.components, a.components or {}, b.components or {})
         and bagsMatch(Shared.props, a.props or {}, b.props or {})

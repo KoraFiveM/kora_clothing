@@ -61,6 +61,11 @@ export interface HairPayload {
     highlight: number
 }
 
+export interface HeadPayload {
+    skinTone: number
+    beard: number
+}
+
 export interface OpenPayload {
     mode: ClothingMode
     service: string
@@ -70,6 +75,7 @@ export interface OpenPayload {
     model: string
     categories: ClothingCategoryItem[]
     hair?: HairPayload | null
+    head?: HeadPayload | null
     tattoos: TattooItem[]
     selectedTattoos: string[]
     outfits: OutfitSummary[]
@@ -117,6 +123,9 @@ export interface SetHairColorResponse {
     highlight?: number
 }
 
+export interface SetHeadPayload { skinTone: number; beard: number }
+export interface SetHeadResponse extends Partial<HeadPayload> { ok: boolean }
+
 export interface RotatePayload {
     deltaDeg: number
 }
@@ -126,6 +135,7 @@ export interface LoadOutfitResponse {
     model?: string
     categories?: ClothingCategoryItem[]
     hair?: HairPayload | null
+    head?: HeadPayload | null
     selectedTattoos?: string[]
 }
 
