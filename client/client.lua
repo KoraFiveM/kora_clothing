@@ -664,12 +664,7 @@ local function applySavedSkin()
     local generation = skinApplyGeneration
 
     CreateThread(function()
-        -- pcall'd: QB.callback.trigger is a cross-resource call into qblib,
-        -- which can error if qblib is mid-restart at the same moment (e.g.
-        -- this resource restarting alongside its dependencies). An uncaught
-        -- error here would otherwise silently kill this CreateThread body.
-        local ok, model, skin = pcall(function() return QB.callback.trigger('qb-clothing:server:getSkin') end)
-        if not ok then return end
+        local model, skin = QB.callback.trigger('qb-clothing:server:getSkin')
         if generation ~= skinApplyGeneration then return end
 
         -- The callback trigger is a network round trip -- a fitting-room
