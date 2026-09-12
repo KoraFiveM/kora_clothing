@@ -277,9 +277,9 @@ H.ok(camera:find('function Camera.stop()', 1, true), 'camera exposes an explicit
 H.ok(camera:find('RenderScriptCams(false, true, 300, true, true)', 1, true), 'camera stop restores the gameplay cam')
 H.ok(client:find('stopControlLock()', 1, true), 'closing a session releases the control lock')
 
--- Migration follows qbinventory's exact convention: checksummed file handed
--- to qbsql's Migrator, no custom runner.
-H.ok(persistence:find('QB.sql.migrate(resource, migrations)', 1, true), 'schema uses qbsql\'s migrator')
+-- Migration follows qbinventory's exact convention: qbsql loads and
+-- fingerprints the declared file, with the historical checksum retained.
+H.ok(persistence:find('QB.sql.migrateFiles(resource, MIGRATIONS, checksum)', 1, true), 'schema uses qbsql\'s file migrator')
 H.ok(persistence:find("{ version = 1, name = 'playerskins_outfits', file = 'sql/001_playerskins_outfits.sql' }", 1, true), 'migration list matches the shipped sql file')
 
 H.finish()
