@@ -33,11 +33,7 @@ local function lerpAngle(current, goal, rate)
     return (current + delta * rate) % 360.0
 end
 
-local function clamp(value, minimum, maximum)
-    if value < minimum then return minimum end
-    if value > maximum then return maximum end
-    return value
-end
+local clamp = QB.util.clamp
 
 -- The selected zone's preset radius plus whatever the wheel has added, clamped
 -- to the configured absolute bounds. Deliberately returned as the LERP GOAL

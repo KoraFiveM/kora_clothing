@@ -13,6 +13,9 @@ local H = dofile('test/harness.lua')
 
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
+_G.QB = { util = { clamp = function(value, minimum, maximum)
+    return math.max(minimum, math.min(maximum, value))
+end } }
 
 dofile('config.lua')
 Config.testMode = true

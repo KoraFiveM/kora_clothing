@@ -409,7 +409,11 @@ end
 
 if Config.clothingAsItem then
     CreateThread(function()
-        while GetResourceState('qbcore') ~= 'started' do Wait(200) end
+        local coreReady = QB.resources.awaitStarted('qbcore', { timeout = 30000, interval = 200 })
+        if not coreReady then
+            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbcore did not start in time.')
+            return
+        end
         local itemOk = pcall(function()
             exports.qbcore:registerShared('items', Config.clothingItem.name, {
                 name = Config.clothingItem.name,
@@ -427,7 +431,11 @@ if Config.clothingAsItem then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but registering the outfit item with qbcore failed.')
         end
 
-        while GetResourceState('qbinventory') ~= 'started' do Wait(200) end
+        local inventoryReady = QB.resources.awaitStarted('qbinventory', { timeout = 30000, interval = 200 })
+        if not inventoryReady then
+            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory did not start in time.')
+            return
+        end
         local useableOk = pcall(function()
             exports.qbinventory:createUseable(Config.clothingItem.name, equipFromItem)
         end)
