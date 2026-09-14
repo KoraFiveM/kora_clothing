@@ -152,7 +152,9 @@ the camera is positioned would stall that frame.
 
 Barber and hairdresser are `service` values inside this same session, not
 separate UIs, so both get free zoom and the unobstructed camera with no
-per-service configuration.
+per-service configuration. Every grooming target accepts either freemode
+gender: the server routes the session to the matching barber or hairdresser
+policy before validating and opening it.
 
 ### Hair colour
 

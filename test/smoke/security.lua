@@ -109,6 +109,10 @@ H.ok(config:find('coords = vector4(127.02, -223.29, 53.56, 70.0)', 1, true), 'th
 H.ok(server:find("shopIndex = tonumber(type(extra) == 'table' and extra.shopId or extra)", 1, true), 'new options-table and legacy numeric shop opens share server validation')
 H.ok(server:find('local function mergeServiceSkin(before, requested, service, model)', 1, true), 'specialist sessions merge only permitted appearance fields')
 H.ok(server:find('if not serviceAllowsModel(service, model) then', 1, true), 'barber and hairdresser model restrictions are checked server-side')
+H.ok(server:find("if (service == 'barber' or service == 'hairdresser') and modelGender then", 1, true),
+    'every grooming target routes to the policy matching the player model')
+H.ok(server:find("service = modelGender == 'female' and 'hairdresser' or 'barber'", 1, true),
+    'female and male models resolve to their matching hair policy before validation')
 H.ok(server:find('local function tattooPriceDiff(previousSkin, newSkin, model)', 1, true), 'new tattoos are individually priced server-side')
 H.ok(server:find('Shared.tattooById(model, id)', 1, true), 'tattoos are validated against the configured model catalogue')
 H.ok(client:find("RegisterNUICallback('qbclothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')

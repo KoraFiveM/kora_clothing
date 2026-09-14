@@ -548,9 +548,15 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
     if not Config.services[service] then return end
 
     local model = (saved and saved.model) or defaultModelFor(src)
-    -- "Barber" is the staff-facing action name; route female freemode models
-    -- through the matching hairdresser policy automatically.
-    if mode == 'admin' and service == 'barber' and Shared.modelGender(model) == 'female' then service = 'hairdresser' end
+    -- Grooming locations share one player-facing service. Their configured
+    -- barber/hairdresser value selects the shop presentation, while the
+    -- player's freemode model selects the server-authoritative hair policy.
+    -- Apply this to normal target interactions as well as admin sessions so a
+    -- player is not rejected merely for using the other styling location.
+    local modelGender = Shared.modelGender(model)
+    if (service == 'barber' or service == 'hairdresser') and modelGender then
+        service = modelGender == 'female' and 'hairdresser' or 'barber'
+    end
     if not serviceAllowsModel(service, model) then
         TriggerClientEvent('qbclothing:client:sessionError', src,
             service == 'barber' and 'Barbers are available to male freemode models only.' or 'Hairdressers are available to female freemode models only.')
