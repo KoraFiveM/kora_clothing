@@ -298,10 +298,8 @@ local function applyModel(model, skin)
     local ped = PlayerPedId()
     local hash = joaat(model)
     if GetEntityModel(ped) ~= hash then
-        RequestModel(hash)
-        local timeout = GetGameTimer() + 5000
-        while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
-        if not HasModelLoaded(hash) then return false end
+        local loaded = QB.stream.loadModel(hash, nil, { timeout = 5000 })
+        if not loaded then return false end
         SetPlayerModel(PlayerId(), hash)
         SetModelAsNoLongerNeeded(hash)
         ped = PlayerPedId()
