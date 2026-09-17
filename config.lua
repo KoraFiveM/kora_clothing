@@ -323,4 +323,22 @@ Config.camera = {
 }
 
 -- Registers this resource-owned configuration with qblib without changing its public Config table.
-if QB and QB.config and QB.config.adopt then Config = QB.config.adopt(Config) end
+if QB and QB.config and QB.config.adopt then
+    local tattooStripItem = QB.config.object({
+        d = QB.config.integer(0, { min = 0 }),
+        t = QB.config.integer(0, { min = 0 }),
+    })
+    Config.tattooStrip.male = QB.config.map(Config.tattooStrip.male, tattooStripItem, {
+        keyType = 'integer',
+        live = true,
+        label = 'Male tattoo preview clothing',
+        description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a male freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
+    })
+    Config.tattooStrip.female = QB.config.map(Config.tattooStrip.female, tattooStripItem, {
+        keyType = 'integer',
+        live = true,
+        label = 'Female tattoo preview clothing',
+        description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a female freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
+    })
+    Config = QB.config.adopt(Config)
+end
