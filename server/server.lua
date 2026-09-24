@@ -754,7 +754,6 @@ end)
 -- is intentional, so it should not emit qblib's cross-resource collision
 -- warning intended for accidental namespace reuse. Powers qbmultichar's
 -- character-select preview camera.
-QB.callback.unregister('qb-multicharacter:server:getSkin')
 QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
     local src = _src
     if type(citizenid) ~= 'string' then return nil end
@@ -772,7 +771,7 @@ QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizeni
     local skin = sanitiseSkin(saved.skin, saved.model)
     byCitizen[citizenid] = { model = saved.model, skin = skin }
     return saved.model, skin
-end, { rateLimit = { max = 20, window = 10000 } })
+end, { replace = true, rateLimit = { max = 20, window = 10000 } })
 
 -- A reconnect is not required to invalidate selection previews. The
 -- qbmultichar server clears its authoritative mode after spawn/cleanup; drop
