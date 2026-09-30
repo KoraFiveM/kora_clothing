@@ -69,6 +69,7 @@ function headlineCopy(mode: ClothingMode, shopLabel?: string, service?: string) 
 function confirmLabel(mode: ClothingMode, total: number) {
     if (mode === "firstCharacter") return "Confirm"
     if (mode === "shop") return total > 0 ? `Buy & Wear · $${total.toLocaleString()}` : "Wear · Free"
+    if (mode === "wardrobe" && total > 0) return `Save & Wear · $${total.toLocaleString()}`
     return "Save & Wear"
 }
 
@@ -567,7 +568,7 @@ export default function App() {
                 <Save size={15} />
                 <input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Name this look" maxLength={40} />
             </label>
-            {open.mode === "shop" && <div className="price-total">
+            {(open.mode === "shop" || open.mode === "wardrobe") && <div className="price-total">
                 <span className="price-label">Total</span>
                 <span className="price-value">${changedTotal.toLocaleString()}</span>
             </div>}
