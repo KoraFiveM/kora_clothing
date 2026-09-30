@@ -8,6 +8,7 @@
 -- allowed to cancel" -- never trust the client's own idea of session state.
 
 local sessions = {} -- [src] = { mode, mandatory, previousBucket, citizenid, shopIndex }
+local openingSessions = {} -- [src] = request identity while appearance reads are pending
 local previewCache = {} -- [src][citizenid] = { model, skin }; pre-login selection-session cache
 local pendingAdminSessions = {} -- [src] = { service, expiresAt }; minted only by qbadmin's server export
 
@@ -478,7 +479,7 @@ exports('OpenAdminSession', function(targetSrc, service)
     if GetInvokingResource() ~= 'qbadmin' then return false, 'only qbadmin may open a remote admin session' end
     targetSrc = tonumber(targetSrc)
     if not targetSrc or targetSrc < 1 or not citizenIdFor(targetSrc) then return false, 'target is not online' end
-    if sessions[targetSrc] then return false, 'that player already has a clothing session open' end
+    if sessions[targetSrc] or openingSessions[targetSrc] then return false, 'that player already has a clothing session open' end
     if service ~= 'clothing' and service ~= 'barber' and service ~= 'tattoo' and service ~= 'creation' then
         return false, 'invalid appearance service'
     end
@@ -498,14 +499,14 @@ end)
 -- exploit menu can't fire these guessable names directly; the server-side
 -- checks below (session state, price computed from a DB diff, re-checked
 -- admin permission) remain the actual authorization, same as before.
-QB.events.register('qbclothing:server:requestSession', function(src, mode, extra)
-    if sessions[src] then return end
+local function requestSession(src, mode, extra, opening)
     if mode ~= 'firstCharacter' and mode ~= 'shop' and mode ~= 'wardrobe' and mode ~= 'admin' then return end
 
     local citizenid = citizenIdFor(src)
     if not citizenid then return end
 
     local saved = dbGetSkin(citizenid)
+    if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
 
     -- "firstCharacter" is a one-time free mandatory fitting for a citizen
     -- with no saved appearance yet. Without this check, a modified client
@@ -563,6 +564,12 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
         return
     end
 
+    local skin = sanitiseSkin((saved and saved.skin) or {}, model)
+    local moneyOk, money = pcall(function() return exports.qbcore:getPlayerData(src, { 'money' }) end)
+    local outfits = dbListOutfits(citizenid)
+    if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
+
+    -- Finish all database reads before capturing the bucket and publishing the session.
     local previousBucket = enterFittingRoom(src)
     sessions[src] = {
         mode = mode,
@@ -574,10 +581,6 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
         free = free == true,
     }
 
-    local skin = sanitiseSkin((saved and saved.skin) or {}, model)
-
-    local moneyOk, money = pcall(function() return exports.qbcore:getPlayerData(src, { 'money' }) end)
-
     TriggerClientEvent('qbclothing:client:openSession', src, {
         mode = mode,
         service = service,
@@ -586,12 +589,23 @@ QB.events.register('qbclothing:server:requestSession', function(src, mode, extra
         shopLabel = shopLabel,
         model = model,
         skin = skin,
-        outfits = dbListOutfits(citizenid),
+        outfits = outfits,
         prices = serviceConfig(service).prices or {},
         tattoos = serviceConfig(service).tattoos and Shared.tattoosFor(model) or {},
         currency = Config.shop.currency,
         money = moneyOk and money or nil,
     })
+end
+
+QB.events.register('qbclothing:server:requestSession', function(src, mode, extra)
+    if sessions[src] then return end
+    if openingSessions[src] then return end
+
+    local opening = {}
+    openingSessions[src] = opening
+    local ok, err = pcall(requestSession, src, mode, extra, opening)
+    if openingSessions[src] == opening then openingSessions[src] = nil end
+    if not ok then error(err, 0) end
 end)
 
 AddEventHandler('playerDropped', function()
@@ -788,12 +802,18 @@ end)
 -- --- cleanup ---
 
 AddEventHandler('playerDropped', function()
+    openingSessions[source] = nil
     sessions[source] = nil
     previewCache[source] = nil
 end)
 
+AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
+    openingSessions[src] = nil
+end)
+
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
+    openingSessions = {}
     for src, session in pairs(sessions) do
         pcall(leaveFittingRoom, src, session.previousBucket)
     end
