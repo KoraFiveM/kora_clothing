@@ -38,8 +38,15 @@ end
 
 -- --- persistence-backed reads/writes ---
 
-local function dbGetSkin(citizenid)
-    local row = QB.sql.single('SELECT `model`, `skin` FROM `playerskins` WHERE `citizenid` = ?', { citizenid })
+local function dbGetSkin(citizenid, src, context)
+    local row, err = QB.sql.single('SELECT `model`, `skin` FROM `playerskins` WHERE `citizenid` = ?', { citizenid })
+    if err then
+        if src and context and citizenIdFor(src) == citizenid
+            and (openingSessions[src] == context or sessions[src] == context) then
+            TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not load your saved appearance. Please try again.')
+        end
+        error(err, 0)
+    end
     if not row then return nil end
     return { model = row.model, skin = decode(row.skin) }
 end
@@ -508,7 +515,7 @@ local function requestSession(src, mode, extra, opening)
     local citizenid = citizenIdFor(src)
     if not citizenid then return end
 
-    local saved = dbGetSkin(citizenid)
+    local saved = dbGetSkin(citizenid, src, opening)
     if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
 
     -- "firstCharacter" is a one-time free mandatory fitting for a citizen
@@ -644,7 +651,7 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     -- Re-read from the DB rather than trusting anything cached from session
     -- open -- the authoritative "before" state for both pricing and (if this
     -- ends up boxed as an item instead of worn) what to revert the live ped to.
-    local before = dbGetSkin(session.citizenid)
+    local before = dbGetSkin(session.citizenid, src, session)
     local beforeModel = (before and before.model) or defaultModelFor(src)
     -- Normal sessions cannot swap a model; that closes a model-spoofing hole
     -- and keeps barber/hairdresser model policy meaningful.

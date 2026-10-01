@@ -15,6 +15,8 @@ local bucketNotices, rawBucketAllowed = {}, false
 local closes = {}
 local buckets, moves, opens = { [7] = 42, [8] = 85 }, {}, {}
 local holdSkin, holdOutfits, failSkin, failOutfits, admin = false, false, false, false, false
+local returnedSkinError
+local sessionErrors = {}
 local skinReads, outfitReads, writes = 0, 0, 0
 local saved = { model = Shared.models.male, skin = {} }
 local outfits = { { id = 9, outfitname = 'Owned', model = Shared.models.male } }
@@ -59,6 +61,7 @@ AddEventHandler = function(name, callback)
 end
 TriggerClientEvent = function(name, src, payload)
     if name == 'qbclothing:client:openSession' then opens[#opens + 1] = { src = src, payload = payload } end
+    if name == 'qbclothing:client:sessionError' then sessionErrors[#sessionErrors + 1] = { src = src, payload = payload } end
     if name == 'qbclothing:client:closeSession' then closes[#closes + 1] = { src = src, payload = payload } end
 end
 json = { encode = function() return '{}' end }
@@ -70,6 +73,7 @@ QB = {
         single = function(_, params)
             skinReads = skinReads + 1
             if failSkin then error('skin read failed') end
+            if returnedSkinError then return nil, returnedSkinError end
             if holdSkin then return coroutine.yield('skin', params[1]) end
             return saved
         end,
@@ -252,6 +256,95 @@ for _, available in ipairs({ true, false }) do
     H.equal(bucketNotices[1].bucket, 42)
 end
 exports['qb-core'].SetPlayerBucket, rawBucketAllowed = compatBucket, false
+
+-- qbsql returns nil,error on failure; it is not an absent saved appearance.
+for _, mode in ipairs({ 'firstCharacter', 'wardrobe', 'shop', 'admin' }) do
+    local count, moved, errors = #opens, #moves, #sessionErrors
+    returnedSkinError = 'controlled saved-skin read failed'
+    local ok, err = pcall(events['qbclothing:server:requestSession'], 7, mode, { shopId = 2, service = 'creation' })
+    H.equal(ok, false, 'a failed saved-skin read cannot authorize ' .. mode)
+    H.ok(tostring(err):find(returnedSkinError, 1, true), 'the server retains the read diagnostic')
+    H.equal(#sessionErrors, errors + 1, 'a failed open sends the existing client error response')
+    H.equal(sessionErrors[#sessionErrors].src, 7)
+    H.equal(sessionErrors[#sessionErrors].payload, 'Could not load your saved appearance. Please try again.')
+    H.equal(sessionErrors[#sessionErrors].payload:find(returnedSkinError, 1, true), nil, 'client feedback omits the SQL diagnostic')
+    H.equal(#opens, count)
+    H.equal(#moves, moved)
+    returnedSkinError = nil
+    start()
+    H.equal(#opens, count + 1, 'a failed read releases the opening reservation')
+    cancel()
+end
+
+-- A retired read error must not notify or release a replacement opening.
+holdSkin = true
+local stale = start()
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+local replacement = start()
+local errors = #sessionErrors
+local ok, err = coroutine.resume(stale, nil, 'controlled retired read failed')
+H.equal(ok, false)
+H.ok(tostring(err):find('controlled retired read failed', 1, true))
+H.equal(#sessionErrors, errors, 'retired opening error cannot notify a replacement')
+local duplicate = start()
+H.equal(coroutine.status(duplicate), 'dead', 'failed old read retains the replacement reservation')
+resume(replacement, saved)
+holdSkin = false
+cancel()
+
+-- Cancellation can replace a fitting while its old confirmation is reading.
+start()
+holdSkin = true
+stale = coroutine.create(function() events['qbclothing:server:confirmSession'](7, { skin = {} }) end)
+local status, stage = coroutine.resume(stale)
+H.equal(status, true)
+H.equal(stage, 'skin')
+cancel()
+replacement = start()
+resume(replacement, saved)
+holdSkin = false
+errors = #sessionErrors
+ok, err = coroutine.resume(stale, nil, 'controlled cancelled confirmation failed')
+H.equal(ok, false)
+H.ok(tostring(err):find('controlled cancelled confirmation failed', 1, true))
+H.equal(#sessionErrors, errors, 'old confirmation error cannot notify the replacement fitting')
+H.equal(buckets[7], Config.bucket.base + 7)
+cancel()
+H.equal(buckets[7], 42)
+
+-- A still-recorded confirmation must not notify a different character.
+start()
+holdSkin = true
+stale = coroutine.create(function() events['qbclothing:server:confirmSession'](7, { skin = {} }) end)
+status, stage = coroutine.resume(stale)
+H.equal(status, true)
+H.equal(stage, 'skin')
+local citizenid = players[7].citizenid
+players[7].citizenid = 'replacement-character'
+errors = #sessionErrors
+ok, err = coroutine.resume(stale, nil, 'controlled previous-character read failed')
+H.equal(ok, false)
+H.equal(#sessionErrors, errors, 'old-character confirmation error cannot notify the new character')
+players[7].citizenid, holdSkin = citizenid, false
+cancel()
+
+-- A failed confirmation read cannot become a free first-sync write.
+start()
+returnedSkinError = 'controlled confirmation read failed'
+local beforeWrites, moved, errors = writes, #moves, #sessionErrors
+local ok, err = pcall(events['qbclothing:server:confirmSession'], 7, { skin = {} })
+H.equal(ok, false)
+H.ok(tostring(err):find(returnedSkinError, 1, true))
+H.equal(#sessionErrors, errors + 1, 'a failed confirmation sends the existing client error response')
+H.equal(sessionErrors[#sessionErrors].src, 7)
+H.equal(sessionErrors[#sessionErrors].payload, 'Could not load your saved appearance. Please try again.')
+H.equal(sessionErrors[#sessionErrors].payload:find(returnedSkinError, 1, true), nil)
+H.equal(writes, beforeWrites, 'failed baseline read cannot overwrite an existing skin')
+H.equal(#moves, moved, 'a failed confirmation retains its existing fitting')
+returnedSkinError = nil
+events['qbclothing:server:confirmSession'](7, { skin = {} })
+H.equal(writes, beforeWrites + 1, 'healthy confirmation retry preserves ordinary persistence')
+H.equal(buckets[7], 42)
 
 -- Character unload retires an open fitting, including mandatory creation.
 for _, mode in ipairs({ 'wardrobe', 'firstCharacter' }) do

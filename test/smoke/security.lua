@@ -50,7 +50,7 @@ H.ok(server:find('pcall(leaveFittingRoom, src, session.previousBucket)', 1, true
 
 -- Shop pricing must be recomputed server-side from a DB re-read, never taken
 -- from the client or from a session-open-time cache.
-H.ok(server:find('local before = dbGetSkin(session.citizenid)', 1, true), 'price diff re-reads the saved skin at confirm time')
+H.ok(server:find('local before = dbGetSkin%(session%.citizenid[,)]'), 'price diff re-reads the saved skin at confirm time')
 H.ok(server:find('local price = priceDiff(', 1, true), 'purchase price is computed server-side')
 H.ok(server:find("exports.qbcore:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')", 1, true), 'purchase takes server-side payment')
 H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-submitted price')
