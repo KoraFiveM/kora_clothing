@@ -346,6 +346,172 @@ events['qbclothing:server:confirmSession'](7, { skin = {} })
 H.equal(writes, beforeWrites + 1, 'healthy confirmation retry preserves ordinary persistence')
 H.equal(buckets[7], 42)
 
+-- Successful SQL completions cannot resume a retired fitting's remaining work.
+local oldSingle, oldQuery, oldExecute = QB.sql.single, QB.sql.query, QB.sql.execute
+local oldScalar, oldInsert, oldRemove, oldAdd = QB.sql.scalar, QB.sql.insert, core.removeMoney, core.addMoney
+local phase
+local skinWrites, presetWrites, charges, refunds = {}, {}, {}, {}
+QB.sql.single = function(query, params)
+    if phase == 'skin' then return coroutine.yield('skin', params[1]) end
+    return oldSingle(query, params)
+end
+QB.sql.query = function(query, params)
+    if not query:find('`outfitname`', 1, true) and phase == 'owned' then
+        return coroutine.yield('owned', params[1])
+    end
+    return oldQuery(query, params)
+end
+QB.sql.execute = function(query, params)
+    skinWrites[#skinWrites + 1] = params[1]
+    local result = oldExecute(query, params)
+    if phase == 'refund' then return nil end
+    if phase == 'write' then return coroutine.yield('write', params[1]) end
+    return result
+end
+QB.sql.scalar = function(_, params)
+    if phase == 'count' then return coroutine.yield('count', params[1]) end
+    return 0
+end
+QB.sql.insert = function(_, params)
+    presetWrites[#presetWrites + 1] = params[1]
+    if phase == 'insert' then return coroutine.yield('insert', params[1]) end
+    return 77
+end
+core.removeMoney = function(_, src, account, amount, reason)
+    charges[#charges + 1] = { citizenid = players[src].citizenid, amount = amount, reason = reason }
+    players[src].money[account] = players[src].money[account] - amount
+    if phase == 'payment' then return coroutine.yield('payment') end
+    return true
+end
+core.addMoney = function(_, src, account, amount)
+    refunds[#refunds + 1] = players[src].citizenid
+    players[src].money[account] = players[src].money[account] + amount
+    if phase == 'refund' then return coroutine.yield('refund') end
+    return true
+end
+local payload = { skin = { components = { ['11'] = { d = 2, t = 0 } } }, saveName = 'Look' }
+local owned = { { model = Shared.models.male, skin = payload.skin } }
+local cases = {
+    { phase = 'skin', result = saved },
+    { phase = 'owned', result = {} },
+    { phase = 'owned', result = owned },
+    { phase = 'write', result = 1 },
+    { phase = 'write' }, -- Already-dispatched failed write must not refund a new character.
+    { phase = 'count', result = 0 },
+    { phase = 'count', result = Config.wardrobe.maxOutfits },
+    { phase = 'insert', result = 77 },
+    { phase = 'insert' },
+}
+for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
+    for _, case in ipairs(cases) do
+        players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
+        start()
+        phase = case.phase
+        local pending = coroutine.create(function() events['qbclothing:server:confirmSession'](7, payload) end)
+        local stage, citizenid = resume(pending)
+        H.equal(stage, case.phase)
+        H.equal(citizenid, 'first', 'SQL retains the initiating citizen identity')
+        phase = nil
+        if boundary == 'cancel' then cancel() else emit('QBCore:Server:OnPlayerUnload', 7, 7) end
+        if boundary == 'logout-different' then players[7].citizenid = 'replacement' end
+        players[7].money.cash = 1000
+        start()
+        local closed, moved, errors = #closes, #moves, #sessionErrors
+        local written, inserted, charged, refunded = #skinWrites, #presetWrites, #charges, #refunds
+        resume(pending, case.result)
+        H.equal(coroutine.status(pending), 'dead')
+        H.equal(#skinWrites, written, 'retired confirmation cannot dispatch another skin write')
+        H.equal(#presetWrites, inserted, 'retired confirmation cannot dispatch another preset write')
+        H.equal(#charges, charged, 'retired confirmation cannot charge the replacement')
+        H.equal(#refunds, refunded, 'retired confirmation cannot credit the replacement')
+        H.equal(#sessionErrors, errors, 'retired completion cannot send a replacement fitting an error')
+        H.equal(#closes, closed, 'retired confirmation cannot close the replacement')
+        H.equal(#moves, moved, 'retired confirmation cannot restore the replacement bucket')
+        H.equal(buckets[7], Config.bucket.base + 7)
+        H.equal(players[7].money.cash, 1000)
+        local opened = #opens
+        start()
+        H.equal(#opens, opened, 'replacement still owns its server session')
+        cancel()
+        H.equal(buckets[7], 42)
+    end
+end
+
+-- Public providers can suspend in their registered player-change subscribers.
+local resourceState = GetResourceState
+GetResourceState = function(name) return name == 'qbinventory' and 'started' or 'missing' end
+exports.qbinventory = { addItem = function() return coroutine.yield('item') end }
+for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
+    for _, provider in ipairs({ 'payment', 'item', 'refund' }) do
+        players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
+        start()
+        Config.clothingAsItem, phase = provider == 'item', provider
+        local pending = coroutine.create(function()
+            events['qbclothing:server:confirmSession'](7, { skin = payload.skin })
+        end)
+        H.equal(resume(pending), provider)
+        phase = nil
+        if boundary == 'cancel' then cancel() else emit('QBCore:Server:OnPlayerUnload', 7, 7) end
+        if boundary == 'logout-different' then players[7].citizenid = 'replacement' end
+        players[7].money.cash = 1000
+        start()
+        local written, closed, moved, errors = #skinWrites, #closes, #moves, #sessionErrors
+        resume(pending, true)
+        H.equal(coroutine.status(pending), 'dead')
+        H.equal(#skinWrites, written, 'retired provider completion cannot dispatch another skin write')
+        H.equal(#closes, closed, 'retired provider completion cannot close the replacement')
+        H.equal(#moves, moved, 'retired provider completion cannot restore the replacement bucket')
+        H.equal(#sessionErrors, errors, 'retired provider completion cannot publish a replacement error')
+        H.equal(players[7].money.cash, 1000)
+        local opened = #opens
+        start()
+        H.equal(#opens, opened, 'replacement still owns its session after provider completion')
+        cancel()
+    end
+end
+Config.clothingAsItem, GetResourceState, exports.qbinventory = false, resourceState, nil
+
+-- Without retirement, payment, direct saving, preset saving and returns are unchanged.
+players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
+start()
+local written, inserted, charged, closed = #skinWrites, #presetWrites, #charges, #closes
+H.equal(events['qbclothing:server:confirmSession'](7, payload), nil)
+H.equal(#skinWrites, written + 1)
+H.equal(#presetWrites, inserted + 1)
+H.equal(#charges, charged + 1)
+H.equal(charges[#charges].amount, Config.services.clothing.prices.tops)
+H.equal(charges[#charges].reason, 'qbclothing-purchase')
+H.equal(players[7].money.cash, 1000 - Config.services.clothing.prices.tops)
+H.equal(#closes, closed + 1)
+H.equal(buckets[7], 42)
+
+-- Boxed purchases retain their existing item arguments and before-look reversion.
+local oldResourceState = GetResourceState
+GetResourceState = function(name) return name == 'qbinventory' and 'started' or 'missing' end
+local grant
+exports.qbinventory = { addItem = function(_, src, name, amount, slot, info, reason)
+    grant = { src = src, name = name, amount = amount, slot = slot, info = info, reason = reason }
+    return true
+end }
+Config.clothingAsItem = true
+start()
+written = #skinWrites
+H.equal(events['qbclothing:server:confirmSession'](7, { skin = payload.skin }), nil)
+H.equal(#skinWrites, written, 'a boxed purchase still does not overwrite the worn appearance')
+H.equal(grant.src, 7)
+H.equal(grant.name, Config.clothingItem.name)
+H.equal(grant.amount, 1)
+H.equal(grant.slot, nil)
+H.equal(grant.reason, 'qbclothing-purchase')
+H.equal(grant.info.model, Shared.models.male)
+H.equal(grant.info.skin.components['11'].d, 2)
+H.equal(closes[#closes].payload.revertTo.model, Shared.models.male)
+H.equal(buckets[7], 42)
+Config.clothingAsItem, GetResourceState, exports.qbinventory = false, oldResourceState, nil
+QB.sql.single, QB.sql.query, QB.sql.execute = oldSingle, oldQuery, oldExecute
+QB.sql.scalar, QB.sql.insert, core.removeMoney, core.addMoney = oldScalar, oldInsert, oldRemove, oldAdd
+players[7].citizenid, players[7].money.cash = 'first', 1000
+
 -- Character unload retires an open fitting, including mandatory creation.
 for _, mode in ipairs({ 'wardrobe', 'firstCharacter' }) do
     local previousSaved = saved

@@ -643,6 +643,10 @@ QB.events.register('qbclothing:server:deleteOutfit', function(src, id)
     TriggerClientEvent('qbclothing:client:outfitsUpdated', src, dbListOutfits(session.citizenid))
 end)
 
+local function isCurrentSession(src, session)
+    return sessions[src] == session and citizenIdFor(src) == session.citizenid
+end
+
 QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     local session = sessions[src]
     if not session then return end
@@ -652,6 +656,7 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     -- open -- the authoritative "before" state for both pricing and (if this
     -- ends up boxed as an item instead of worn) what to revert the live ped to.
     local before = dbGetSkin(session.citizenid, src, session)
+    if not isCurrentSession(src, session) then return end
     local beforeModel = (before and before.model) or defaultModelFor(src)
     -- Normal sessions cannot swap a model; that closes a model-spoofing hole
     -- and keeps barber/hairdresser model policy meaningful.
@@ -675,13 +680,16 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     -- outfit this citizen already owns (saved to playeroutfits before) --
     -- you paid for those pieces once; re-wearing them isn't a new purchase.
     local chargedAmount = 0
-    if not session.free and session.mode ~= 'firstCharacter' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then
+    local needsPayment = not session.free and session.mode ~= 'firstCharacter' and before and not ownedOutfitMatch(session.citizenid, model, newSkin)
+    if not isCurrentSession(src, session) then return end
+    if needsPayment then
         local price = priceDiff(beforeSkin, newSkin, serviceConfig(session.service).prices)
         if serviceConfig(session.service).tattoos then
             price = price + tattooPriceDiff(beforeSkin, newSkin, model)
         end
         if price > 0 then
             local paid, err = exports.qbcore:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')
+            if not isCurrentSession(src, session) then return end
             if not paid then
                 TriggerClientEvent('qbclothing:client:sessionError', src, err or 'You cannot afford this outfit.')
                 return
@@ -701,15 +709,19 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     -- give a physical item instead of silently changing the persisted look.
     local wantsBox = not session.free and session.mode ~= 'firstCharacter' and Config.clothingAsItem
     local boxed = wantsBox and giveOutfitItem(src, model, newSkin, saveName or session.shopLabel or 'Outfit')
+    if wantsBox and not isCurrentSession(src, session) then return end
 
     if not boxed then
         -- Falls through here both when boxing was never wanted (feature off)
         -- and when it WAS wanted but failed (qbinventory not running, or the
         -- player's inventory couldn't fit it) -- the latter still needs to
         -- equip directly rather than silently losing an already-paid purchase.
-        if not dbSetSkin(session.citizenid, model, newSkin) then
+        local persisted = dbSetSkin(session.citizenid, model, newSkin)
+        if not isCurrentSession(src, session) then return end
+        if not persisted then
             if chargedAmount > 0 then
                 exports.qbcore:addMoney(src, Config.shop.currency, chargedAmount, 'qbclothing-persistence-refund')
+                if not isCurrentSession(src, session) then return end
             end
             TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not save your outfit. You were not charged.')
             return
@@ -720,10 +732,13 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     end
 
     if saveName then
-        if dbCountOutfits(session.citizenid) >= Config.wardrobe.maxOutfits then
+        local count = dbCountOutfits(session.citizenid)
+        if not isCurrentSession(src, session) then return end
+        if count >= Config.wardrobe.maxOutfits then
             TriggerClientEvent('qbclothing:client:sessionError', src, 'Outfit slots are full.')
         else
             local outfitId = dbInsertOutfit(session.citizenid, saveName, model, newSkin)
+            if not isCurrentSession(src, session) then return end
             if not outfitId then
                 TriggerClientEvent('qbclothing:client:sessionError', src, 'Your outfit was equipped, but the named preset could not be saved.')
             end

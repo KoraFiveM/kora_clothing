@@ -65,7 +65,7 @@ H.ok(server:find('local function withinShopZone(pos, zone, shopCoords)', 1, true
     'shop-session proximity uses the configured target geometry, not only the blip/counter point')
 H.ok(server:find('pointInPolygon(pos.x, pos.y, zone.points)', 1, true),
     'polygon storefront targets are server-validated against their actual footprint')
-H.ok(server:find('if not session.free and session.mode ~= \'firstCharacter\' and before and not ownedOutfitMatch(session.citizenid, model, newSkin) then', 1, true), 'configured free shops bypass pricing while paid sessions remain server-priced')
+H.ok(server:find('local needsPayment = not session.free and session.mode ~= \'firstCharacter\' and before and not ownedOutfitMatch(session.citizenid, model, newSkin)', 1, true) and server:find('if needsPayment then', 1, true), 'configured free shops bypass pricing while paid sessions remain server-priced')
 H.ok(server:find('local beforeSkin = sanitiseSkin((before and before.skin) or {}, model)', 1, true), 'the saved baseline is sanitised before pricing and persistence')
 H.ok(server:find('return ok and added == true', 1, true), "boxing an outfit checks addItem's actual return value, not just that the export call didn't throw")
 H.ok(server:find('if wantsBox then', 1, true) and server:find("equipped it directly instead", 1, true), 'a failed box falls back to a direct equip and tells the player, instead of silently losing a paid purchase')
