@@ -812,6 +812,13 @@ end)
 
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
     openingSessions[src] = nil
+    local session = sessions[src]
+    sessions[src] = nil
+    if not session or not GetPlayerName(src) then return end
+
+    -- Character logout retires even a mandatory fitting before the next character.
+    leaveFittingRoom(src, session.previousBucket)
+    TriggerClientEvent('qbclothing:client:closeSession', src, { ok = true, cancelled = true })
 end)
 
 AddEventHandler('onResourceStop', function(resource)

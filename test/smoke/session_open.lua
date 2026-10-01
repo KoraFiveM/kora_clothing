@@ -12,6 +12,7 @@ local players = {
     [8] = { citizenid = 'other', charinfo = { gender = 1 }, money = { cash = 1000 } },
 }
 local bucketNotices, rawBucketAllowed = {}, false
+local closes = {}
 local buckets, moves, opens = { [7] = 42, [8] = 85 }, {}, {}
 local holdSkin, holdOutfits, failSkin, failOutfits, admin = false, false, false, false, false
 local skinReads, outfitReads, writes = 0, 0, 0
@@ -44,6 +45,7 @@ SetPlayerRoutingBucket = function(src, bucket)
 end
 GetCurrentResourceName = function() return 'qbclothing' end
 GetInvokingResource = function() return 'qbadmin' end
+GetPlayerName = function(src) return players[src] and 'connected player' end
 GetPlayerPed = function(src) return src end
 DoesEntityExist = function() return true end
 local position = Config.shops[2].coords
@@ -57,6 +59,7 @@ AddEventHandler = function(name, callback)
 end
 TriggerClientEvent = function(name, src, payload)
     if name == 'qbclothing:client:openSession' then opens[#opens + 1] = { src = src, payload = payload } end
+    if name == 'qbclothing:client:closeSession' then closes[#closes + 1] = { src = src, payload = payload } end
 end
 json = { encode = function() return '{}' end }
 QB = {
@@ -249,6 +252,40 @@ for _, available in ipairs({ true, false }) do
     H.equal(bucketNotices[1].bucket, 42)
 end
 exports['qb-core'].SetPlayerBucket, rawBucketAllowed = compatBucket, false
+
+-- Character unload retires an open fitting, including mandatory creation.
+for _, mode in ipairs({ 'wardrobe', 'firstCharacter' }) do
+    local previousSaved = saved
+    if mode == 'firstCharacter' then saved = nil end
+    start(mode)
+    local count, closed = #opens, #closes
+    H.equal(buckets[7], Config.bucket.base + 7)
+    emit('QBCore:Server:OnPlayerUnload', 7, 7)
+    H.equal(buckets[7], 42, 'character unload restores the fitting-room bucket')
+    H.equal(#closes, closed + 1, 'character unload closes the client fitting room')
+    H.equal(closes[#closes].payload.cancelled, true, 'unload discards unsaved previews')
+    emit('QBCore:Server:OnPlayerUnload', 7, 7)
+    H.equal(#closes, closed + 1, 'duplicate unload is inert')
+    local oldCitizen = players[7].citizenid
+    players[7].citizenid, saved = 'next-character', previousSaved
+    start()
+    H.equal(#opens, count + 1, 'the next character can open its own fitting')
+    cancel()
+    H.equal(buckets[7], 42)
+    players[7].citizenid, saved = oldCitizen, previousSaved
+end
+
+-- A disconnected source loses the record without native moves or client messages.
+start()
+local oldPlayer, closed, moved, count = players[7], #closes, #moves, #opens
+players[7] = nil
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+H.equal(#closes, closed)
+H.equal(#moves, moved)
+players[7], buckets[7] = oldPlayer, 42
+start()
+H.equal(#opens, count + 1, 'a reused source cannot inherit the departed fitting')
+cancel()
 
 saved = nil
 start('firstCharacter')
