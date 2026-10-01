@@ -11,6 +11,7 @@ local players = {
     [7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } },
     [8] = { citizenid = 'other', charinfo = { gender = 1 }, money = { cash = 1000 } },
 }
+local bucketNotices, rawBucketAllowed = {}, false
 local buckets, moves, opens = { [7] = 42, [8] = 85 }, {}, {}
 local holdSkin, holdOutfits, failSkin, failOutfits, admin = false, false, false, false, false
 local skinReads, outfitReads, writes = 0, 0, 0
@@ -25,12 +26,22 @@ local function setBucket(_, src, bucket)
     buckets[src] = bucket
     moves[#moves + 1] = { src = src, bucket = bucket }
 end
+TriggerEvent = function(name, src)
+    if name == 'qbvoice:server:bucketChanged' then bucketNotices[#bucketNotices + 1] = { src = src, bucket = buckets[src] } end
+end
+local function compatBucket(...)
+    setBucket(...)
+    TriggerEvent('qbvoice:server:bucketChanged', select(2, ...))
+end
 -- FiveM exposes a callable exports table; the metatable only adapts that host API.
-exports = setmetatable({ qbcore = core, ['qb-core'] = { SetPlayerBucket = setBucket } }, {
+exports = setmetatable({ qbcore = core, ['qb-core'] = { SetPlayerBucket = compatBucket } }, {
     __call = function(_, name, callback) public[name] = callback end,
 })
 GetPlayerRoutingBucket = function(src) return buckets[src] end
-SetPlayerRoutingBucket = function() error('compat bucket export should be used') end
+SetPlayerRoutingBucket = function(src, bucket)
+    assert(rawBucketAllowed, 'compat bucket export should be used')
+    setBucket(nil, src, bucket)
+end
 GetCurrentResourceName = function() return 'qbclothing' end
 GetInvokingResource = function() return 'qbadmin' end
 GetPlayerPed = function(src) return src end
@@ -220,6 +231,24 @@ cancel()
 local count = #opens
 start('admin', { service = 'tattoo' })
 H.equal(#opens, count, 'remote admin grant remains one-use')
+
+-- Compat-disabled installations use the raw native, with the same local notice.
+saved = { model = Shared.models.male, skin = {} }
+for _, available in ipairs({ true, false }) do
+    rawBucketAllowed = not available
+    exports['qb-core'].SetPlayerBucket = available and compatBucket or function() error('compat disabled') end
+    bucketNotices = {}
+    start()
+    H.equal(#bucketNotices, 1)
+    H.equal(bucketNotices[1].src, 7)
+    H.equal(bucketNotices[1].bucket, Config.bucket.base + 7)
+    bucketNotices = {}
+    cancel()
+    H.equal(#bucketNotices, 1)
+    H.equal(bucketNotices[1].src, 7)
+    H.equal(bucketNotices[1].bucket, 42)
+end
+exports['qb-core'].SetPlayerBucket, rawBucketAllowed = compatBucket, false
 
 saved = nil
 start('firstCharacter')

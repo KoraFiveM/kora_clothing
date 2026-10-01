@@ -372,7 +372,10 @@ end
 -- disabled on the qbcore side) so a fitting room never silently fails to isolate.
 local function setBucket(src, bucket)
     local ok = pcall(function() exports['qb-core']:SetPlayerBucket(src, bucket) end)
-    if not ok then SetPlayerRoutingBucket(src, bucket) end
+    if not ok then
+        SetPlayerRoutingBucket(src, bucket)
+        TriggerEvent('qbvoice:server:bucketChanged', src)
+    end
 end
 
 local function enterFittingRoom(src)
