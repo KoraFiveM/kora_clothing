@@ -43,7 +43,7 @@ H.ok(server:find('if not session or session.mandatory then return end', 1, true)
 -- Routing-bucket isolation must go through the qb-core compat export (keeps
 -- QBCore.Functions.GetPlayersInBucket accurate for other legacy consumers),
 -- never the raw native directly, and must always restore on every exit path.
-H.ok(server:find("exports['qb-core']:SetPlayerBucket(src, bucket)", 1, true), 'entering the fitting room uses the qb-core bucket export')
+H.ok(server:find("exports.qbcore:setPlayerBucket(src, bucket)", 1, true), 'entering the fitting room uses the qb-core bucket export')
 H.ok(server:find('local function leaveFittingRoom(src, previousBucket)', 1, true), 'bucket restore is a single named function')
 H.ok(server:find('leaveFittingRoom(src, session.previousBucket)', 1, true), 'confirm restores the prior bucket')
 H.ok(server:find('pcall(leaveFittingRoom, src, session.previousBucket)', 1, true), 'a resource stop still restores every open session\'s bucket')

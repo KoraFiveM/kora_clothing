@@ -37,7 +37,8 @@ local function compatBucket(...)
     TriggerEvent('qbvoice:server:bucketChanged', select(2, ...))
 end
 -- FiveM exposes a callable exports table; the metatable only adapts that host API.
-exports = setmetatable({ qbcore = core, ['qb-core'] = { SetPlayerBucket = compatBucket } }, {
+core.setPlayerBucket = compatBucket
+exports = setmetatable({ qbcore = core }, {
     __call = function(_, name, callback) public[name] = callback end,
 })
 GetPlayerRoutingBucket = function(src) return buckets[src] end
@@ -243,7 +244,7 @@ H.equal(#opens, count, 'remote admin grant remains one-use')
 saved = { model = Shared.models.male, skin = {} }
 for _, available in ipairs({ true, false }) do
     rawBucketAllowed = not available
-    exports['qb-core'].SetPlayerBucket = available and compatBucket or function() error('compat disabled') end
+    exports.qbcore.setPlayerBucket = available and compatBucket or function() error('compat disabled') end
     bucketNotices = {}
     start()
     H.equal(#bucketNotices, 1)
@@ -255,7 +256,7 @@ for _, available in ipairs({ true, false }) do
     H.equal(bucketNotices[1].src, 7)
     H.equal(bucketNotices[1].bucket, 42)
 end
-exports['qb-core'].SetPlayerBucket, rawBucketAllowed = compatBucket, false
+exports.qbcore.setPlayerBucket, rawBucketAllowed = compatBucket, false
 
 -- qbsql returns nil,error on failure; it is not an absent saved appearance.
 for _, mode in ipairs({ 'firstCharacter', 'wardrobe', 'shop', 'admin' }) do

@@ -371,14 +371,10 @@ end
 
 -- --- bucket helpers ---
 
--- Routed through the qb-core compat export (not the raw native directly) so
--- QBCore.Functions.GetPlayersInBucket/GetBucketObjects -- used by any other
--- legacy-compat resource -- stay accurate about who qbclothing has moved.
--- See qbcore/compat/server/qb-core.lua's SetPlayerBucket. Falls back to the
--- raw native if that export is unavailable (e.g. Config.compat.coreObjectExport
--- disabled on the qbcore side) so a fitting room never silently fails to isolate.
+-- qbcore updates legacy bucket tracking and notifies voice subscribers too.
+-- Keep the native fallback so a core outage cannot prevent fitting-room isolation.
 local function setBucket(src, bucket)
-    local ok = pcall(function() exports['qb-core']:SetPlayerBucket(src, bucket) end)
+    local ok = pcall(function() exports.qbcore:setPlayerBucket(src, bucket) end)
     if not ok then
         SetPlayerRoutingBucket(src, bucket)
         TriggerEvent('qbvoice:server:bucketChanged', src)
