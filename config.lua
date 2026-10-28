@@ -1,6 +1,6 @@
--- Own config, self-contained -- matches qbmultichar's convention of owning
--- its data rather than reading qbcore's shared registries. Named `Config`,
--- not a `QB`-prefixed global -- qblib's `@qblib/init.lua` already owns the
+-- Own config, self-contained -- matches kora_multichar's convention of owning
+-- its data rather than reading kora_core's shared registries. Named `Config`,
+-- not a `QB`-prefixed global -- kora_lib's `@kora_lib/init.lua` already owns the
 -- global `QB` as a live cross-resource proxy in this codebase.
 
 Config = {}
@@ -47,11 +47,11 @@ Config.wardrobe = {
 -- When true, a purchase/save that would normally equip the outfit directly
 -- instead gives the player a physical inventory item holding that exact
 -- model+skin; using the item from inventory is what actually puts it on.
--- Off by default -- direct-equip needs no qbinventory item definitions to
--- exist, so this is a safe default for a server not running qbinventory or
--- not wanting a wardrobe-as-inventory economy. Requires qbinventory running
--- when enabled; qbclothing registers the item with qbcore and its use
--- handler with qbinventory itself, no server-side setup needed beyond
+-- Off by default -- direct-equip needs no kora_inventory item definitions to
+-- exist, so this is a safe default for a server not running kora_inventory or
+-- not wanting a wardrobe-as-inventory economy. Requires kora_inventory running
+-- when enabled; kora_clothing registers the item with kora_core and its use
+-- handler with kora_inventory itself, no server-side setup needed beyond
 -- flipping this on.
 Config.clothingAsItem = false
 
@@ -75,7 +75,7 @@ Config.shopPeds = false
 -- target remains the storefront zone and is always available.
 Config.shopPedScopeRadius = 75.0
 
--- Fixed service locations. Each entry creates a qbtarget zone; `free` is
+-- Fixed service locations. Each entry creates a kora_target zone; `free` is
 -- resolved only by the server from this config, so callers cannot forge it.
 --
 -- `coords` is the interaction/blip point (heading in `.w`, used for the clerk
@@ -86,10 +86,10 @@ Config.shopPedScopeRadius = 75.0
 -- Clothing stores are POLYGONS covering the walkable shop interior, not a
 -- counter box: the player browses the whole floor, so anywhere inside the
 -- store should open the shop rather than one 2m spot by the till. Polys are
--- captured in-game with qblib's zone creator (`QB.zones.poly` output pasted
+-- captured in-game with kora_lib's zone creator (`QB.zones.poly` output pasted
 -- verbatim), so the shape matches the real map geometry. `thickness` is
 -- measured UPWARD from the lowest point, not centred on the average -- see
--- qblib/modules/zones/client.lua -- so 4.0 is one storey of headroom above
+-- kora_lib/modules/zones/client.lua -- so 4.0 is one storey of headroom above
 -- the floor the points were traced on. Barber and tattoo zones are kept tight
 -- around their chair, but remain polygons so every service location uses the
 -- same target-zone primitive.
@@ -322,7 +322,7 @@ Config.camera = {
     transitionMs = 350,
 }
 
--- Registers this resource-owned configuration with qblib without changing its public Config table.
+-- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if QB and QB.config and QB.config.adopt then
     local tattooStripItem = QB.config.object({
         d = QB.config.integer(0, { min = 0 }),

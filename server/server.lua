@@ -1,4 +1,4 @@
--- qbclothing server authority: fitting-room bucket isolation, skin/outfit
+-- kora_clothing server authority: fitting-room bucket isolation, skin/outfit
 -- persistence, and the real qb-clothing wire protocol (net events + QB
 -- callback names) for third-party compat.
 --
@@ -10,10 +10,10 @@
 local sessions = {} -- [src] = { mode, mandatory, previousBucket, citizenid, shopIndex }
 local openingSessions = {} -- [src] = request identity while appearance reads are pending
 local previewCache = {} -- [src][citizenid] = { model, skin }; pre-login selection-session cache
-local pendingAdminSessions = {} -- [src] = { service, expiresAt }; minted only by qbadmin's server export
+local pendingAdminSessions = {} -- [src] = { service, expiresAt }; minted only by kora_admin's server export
 
 local function citizenIdFor(src)
-    local ok, citizenid = pcall(function() return exports.qbcore:getPlayerData(src, { 'citizenid' }) end)
+    local ok, citizenid = pcall(function() return exports.kora_core:getPlayerData(src, { 'citizenid' }) end)
     if not ok or type(citizenid) ~= 'string' or citizenid == '' then return nil end
     return citizenid
 end
@@ -31,7 +31,7 @@ local function encode(value)
 end
 
 local function defaultModelFor(src)
-    local ok, charinfo = pcall(function() return exports.qbcore:getPlayerData(src, { 'charinfo' }) end)
+    local ok, charinfo = pcall(function() return exports.kora_core:getPlayerData(src, { 'charinfo' }) end)
     local gender = ok and type(charinfo) == 'table' and charinfo.gender or 0
     return gender == 1 and Shared.models.female or Shared.models.male
 end
@@ -139,7 +139,7 @@ local function withinShopZone(pos, zone, shopCoords)
     local size = zone.size
     if not size then return false end
 
-    -- qblib box zones rotate their XY footprint around shop.coords and use a
+    -- kora_lib box zones rotate their XY footprint around shop.coords and use a
     -- vertical band centred on its Z coordinate.
     local rotation = math.rad(zone.rotation or shopCoords.w or 0.0)
     local dx, dy = pos.x - shopCoords.x, pos.y - shopCoords.y
@@ -371,10 +371,10 @@ end
 
 -- --- bucket helpers ---
 
--- qbcore updates legacy bucket tracking and notifies voice subscribers too.
+-- kora_core updates legacy bucket tracking and notifies voice subscribers too.
 -- Keep the native fallback so a core outage cannot prevent fitting-room isolation.
 local function setBucket(src, bucket)
-    local ok = pcall(function() exports.qbcore:setPlayerBucket(src, bucket) end)
+    local ok = pcall(function() exports.kora_core:setPlayerBucket(src, bucket) end)
     if not ok then
         SetPlayerRoutingBucket(src, bucket)
         TriggerEvent('qbvoice:server:bucketChanged', src)
@@ -396,7 +396,7 @@ end
 -- Fires when a player uses a `qbclothing_outfit` item from their inventory.
 -- Equips it live and persists it as their current look, same as a direct
 -- shop purchase would -- the item is deliberately NOT consumed (`return
--- false`, matching qbinventory's own non-consumed-use convention) so it stays
+-- false`, matching kora_inventory's own non-consumed-use convention) so it stays
 -- in the inventory as a reusable garment, swappable like a real wardrobe.
 local function equipFromItem(src, item)
     local info = (item and item.info) or {}
@@ -416,13 +416,13 @@ end
 
 if Config.clothingAsItem then
     CreateThread(function()
-        local coreReady = QB.resources.awaitStarted('qbcore', { timeout = 30000, interval = 200 })
+        local coreReady = QB.resources.awaitStarted('kora_core', { timeout = 30000, interval = 200 })
         if not coreReady then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but qbcore did not start in time.')
             return
         end
         local itemOk = pcall(function()
-            exports.qbcore:registerShared('items', Config.clothingItem.name, {
+            exports.kora_core:registerShared('items', Config.clothingItem.name, {
                 name = Config.clothingItem.name,
                 label = Config.clothingItem.label,
                 weight = Config.clothingItem.weight,
@@ -438,27 +438,27 @@ if Config.clothingAsItem then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but registering the outfit item with qbcore failed.')
         end
 
-        local inventoryReady = QB.resources.awaitStarted('qbinventory', { timeout = 30000, interval = 200 })
+        local inventoryReady = QB.resources.awaitStarted('kora_inventory', { timeout = 30000, interval = 200 })
         if not inventoryReady then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory did not start in time.')
             return
         end
         local useableOk = pcall(function()
-            exports.qbinventory:createUseable(Config.clothingItem.name, equipFromItem)
+            exports.kora_inventory:createUseable(Config.clothingItem.name, equipFromItem)
         end)
         if not useableOk then
-            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory:createUseable failed -- is qbinventory running?')
+            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory:createUseable failed -- is kora_inventory running?')
         end
     end)
 end
 
 -- Gives a boxed outfit item instead of equipping directly. Only called when
--- Config.clothingAsItem is on and qbinventory is actually available -- the
+-- Config.clothingAsItem is on and kora_inventory is actually available -- the
 -- caller falls back to a direct dbSetSkin equip otherwise, so an operator
--- flipping the config on without qbinventory running degrades gracefully
+-- flipping the config on without kora_inventory running degrades gracefully
 -- instead of silently losing the purchase.
 local function giveOutfitItem(src, model, skin, label)
-    if not Config.clothingAsItem or GetResourceState('qbinventory') ~= 'started' then return false end
+    if not Config.clothingAsItem or GetResourceState('kora_inventory') ~= 'started' then return false end
     -- pcall's own success only means "the export call didn't error" --
     -- addItem itself returns (false, 'no free slot'/'too heavy'/...) on a
     -- full or over-weight inventory WITHOUT throwing, so that failure has to
@@ -466,7 +466,7 @@ local function giveOutfitItem(src, model, skin, label)
     -- from pcall's ok alone. Getting this wrong means charging a player and
     -- giving them nothing in return.
     local ok, added = pcall(function()
-        return exports.qbinventory:addItem(src, Config.clothingItem.name, 1, nil, {
+        return exports.kora_inventory:addItem(src, Config.clothingItem.name, 1, nil, {
             model = model,
             skin = skin,
             label = label,
@@ -477,12 +477,12 @@ end
 
 -- --- session lifecycle ---
 
--- Server-to-server entry point used by qbadmin after its own command has
+-- Server-to-server entry point used by kora_admin after its own command has
 -- resolved a target and passed the admin gate. The short-lived grant is
 -- consumed by requestSession on the target's token-authenticated client flow;
 -- a player cannot manufacture one by firing a public net event.
 exports('OpenAdminSession', function(targetSrc, service)
-    if GetInvokingResource() ~= 'qbadmin' then return false, 'only qbadmin may open a remote admin session' end
+    if GetInvokingResource() ~= 'kora_admin' then return false, 'only qbadmin may open a remote admin session' end
     targetSrc = tonumber(targetSrc)
     if not targetSrc or targetSrc < 1 or not citizenIdFor(targetSrc) then return false, 'target is not online' end
     if sessions[targetSrc] or openingSessions[targetSrc] then return false, 'that player already has a clothing session open' end
@@ -501,7 +501,7 @@ end)
 
 -- Session open/confirm move real money (confirmSession) and gate an
 -- admin-only free fitting (requestSession's 'admin' mode) -- routed through
--- qblib's tokenised QB.events instead of a raw RegisterNetEvent so a static
+-- kora_lib's tokenised QB.events instead of a raw RegisterNetEvent so a static
 -- exploit menu can't fire these guessable names directly; the server-side
 -- checks below (session state, price computed from a DB diff, re-checked
 -- admin permission) remain the actual authorization, same as before.
@@ -539,7 +539,7 @@ local function requestSession(src, mode, extra, opening)
     elseif mode == 'admin' then
         local requested = type(extra) == 'table' and extra.service or nil
         local grant = pendingAdminSessions[src]
-        local selfAuthorized = exports.qbcore:hasPermission(src, 'admin')
+        local selfAuthorized = exports.kora_core:hasPermission(src, 'admin')
         if not selfAuthorized then
             if not grant or grant.expiresAt < os.time() or grant.service ~= requested then return end
             pendingAdminSessions[src] = nil
@@ -571,7 +571,7 @@ local function requestSession(src, mode, extra, opening)
     end
 
     local skin = sanitiseSkin((saved and saved.skin) or {}, model)
-    local moneyOk, money = pcall(function() return exports.qbcore:getPlayerData(src, { 'money' }) end)
+    local moneyOk, money = pcall(function() return exports.kora_core:getPlayerData(src, { 'money' }) end)
     local outfits = dbListOutfits(citizenid)
     if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
 
@@ -667,7 +667,7 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     -- alone would let a player dress in brand-new items for free simply by
     -- opening the wardrobe instead of a shop. Also skipped when `before` is
     -- nil (no playerskins row exists yet outside the firstCharacter flow --
-    -- e.g. a pre-existing citizen from before qbclothing was installed, or a
+    -- e.g. a pre-existing citizen from before kora_clothing was installed, or a
     -- third-party script opening a session directly): `beforeSkin` in that
     -- case is an EMPTY placeholder, not the citizen's real current look, and
     -- diffing every category against "nothing" would charge for every
@@ -684,7 +684,7 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
             price = price + tattooPriceDiff(beforeSkin, newSkin, model)
         end
         if price > 0 then
-            local paid, err = exports.qbcore:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')
+            local paid, err = exports.kora_core:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')
             if not isCurrentSession(src, session) then return end
             if not paid then
                 TriggerClientEvent('qbclothing:client:sessionError', src, err or 'You cannot afford this outfit.')
@@ -709,14 +709,14 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
 
     if not boxed then
         -- Falls through here both when boxing was never wanted (feature off)
-        -- and when it WAS wanted but failed (qbinventory not running, or the
+        -- and when it WAS wanted but failed (kora_inventory not running, or the
         -- player's inventory couldn't fit it) -- the latter still needs to
         -- equip directly rather than silently losing an already-paid purchase.
         local persisted = dbSetSkin(session.citizenid, model, newSkin)
         if not isCurrentSession(src, session) then return end
         if not persisted then
             if chargedAmount > 0 then
-                exports.qbcore:addMoney(src, Config.shop.currency, chargedAmount, 'qbclothing-persistence-refund')
+                exports.kora_core:addMoney(src, Config.shop.currency, chargedAmount, 'qbclothing-persistence-refund')
                 if not isCurrentSession(src, session) then return end
             end
             TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not save your outfit. You were not charged.')
@@ -763,11 +763,11 @@ end)
 
 -- --- real qb-clothing / qb-multicharacter compat callbacks ---
 
--- Real signature: cb(model, skin). qblib's QB.callback is return-value based
--- (see qbcore/compat/server/qb-multicharacter.lua's own getSkin stub), so a
+-- Real signature: cb(model, skin). kora_lib's QB.callback is return-value based
+-- (see kora_core/compat/server/qb-multicharacter.lua's own getSkin stub), so a
 -- handler returning `model, skin` is what QB.callback.trigger(...) surfaces
 -- to a caller using the modern trigger style; QBCore.Functions.CreateCallback
--- compat (qbcore/compat/server/qb-core.lua:177) is a thin wrapper over the
+-- compat (kora_core/compat/server/qb-core.lua:177) is a thin wrapper over the
 -- same registry, so legacy `cb(model, skin)`-style callers work too.
 QB.callback.register('qb-clothing:server:getSkin', function(src)
     local citizenid = citizenIdFor(src)
@@ -782,17 +782,17 @@ QB.callback.register('qb-clothing:server:getSkin', function(src)
     return saved.model, sanitiseSkin(saved.skin, saved.model)
 end)
 
--- Overrides qbcore's own honest "no clothing module exists" stub
+-- Overrides kora_core's own honest "no clothing module exists" stub
 -- (compat/server/qb-multicharacter.lua) now that one does. QB.callback.register
--- is a plain last-writer-wins overwrite (qblib/local/callback/server.lua).
+-- is a plain last-writer-wins overwrite (kora_lib/local/callback/server.lua).
 -- Explicitly unregister the documented placeholder first: this replacement
--- is intentional, so it should not emit qblib's cross-resource collision
--- warning intended for accidental namespace reuse. Powers qbmultichar's
+-- is intentional, so it should not emit kora_lib's cross-resource collision
+-- warning intended for accidental namespace reuse. Powers kora_multichar's
 -- character-select preview camera.
 QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
     local src = _src
     if type(citizenid) ~= 'string' then return nil end
-    local ok, owned = pcall(function() return exports.qbcore:ownsCharacter(src, citizenid) end)
+    local ok, owned = pcall(function() return exports.kora_core:ownsCharacter(src, citizenid) end)
     if not ok or owned ~= true then return nil end
 
     local byCitizen = previewCache[src]
@@ -809,12 +809,12 @@ QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizeni
 end, { replace = true, rateLimit = { max = 20, window = 10000 } })
 
 -- A reconnect is not required to invalidate selection previews. The
--- qbmultichar server clears its authoritative mode after spawn/cleanup; drop
+-- kora_multichar server clears its authoritative mode after spawn/cleanup; drop
 -- that source's cached pre-login reads at the same boundary so a later return
 -- to character selection cannot see an outfit saved during this session.
 AddStateBagChangeHandler('qbmultichar:mode', nil, function(bagName, _, value)
-    -- A cleared mode is falsy: `false` from qbmultichar's writeMode, or nil on
-    -- a server whose qbmultichar predates that change.
+    -- A cleared mode is falsy: `false` from kora_multichar's writeMode, or nil on
+    -- a server whose kora_multichar predates that change.
     if value or type(bagName) ~= 'string' then return end
     local src = tonumber(bagName:match('^player:(%d+)$'))
     if src then previewCache[src] = nil end

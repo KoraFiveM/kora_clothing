@@ -1,6 +1,6 @@
--- Schema bootstrap for playerskins/playeroutfits, following qbinventory's
+-- Schema bootstrap for playerskins/playeroutfits, following kora_inventory's
 -- exact migration convention (server/persistence.lua): read the .sql file,
--- checksum it, hand both to qbsql's Migrator via QB.sql.migrate. qbsql tracks
+-- checksum it, hand both to kora_sql's Migrator via QB.sql.migrate. kora_sql tracks
 -- applied (resource, version) pairs itself -- no custom runner needed here.
 
 QbClothing = QbClothing or {}
@@ -23,8 +23,8 @@ local function fnv1a(str)
     return hash
 end
 
--- Matches qbinventory's checksum format exactly (two 64-bit FNV-1a hex
--- halves, zero-padded to qbsql's expected 64 hex chars) -- qbsql's Migrator
+-- Matches kora_inventory's checksum format exactly (two 64-bit FNV-1a hex
+-- halves, zero-padded to kora_sql's expected 64 hex chars) -- kora_sql's Migrator
 -- only cares that the same source always produces the same checksum.
 local function checksum(str)
     local a, b = fnv1a(str), fnv1a(str:reverse())

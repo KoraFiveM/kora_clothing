@@ -47,7 +47,7 @@ local function goalRadius(zoneCfg)
     return clamp(zoneCfg.camOffset.y + target.zoomOffset, bounds.min, bounds.max)
 end
 
--- Ported from qbmultichar's scene.lua, which solves this exact problem for its
+-- Ported from kora_multichar's scene.lua, which solves this exact problem for its
 -- authored character cameras: without it a wall, a parked car or a passing ped
 -- can sit between the camera and the ped being dressed. A capsule rather than a
 -- zero-width ray so the camera does not end up grazing a wall, column or

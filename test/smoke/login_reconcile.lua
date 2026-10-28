@@ -1,5 +1,5 @@
 -- Regression coverage for the state-bag reconcile path added alongside
--- qbhud's (client/bridge/qbcore.lua): `ensure qbclothing` mid-session must
+-- kora_hud's (client/bridge/qbcore.lua): `ensure kora_clothing` mid-session must
 -- re-apply the player's saved skin WITHOUT waiting for
 -- QBCore:Client:OnPlayerLoaded to fire again -- that legacy event does not
 -- re-fire on a resource restart, only on an actual fresh login. Proves the
@@ -7,7 +7,7 @@
 -- being true at chunk load.
 local H = dofile('test/harness.lua')
 
-_G.GetCurrentResourceName = function() return 'qbclothing' end
+_G.GetCurrentResourceName = function() return 'kora_clothing' end
 _G.AddEventHandler = function() end
 
 local registeredNetEvents = {}
@@ -29,7 +29,7 @@ _G.PlayerId = function() return 1 end
 _G.PlayerPedId = function() return 1 end
 _G.GetPlayerServerId = function() return 1 end
 
--- Simulates `ensure qbclothing` mid-session: the server-owned login state
+-- Simulates `ensure kora_clothing` mid-session: the server-owned login state
 -- bag is ALREADY true by the time this chunk loads, and nothing will flip it
 -- again (no fresh login is happening).
 _G.LocalPlayer = { state = { ['qbcore:loggedIn'] = true } }
@@ -86,7 +86,7 @@ _G.QB = {
 dofile('config.lua')
 Config.testMode = true
 -- Emptied so the unrelated chunk-load shop-ped spawn thread (QB.entities.
--- create/exports.qbtarget) is a no-op -- irrelevant to this test and not
+-- create/exports.kora_target) is a no-op -- irrelevant to this test and not
 -- worth mocking out.
 Config.shops = {}
 dofile('shared/components.lua')

@@ -8,7 +8,7 @@ declare global {
 const browser = typeof window.invokeNative !== "function"
 
 function resourceName() {
-    return window.GetParentResourceName?.() ?? "qbclothing"
+    return window.GetParentResourceName?.() ?? "kora_clothing"
 }
 
 /** The sole browser-to-Lua transport. Every RegisterNUICallback name the Lua

@@ -1,7 +1,7 @@
 -- Source-contract coverage for security/UX boundaries that need an FXServer
 -- to exercise at runtime -- these assertions inspect the public transport
 -- shape instead of pretending a plain Lua process can emulate Cfx natives.
--- Same convention as qbinventory/test/smoke/security.lua.
+-- Same convention as kora_inventory/test/smoke/security.lua.
 local H = dofile('test/harness.lua')
 
 local function read(path)
@@ -21,7 +21,7 @@ local shared = read('shared/components.lua')
 
 -- No stray backtick hash-literal syntax (a CFX-only Lua extension) anywhere in
 -- the resource -- a real occurrence silently breaks stock lua/luac-based
--- tooling like this smoke suite (see qbcore's own gotcha notes). Every
+-- tooling like this smoke suite (see kora_core's own gotcha notes). Every
 -- backtick present is inside an ordinary quoted SQL identifier string or a
 -- comment, never bare source syntax.
 for _, path in ipairs({ 'fxmanifest.lua', 'config.lua', 'shared/components.lua', 'server/persistence.lua', 'server/server.lua', 'client/client.lua', 'client/camera.lua' }) do
@@ -43,7 +43,7 @@ H.ok(server:find('if not session or session.mandatory then return end', 1, true)
 -- Routing-bucket isolation must go through the qb-core compat export (keeps
 -- QBCore.Functions.GetPlayersInBucket accurate for other legacy consumers),
 -- never the raw native directly, and must always restore on every exit path.
-H.ok(server:find("exports.qbcore:setPlayerBucket(src, bucket)", 1, true), 'entering the fitting room uses the qb-core bucket export')
+H.ok(server:find("exports.kora_core:setPlayerBucket(src, bucket)", 1, true), 'entering the fitting room uses the qb-core bucket export')
 H.ok(server:find('local function leaveFittingRoom(src, previousBucket)', 1, true), 'bucket restore is a single named function')
 H.ok(server:find('leaveFittingRoom(src, session.previousBucket)', 1, true), 'confirm restores the prior bucket')
 H.ok(server:find('pcall(leaveFittingRoom, src, session.previousBucket)', 1, true), 'a resource stop still restores every open session\'s bucket')
@@ -52,7 +52,7 @@ H.ok(server:find('pcall(leaveFittingRoom, src, session.previousBucket)', 1, true
 -- from the client or from a session-open-time cache.
 H.ok(server:find('local before = dbGetSkin%(session%.citizenid[,)]'), 'price diff re-reads the saved skin at confirm time')
 H.ok(server:find('local price = priceDiff(', 1, true), 'purchase price is computed server-side')
-H.ok(server:find("exports.qbcore:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')", 1, true), 'purchase takes server-side payment')
+H.ok(server:find("exports.kora_core:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')", 1, true), 'purchase takes server-side payment')
 H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-submitted price')
 
 -- The free mandatory first-fitting must be usable exactly once per citizen --
@@ -82,14 +82,14 @@ H.ok(server:find('for _, row in ipairs(dbListOutfitSkins(citizenid)) do', 1, tru
 H.ok(server:find('not ownedOutfitMatch(session.citizenid, model, newSkin)', 1, true), 'pricing is skipped when the confirmed look matches an already-owned outfit')
 
 -- Config.clothingAsItem: off by default; when on, the item is registered
--- with qbcore/qbinventory rather than assumed to already exist, purchases
+-- with kora_core/qbinventory rather than assumed to already exist, purchases
 -- still go through the same payment path as a direct equip, the item is
 -- reusable (not consumed) so it behaves like a real wardrobe piece, and the
 -- live try-on preview is reverted (never silently kept as "worn") once it's
 -- actually boxed instead of equipped.
 H.ok(config:find('Config.clothingAsItem = false', 1, true), 'clothing-as-item defaults off')
-H.ok(server:find("exports.qbcore:registerShared('items', Config.clothingItem.name,", 1, true), 'the outfit item is registered with qbcore, not assumed to pre-exist')
-H.ok(server:find("exports.qbinventory:createUseable(Config.clothingItem.name, equipFromItem)", 1, true), 'the outfit item registers a qbinventory use handler')
+H.ok(server:find("exports.kora_core:registerShared('items', Config.clothingItem.name,", 1, true), 'the outfit item is registered with qbcore, not assumed to pre-exist')
+H.ok(server:find("exports.kora_inventory:createUseable(Config.clothingItem.name, equipFromItem)", 1, true), 'the outfit item registers a qbinventory use handler')
 H.ok(server:find('local function equipFromItem(src, item)', 1, true) and server:find('return false\nend', 1, true), 'using an outfit item does not consume it')
 H.ok(server:find('local wantsBox = not session.free and session.mode ~= ' .. "'firstCharacter'" .. ' and Config.clothingAsItem', 1, true), 'free configured sessions never produce free inventory outfit items')
 H.ok(server:find('revertTo = boxed and { model = beforeModel, skin = beforeSkin } or nil', 1, true), 'a boxed purchase reverts the live try-on preview instead of leaving it worn')
@@ -136,13 +136,13 @@ H.ok(client:find('previousAppearance = { model = payload.model, skin = payload.s
 H.ok(client:find('applyModel(previousAppearance.model, previousAppearance.skin)', 1, true),
     'cancelling a session immediately restores the appearance from when it opened')
 
--- qbhud is an optional integration: a fitting-room session removes its own
+-- kora_hud is an optional integration: a fitting-room session removes its own
 -- HUD overlay, but records that it did so and only restores that same HUD on
 -- close. A pre-existing hide (from another resource or the player) remains
 -- intact.
-H.ok(client:find("GetResourceState('qbhud') ~= 'started'", 1, true),
+H.ok(client:find("GetResourceState('kora_hud') ~= 'started'", 1, true),
     'qbhud is checked at runtime so qbclothing remains compatible with other HUDs')
-H.ok(client:find("exports['qbhud']:isVisible()", 1, true) and client:find("exports['qbhud']:hide()", 1, true),
+H.ok(client:find("exports['kora_hud']:isVisible()", 1, true) and client:find("exports['kora_hud']:hide()", 1, true),
     'a clothing session hides qbhud only when it was already visible')
 H.ok(client:find('activeSession.hudHidden = hideHudForSession()', 1, true),
     'the session remembers whether it hid the HUD')
@@ -155,7 +155,7 @@ H.ok(server:find('return saved.model, sanitiseSkin(saved.skin, saved.model)', 1,
     'the spawn-time getSkin callback sanitises the saved skin like every other read path -- ' ..
     'it used to return the raw DB blob straight to SetPedComponentVariation/SetPedPropIndex')
 H.ok(server:find("QB.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
-H.ok(server:find('exports.qbcore:ownsCharacter(src, citizenid)', 1, true), 'character preview appearance is ownership checked before reading the skin')
+H.ok(server:find('exports.kora_core:ownsCharacter(src, citizenid)', 1, true), 'character preview appearance is ownership checked before reading the skin')
 H.ok(server:find('previewCache[src]', 1, true), 'selection-session appearance reads are cached per source')
 H.ok(server:find("AddStateBagChangeHandler('qbmultichar:mode'", 1, true), 'appearance cache clears when the cinematic selection session ends')
 H.ok(server:find("rateLimit = { max = 20, window = 10000 }", 1, true), 'character preview appearance reads are rate limited')
@@ -166,21 +166,21 @@ H.ok(client:find("RegisterNetEvent('qb-clothing:client:openOutfitMenu'", 1, true
 H.ok(client:find("RegisterNetEvent('qbclothing:client:openNearestShop'", 1, true), 'admin integrations can request the nearest configured service shop')
 H.ok(client:find("RegisterNetEvent('qbclothing:client:openAdminSession'", 1, true), 'admin integrations use a dedicated full-styling session')
 H.ok(client:find("nearestDistance > (Config.interactDistance + 1.0)", 1, true), 'nearest-shop client feedback uses the same tolerance as the authoritative server check')
-H.ok(server:find("elseif mode == 'admin' then", 1, true) and server:find("exports.qbcore:hasPermission(src, 'admin')", 1, true), 'full-styling admin sessions are permission-checked server-side')
+H.ok(server:find("elseif mode == 'admin' then", 1, true) and server:find("exports.kora_core:hasPermission(src, 'admin')", 1, true), 'full-styling admin sessions are permission-checked server-side')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:loadOutfit'", 1, true), 'real qb-clothing loadOutfit event is implemented')
 H.ok(client:find("exports('OpenClothingRoom'", 1, true), 'real qb-clothing OpenClothingRoom export is implemented')
 H.ok(client:find("exports('ApplyAppearanceToPed'", 1, true), 'local preview peds can use qbclothing\'s bounded appearance application')
 H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the qb-clothing identity')
 
--- The character-creation hook is a listener: it arms on the event qbcore
--- already fires and opens on the completion event qbmultichar publishes.
+-- The character-creation hook is a listener: it arms on the event kora_core
+-- already fires and opens on the completion event kora_multichar publishes.
 H.ok(client:find("RegisterNetEvent('qb-multicharacter:client:closeNUIdefault'", 1, true), 'hooks the existing new-character signal')
 H.ok(client:find("AddEventHandler('qbmultichar:client:spawnComplete'", 1, true),
     'first-character clothing opens on qbmultichar\'s spawn-completion event, not on a timer -- ' ..
     'the qbmultichar:mode bag it used to poll is cleared BEFORE the teleport runs, so a poller ' ..
     'woke while the ped was still being placed and put the fitting room on screen pre-spawn')
 H.ok(client:find("if isNew ~= true then return end", 1, true), 'an ordinary login never opens the creation fitting room')
-H.ok(client:find("local function hasSpawnCompleteSignal()", 1, true) and client:find("GetResourceState('qbmultichar') == 'started'", 1, true),
+H.ok(client:find("local function hasSpawnCompleteSignal()", 1, true) and client:find("GetResourceState('kora_multichar') == 'started'", 1, true),
     'third-party qb-multicharacter, which publishes no completion event, keeps the ped-observing fallback -- ' ..
     'asked at arm time, since a chunk-load read can catch qbmultichar still starting in the same batch')
 H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'the fallback path waits for the player to actually be spawned before opening')
@@ -202,8 +202,8 @@ H.ok(client:find('model = currentModelName(ped),', 1, true), 'session-open paylo
 H.ok(client:find('model = currentModelName(ped),\n        categories = buildCategoryPayload(ped, activeSession.service),', 1, true), 'loadOutfit response reports the actual applied model and service-filtered categories')
 H.ok(client:find('model = currentModelName(ped),\n        skin = currentSkinSnapshot(ped),', 1, true), 'confirm submits the actual applied model')
 
--- NUI is this resource's own frame -- raw natives only, never qblib's QB.nui.*
--- (which would dispatch into qblib's own VM/frame instead of this one).
+-- NUI is this resource's own frame -- raw natives only, never kora_lib's QB.nui.*
+-- (which would dispatch into kora_lib's own VM/frame instead of this one).
 H.ok(client:find('SendNUIMessage', 1, true) and client:find('RegisterNUICallback', 1, true), 'client owns its own NUI transport')
 do
     -- Strip comments first: the file's own header explains, in prose, why
@@ -216,7 +216,7 @@ H.ok(not server:find('SendNUIMessage', 1, true) and not server:find('RegisterNUI
 
 -- The preview camera must never accept a position with world geometry between
 -- it and the ped -- a shop counter, a parked car or a passing ped otherwise
--- sits in shot. Ported from qbmultichar's scene.lua: capsule (not ray) trace,
+-- sits in shot. Ported from kora_multichar's scene.lua: capsule (not ray) trace,
 -- fan around the obstruction at the same distance first, pull in only as a
 -- last resort. Re-resolved on every zone/zoom change, not just at start.
 H.ok(camera:find('local function traceCameraPath(subject, candidate)', 1, true), 'the camera capsule-traces its own path to the ped')
@@ -258,8 +258,8 @@ H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return 
 -- Shop interaction is geometry, not a ped: a ped-bound target dies with the
 -- ped (unstreamed model, shoved out of place, deleted by another resource) and
 -- leaves the shop silently unopenable.
-H.ok(not client:find('exports.qbtarget:addEntity', 1, true), 'shops are no longer targeted through a spawned clerk entity')
-H.ok(client:find('exports.qbtarget:addBoxZone({', 1, true) and client:find('exports.qbtarget:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
+H.ok(not client:find('exports.kora_target:addEntity', 1, true), 'shops are no longer targeted through a spawned clerk entity')
+H.ok(client:find('exports.kora_target:addBoxZone({', 1, true) and client:find('exports.kora_target:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
 H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
 H.ok(client:find('if Config.shopPeds then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
@@ -281,7 +281,7 @@ H.ok(camera:find('function Camera.stop()', 1, true), 'camera exposes an explicit
 H.ok(camera:find('RenderScriptCams(false, true, 300, true, true)', 1, true), 'camera stop restores the gameplay cam')
 H.ok(client:find('stopControlLock()', 1, true), 'closing a session releases the control lock')
 
--- Migration follows qbinventory's exact convention: qbsql loads and
+-- Migration follows kora_inventory's exact convention: kora_sql loads and
 -- fingerprints the declared file, with the historical checksum retained.
 H.ok(persistence:find('QB.sql.migrateFiles(resource, MIGRATIONS, checksum)', 1, true), 'schema uses qbsql\'s file migrator')
 H.ok(persistence:find("{ version = 1, name = 'playerskins_outfits', file = 'sql/001_playerskins_outfits.sql' }", 1, true), 'migration list matches the shipped sql file')

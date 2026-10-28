@@ -1,13 +1,13 @@
 -- Coverage for the shape of Config.shops now that the interaction target is
--- zone GEOMETRY rather than a spawned clerk. qbtarget's addBoxZone/addPolyZone
+-- zone GEOMETRY rather than a spawned clerk. kora_target's addBoxZone/addPolyZone
 -- assert on their arguments (isCoordsLike, ">= 3 points" -- see
--- qbtarget/client/state.lua), and those asserts fire at chunk load inside a
+-- kora_target/client/state.lua), and those asserts fire at chunk load inside a
 -- CreateThread, where the failure is a line in the server console and a shop
 -- that simply never opens. Checking the config's shape here is what turns that
 -- into a test failure instead.
 --
 -- Also guards map-legend grouping: matching named categories collapse every
--- branch of a service beneath one heading (see qblib/modules/blips/docs.md).
+-- branch of a service beneath one heading (see kora_lib/modules/blips/docs.md).
 local H = dofile('test/harness.lua')
 
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
@@ -47,7 +47,7 @@ for index, shop in ipairs(Config.shops) do
         for pointIndex, point in ipairs(zone.points) do
             H.ok(isCoordsLike(point), ('%s polyzone point %d is a table with numeric x/y/z'):format(where, pointIndex))
         end
-        -- Without one of these qblib falls back to Config.zones.defaultPolyThickness,
+        -- Without one of these kora_lib falls back to Config.zones.defaultPolyThickness,
         -- which is a qblib-wide number that has nothing to do with this shop's
         -- ceiling: a store traced on one floor would silently reach through it.
         H.ok(type(zone.thickness) == 'number' or (type(zone.minZ) == 'number' and type(zone.maxZ) == 'number'),
@@ -77,7 +77,7 @@ for index, shop in ipairs(Config.shops) do
     end
 end
 
--- The shop's own `label` stays brand-specific: it is the qbtarget prompt
+-- The shop's own `label` stays brand-specific: it is the kora_target prompt
 -- ("Open Suburban"), not the map label, so the blip configuration must not
 -- have flattened it.
 local shopLabels = {}

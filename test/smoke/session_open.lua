@@ -38,7 +38,7 @@ local function compatBucket(...)
 end
 -- FiveM exposes a callable exports table; the metatable only adapts that host API.
 core.setPlayerBucket = compatBucket
-exports = setmetatable({ qbcore = core }, {
+exports = setmetatable({ kora_core = core }, {
     __call = function(_, name, callback) public[name] = callback end,
 })
 GetPlayerRoutingBucket = function(src) return buckets[src] end
@@ -46,8 +46,8 @@ SetPlayerRoutingBucket = function(src, bucket)
     assert(rawBucketAllowed, 'compat bucket export should be used')
     setBucket(nil, src, bucket)
 end
-GetCurrentResourceName = function() return 'qbclothing' end
-GetInvokingResource = function() return 'qbadmin' end
+GetCurrentResourceName = function() return 'kora_clothing' end
+GetInvokingResource = function() return 'kora_admin' end
 GetPlayerName = function(src) return players[src] and 'connected player' end
 GetPlayerPed = function(src) return src end
 DoesEntityExist = function() return true end
@@ -161,7 +161,7 @@ for _, boundary in ipairs({ 'playerDropped', 'QBCore:Server:OnPlayerUnload', 'on
             emit(boundary, 7, 'another-resource')
             local duplicate = start()
             H.equal(coroutine.status(duplicate), 'dead', 'another resource stop retains the reservation')
-            emit(boundary, 7, 'qbclothing')
+            emit(boundary, 7, 'kora_clothing')
         elseif boundary == 'QBCore:Server:OnPlayerUnload' then
             emit(boundary, 7, 7)
         else
@@ -244,7 +244,7 @@ H.equal(#opens, count, 'remote admin grant remains one-use')
 saved = { model = Shared.models.male, skin = {} }
 for _, available in ipairs({ true, false }) do
     rawBucketAllowed = not available
-    exports.qbcore.setPlayerBucket = available and compatBucket or function() error('compat disabled') end
+    exports.kora_core.setPlayerBucket = available and compatBucket or function() error('compat disabled') end
     bucketNotices = {}
     start()
     H.equal(#bucketNotices, 1)
@@ -256,9 +256,9 @@ for _, available in ipairs({ true, false }) do
     H.equal(bucketNotices[1].src, 7)
     H.equal(bucketNotices[1].bucket, 42)
 end
-exports.qbcore.setPlayerBucket, rawBucketAllowed = compatBucket, false
+exports.kora_core.setPlayerBucket, rawBucketAllowed = compatBucket, false
 
--- qbsql returns nil,error on failure; it is not an absent saved appearance.
+-- kora_sql returns nil,error on failure; it is not an absent saved appearance.
 for _, mode in ipairs({ 'firstCharacter', 'wardrobe', 'shop', 'admin' }) do
     local count, moved, errors = #opens, #moves, #sessionErrors
     returnedSkinError = 'controlled saved-skin read failed'
@@ -440,8 +440,8 @@ end
 
 -- Public providers can suspend in their registered player-change subscribers.
 local resourceState = GetResourceState
-GetResourceState = function(name) return name == 'qbinventory' and 'started' or 'missing' end
-exports.qbinventory = { addItem = function() return coroutine.yield('item') end }
+GetResourceState = function(name) return name == 'kora_inventory' and 'started' or 'missing' end
+exports.kora_inventory = { addItem = function() return coroutine.yield('item') end }
 for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
     for _, provider in ipairs({ 'payment', 'item', 'refund' }) do
         players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
@@ -470,7 +470,7 @@ for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
         cancel()
     end
 end
-Config.clothingAsItem, GetResourceState, exports.qbinventory = false, resourceState, nil
+Config.clothingAsItem, GetResourceState, exports.kora_inventory = false, resourceState, nil
 
 -- Without retirement, payment, direct saving, preset saving and returns are unchanged.
 players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
@@ -488,9 +488,9 @@ H.equal(buckets[7], 42)
 
 -- Boxed purchases retain their existing item arguments and before-look reversion.
 local oldResourceState = GetResourceState
-GetResourceState = function(name) return name == 'qbinventory' and 'started' or 'missing' end
+GetResourceState = function(name) return name == 'kora_inventory' and 'started' or 'missing' end
 local grant
-exports.qbinventory = { addItem = function(_, src, name, amount, slot, info, reason)
+exports.kora_inventory = { addItem = function(_, src, name, amount, slot, info, reason)
     grant = { src = src, name = name, amount = amount, slot = slot, info = info, reason = reason }
     return true
 end }
@@ -508,7 +508,7 @@ H.equal(grant.info.model, Shared.models.male)
 H.equal(grant.info.skin.components['11'].d, 2)
 H.equal(closes[#closes].payload.revertTo.model, Shared.models.male)
 H.equal(buckets[7], 42)
-Config.clothingAsItem, GetResourceState, exports.qbinventory = false, oldResourceState, nil
+Config.clothingAsItem, GetResourceState, exports.kora_inventory = false, oldResourceState, nil
 QB.sql.single, QB.sql.query, QB.sql.execute = oldSingle, oldQuery, oldExecute
 QB.sql.scalar, QB.sql.insert, core.removeMoney, core.addMoney = oldScalar, oldInsert, oldRemove, oldAdd
 players[7].citizenid, players[7].money.cash = 'first', 1000
@@ -552,6 +552,6 @@ start('firstCharacter')
 H.equal(opens[#opens].payload.mandatory, true)
 cancel()
 H.equal(buckets[7], Config.bucket.base + 7, 'mandatory creation cannot be cancelled')
-emit('onResourceStop', 7, 'qbclothing')
+emit('onResourceStop', 7, 'kora_clothing')
 H.equal(buckets[7], 42, 'resource stop retains active-session restoration')
 H.finish()

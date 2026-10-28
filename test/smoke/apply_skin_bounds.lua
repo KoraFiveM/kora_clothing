@@ -15,7 +15,7 @@
 -- is the only way to catch an off-by-one in it.
 local H = dofile('test/harness.lua')
 
-_G.GetCurrentResourceName = function() return 'qbclothing' end
+_G.GetCurrentResourceName = function() return 'kora_clothing' end
 _G.AddEventHandler = function() end
 _G.RegisterNetEvent = function() end
 _G.RegisterNUICallback = function() end
@@ -24,7 +24,7 @@ _G.exports = setmetatable({}, {
     __call = function() end, -- bare exports('Name', fn) registration
     __index = function() return function() end end, -- exports.other:fn(...)
 })
--- Chunk-load reconcile (mirrors qbhud's client/bridge/qbcore.lua pattern):
+-- Chunk-load reconcile (mirrors kora_hud's client/bridge/qbcore.lua pattern):
 -- client.lua reads the login state bag and calls PlayerId/GetPlayerServerId
 -- as soon as it loads, so these need to exist even though this test never
 -- drives a login transition. CreateThread above is a no-op stub, so the

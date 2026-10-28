@@ -1,6 +1,6 @@
 ---
 layout: default
-title: qbclothing
+title: kora_clothing
 ---
 
 Illenium-style clothing, appearance and outfit wardrobe for FiveM. A player
@@ -11,41 +11,41 @@ camera that free-zooms on the mouse wheel and traces its own path so a wall or
 counter never lands in shot. Outfits are saved per citizen
 (`playerskins` for the current look, `playeroutfits` for up to
 `Config.wardrobe.maxOutfits` named presets) via
-[qbsql](https://qbcore2.github.io/qbsql/)'s migration runner. Purchases are
+[qbsql](https://qbcore2.github.io/kora_sql/)'s migration runner. Purchases are
 priced per touched category (clothing/hair/tattoos) and charged through
-[qbcore](https://qbcore2.github.io/qbcore/) money, with an optional
+[qbcore](https://qbcore2.github.io/kora_core/) money, with an optional
 "clothing-as-item" mode that boxes a purchase as a physical, reusable
-inventory item instead of equipping it directly. `qbclothing` `provide`s
+inventory item instead of equipping it directly. `kora_clothing` `provide`s
 `qb-clothing` and speaks the real upstream qb-clothing wire protocol (net
 events, callback names) directly, so third-party barber/tattoo/uniform
 scripts built against it keep working unmodified.
 
-When [qbhud](https://qbcore2.github.io/qbhud/) is running, qbclothing hides it
+When [qbhud](https://qbcore2.github.io/kora_hud/) is running, kora_clothing hides it
 for the duration of a fitting-room session and restores it on close. Servers
 using another HUD need no configuration; the integration is optional.
 
 ## Requirements
 
-- [qblib](https://qbcore2.github.io/qblib/)
-- [qbsql](https://qbcore2.github.io/qbsql/)
-- [qbcore](https://qbcore2.github.io/qbcore/)
-- [qbtarget](https://qbcore2.github.io/qbtarget/) — shops are targeted through qbtarget zones
+- [qblib](https://qbcore2.github.io/kora_lib/)
+- [qbsql](https://qbcore2.github.io/kora_sql/)
+- [qbcore](https://qbcore2.github.io/kora_core/)
+- [qbtarget](https://qbcore2.github.io/kora_target/) — shops are targeted through kora_target zones
 
 ## Installation
 
 `server.cfg`, in this order:
 ```
 set mysql_connection_string "mysql://user:pass@localhost/qbcore?charset=utf8mb4"
-ensure qbsql
-ensure qblib
-ensure qbcore
-ensure qbtarget
-ensure qbclothing
+ensure kora_sql
+ensure kora_lib
+ensure kora_core
+ensure kora_target
+ensure kora_clothing
 ```
-qbclothing owns its schema (`playerskins`, `playeroutfits`) and applies
-`sql/001_playerskins_outfits.sql` itself via qbsql's migration runner on first
+kora_clothing owns its schema (`playerskins`, `playeroutfits`) and applies
+`sql/001_playerskins_outfits.sql` itself via kora_sql's migration runner on first
 boot — no manual SQL import needed. `fxmanifest.lua` also declares hard
-`dependency` edges on qblib/qbsql/qbcore/qbtarget, so FXServer guarantees
+`dependency` edges on kora_lib/kora_sql/kora_core/qbtarget, so FXServer guarantees
 correct start order even if `ensure` lines are reshuffled.
 
 ## Usage examples
@@ -53,20 +53,20 @@ correct start order even if `ensure` lines are reshuffled.
 ### Open the wardrobe from another resource
 ```lua
 -- client
-exports.qbclothing:OpenWardrobe()
+exports.kora_clothing:OpenWardrobe()
 ```
 
 ### Send a player to a specific shop by config index
 ```lua
 -- client, e.g. from a custom "personal shopper" NPC
-exports.qbclothing:OpenClothingRoom({ shopId = 3 }) -- Config.shops[3] ("Ponsonbys")
+exports.kora_clothing:OpenClothingRoom({ shopId = 3 }) -- Config.shops[3] ("Ponsonbys")
 ```
 
 ### Guard against opening the UI twice
 ```lua
 -- client
-if not exports.qbclothing:IsClothingMenuOpen() then
-    exports.qbclothing:OpenWardrobe()
+if not exports.kora_clothing:IsClothingMenuOpen() then
+    exports.kora_clothing:OpenWardrobe()
 end
 ```
 
@@ -98,11 +98,11 @@ end)
 
 ### Client exports
 ```lua
-exports.qbclothing:OpenClothingRoom(options)  -- options = { shopId = n } or a bare number
-exports.qbclothing:OpenWardrobe()
-exports.qbclothing:IsClothingMenuOpen()       -- true while the fitting-room NUI is open
-exports.qbclothing:GetPedModels()             -- { male = 'mp_m_freemode_01', female = 'mp_f_freemode_01' }
-exports.qbclothing:ApplyAppearanceToPed(ped, model, skin) -- local preview ped; (true) or (false, err)
+exports.kora_clothing:OpenClothingRoom(options)  -- options = { shopId = n } or a bare number
+exports.kora_clothing:OpenWardrobe()
+exports.kora_clothing:IsClothingMenuOpen()       -- true while the fitting-room NUI is open
+exports.kora_clothing:GetPedModels()             -- { male = 'mp_m_freemode_01', female = 'mp_f_freemode_01' }
+exports.kora_clothing:ApplyAppearanceToPed(ped, model, skin) -- local preview ped; (true) or (false, err)
 ```
 
 ### Legacy qb-clothing / qb-multicharacter compat events (client)
@@ -120,7 +120,7 @@ QB.callback.trigger('qb-multicharacter:server:getSkin', citizenid)   -- -> model
 QB.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
 ```
 
-The multicharacter preview callback is pre-login safe: qbcore verifies that
+The multicharacter preview callback is pre-login safe: kora_core verifies that
 the requested active character belongs to the requesting license before any
 appearance is returned. Foreign and soft-deleted citizen IDs are rejected;
 successful results are sanitized, rate-limited, and cached for that source's
@@ -180,10 +180,10 @@ to the hair component's category.
 
 ### Session net events
 ```lua
--- client -> server (qblib's tokenised QB.events gateway, not a raw
+-- client -> server (kora_lib's tokenised QB.events gateway, not a raw
 -- RegisterNetEvent -- confirmSession moves real money and requestSession
 -- gates an admin-only free fitting, so these go through the per-session
--- token instead of a guessable static event name; see qblib's
+-- token instead of a guessable static event name; see kora_lib's
 -- local/events/docs.md)
 QB.events.trigger('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
 QB.events.trigger('qbclothing:server:confirmSession', { model, skin, saveName })
@@ -201,28 +201,28 @@ A session is entered by `requestSession` (shop sessions require standing
 within `Config.interactDistance` of the shop's `coords`), finalised by
 `confirmSession` (server re-diffs, prices and persists — never trusts the
 client's price), and torn down by `cancelSession` or `closeSession`. Shop
-sessions are also reachable via qbtarget zones placed on each configured
+sessions are also reachable via kora_target zones placed on each configured
 shop, and `qbclothing:client:openNearestShop(service)` opens the closest
 shop by proximity for the given service (`'clothing'` by default, or
-`'barber'`/`'tattoo'`) — used by qbadmin's self-service clothing/barber/tattoo
+`'barber'`/`'tattoo'`) — used by kora_admin's self-service clothing/barber/tattoo
 entries. `qbclothing:client:openAdminSession` opens a free, unrestricted
 clothing+hair+tattoo session (the same `creation` service policy used for
 first-character fittings); the server re-checks `admin` permission before
-granting it regardless of what qbadmin's menu shows client-side.
+granting it regardless of what kora_admin's menu shows client-side.
 
-qbadmin can also open a single free `clothing`, `barber`/`hairdresser`, or
-`tattoo` service for another player through qbclothing's server-only
+kora_admin can also open a single free `clothing`, `barber`/`hairdresser`, or
+`tattoo` service for another player through kora_clothing's server-only
 `OpenAdminSession(targetSrc, service)` integration. The export accepts calls
-only from the `qbadmin` resource, creates a ten-second one-use authorization,
+only from the `kora_admin` resource, creates a ten-second one-use authorization,
 and the target consumes it through the normal token-authenticated session
 request. A female freemode model selected through the barber action is routed
 to the hairdresser policy automatically.
 
 ### First-character fitting
 
-`qb-multicharacter:client:closeNUIdefault` (fired by qbcore only on successful
+`qb-multicharacter:client:closeNUIdefault` (fired by kora_core only on successful
 character creation) *arms* the mandatory first fitting; it does not open it.
-The open waits for [qbmultichar](https://qbcore2.github.io/qbmultichar/)'s
+The open waits for [qbmultichar](https://qbcore2.github.io/kora_multichar/)'s
 `qbmultichar:client:spawnComplete` event, which lands once the ped has been
 placed, resurrected, revealed and the fade-in has finished — so the fitting
 room can never appear over the spawn carousel or mid-teleport. On a server
@@ -235,13 +235,13 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.shop.currency` — account charged for purchases (default `cash`)
 - `Config.services` — per-service (`clothing`/`barber`/`hairdresser`/`tattoo`/`creation`) component/prop whitelists, prices and gender restrictions
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen
-- `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/qbinventory/)) instead of equipping directly
+- `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/kora_inventory/)) instead of equipping directly
 - `Config.shops` — per-shop service, coordinates, target zone geometry (`zone = { size, rotation }`, or `{ points, minZ, maxZ }` for an irregular shape), blip and optional clerk model
 - `Config.shopPeds` (default `false`) — spawn a decorative clerk per shop only while the local player is near it. The interaction target is the storefront zone either way; a ped-bound target dies with the ped (unstreamed model, shoved out of place, deleted by another resource) and leaves the shop silently unopenable, so the ped is set dressing only
 - `Config.shopPedScopeRadius` (75.0m) — the radius that creates a decorative clerk for the local player; independent of the interaction range
 - `Config.shopZoneDefault` — fallback box for a shop entry added without its own `zone`
 - `Config.tattoos` — the base-game overlay catalogue with per-tattoo pricing
-- `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and qbtarget zone range
+- `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and kora_target zone range
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
@@ -251,19 +251,19 @@ behaviour applies: wait for the ped to be active and alive, then open.
 Every shop blip uses a canonical named category: `Clothing`, `Tattoo`, or
 `Grooming`. Barber and hairdresser locations deliberately share `Grooming`
 instead of splitting one service across two legend headings. Clothing shops
-also pass their storefront name (`Suburban`, `Ponsonbys`, or `Binco`), so qblib
+also pass their storefront name (`Suburban`, `Ponsonbys`, or `Binco`), so kora_lib
 renders labels such as `Clothing: Ponsonbys`; generic Tattoo and Grooming
-markers render only the category. The shop's own `label` remains the qbtarget
+markers render only the category. The shop's own `label` remains the kora_target
 interaction prompt.
 
 ## Related resources
 
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
-- [qblib](https://qbcore2.github.io/qblib/) — shared helper library
-- [qbsql](https://qbcore2.github.io/qbsql/) — database driver
-- [qbcore](https://qbcore2.github.io/qbcore/) — framework core
-- [qbinventory](https://qbcore2.github.io/qbinventory/) — headless inventory
-- [qbtarget](https://qbcore2.github.io/qbtarget/) — targeting/interaction
-- [qbadmin](https://qbcore2.github.io/qbadmin/) — admin menu
+- [qblib](https://qbcore2.github.io/kora_lib/) — shared helper library
+- [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
+- [qbcore](https://qbcore2.github.io/kora_core/) — framework core
+- [qbinventory](https://qbcore2.github.io/kora_inventory/) — headless inventory
+- [qbtarget](https://qbcore2.github.io/kora_target/) — targeting/interaction
+- [qbadmin](https://qbcore2.github.io/kora_admin/) — admin menu
 - [full resource list ↗](https://github.com/orgs/qbcore2/repositories)

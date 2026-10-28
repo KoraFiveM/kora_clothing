@@ -1,29 +1,29 @@
--- qbclothing client: NUI owner, ped/camera control while a fitting-room
+-- kora_clothing client: NUI owner, ped/camera control while a fitting-room
 -- session is open, shop target zones, and the real qb-clothing client wire
 -- protocol for third-party compat. Owns its own NUI frame (own `ui_page`), so
 -- this talks to it with the raw natives directly -- QB.nui.* would dispatch
--- into qblib's own resource VM/frame instead of this one.
+-- into kora_lib's own resource VM/frame instead of this one.
 
 local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
 local disableControlsThread = false
 local previewTattoos = {}
 
--- qbhud is optional: qbclothing can still run on servers with a different HUD.
--- Remember whether this session actually hid a visible qbhud instance so its
+-- kora_hud is optional: kora_clothing can still run on servers with a different HUD.
+-- Remember whether this session actually hid a visible kora_hud instance so its
 -- close path never reveals a HUD another resource (or the player) had hidden.
 local function hideHudForSession()
-    if type(GetResourceState) ~= 'function' or GetResourceState('qbhud') ~= 'started' then return false end
+    if type(GetResourceState) ~= 'function' or GetResourceState('kora_hud') ~= 'started' then return false end
 
-    local ok, visible = pcall(function() return exports['qbhud']:isVisible() end)
+    local ok, visible = pcall(function() return exports['kora_hud']:isVisible() end)
     if not ok or visible ~= true then return false end
 
-    return pcall(function() exports['qbhud']:hide() end)
+    return pcall(function() exports['kora_hud']:hide() end)
 end
 
 local function restoreHudForSession(session)
     if not session or session.hudHidden ~= true then return end
-    if type(GetResourceState) ~= 'function' or GetResourceState('qbhud') ~= 'started' then return end
-    pcall(function() exports['qbhud']:show() end)
+    if type(GetResourceState) ~= 'function' or GetResourceState('kora_hud') ~= 'started' then return end
+    pcall(function() exports['kora_hud']:show() end)
 end
 
 -- Session-local mirror of the two hair-palette indices currently on the ped.
@@ -654,7 +654,7 @@ end
 -- reconcile below in close succession). Only the call whose generation is
 -- still current when its answer arrives actually applies the skin, so the
 -- player doesn't get the same (or a stale) skin applied twice. Mirrors
--- qbhud's client/bridge/qbcore.lua loginGeneration pattern.
+-- kora_hud's client/bridge/qbcore.lua loginGeneration pattern.
 local skinApplyGeneration = 0
 
 local function applySavedSkin()
@@ -667,7 +667,7 @@ local function applySavedSkin()
 
         -- The callback trigger is a network round trip -- a fitting-room
         -- session can legitimately open while it's in flight (e.g. another
-        -- resource calls exports.qbclothing:OpenWardrobe() right after
+        -- resource calls exports.kora_clothing:OpenWardrobe() right after
         -- login). Applying a late-arriving saved skin at that point would
         -- silently clobber whatever the player is currently trying on.
         if not model or activeSession then return end
@@ -678,10 +678,10 @@ end
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', applySavedSkin)
 
 -- Additional path for "this resource just restarted while a player was
--- already logged in" (e.g. `ensure qbclothing` mid-session): the legacy
+-- already logged in" (e.g. `ensure kora_clothing` mid-session): the legacy
 -- OnPlayerLoaded event above does NOT re-fire on a resource restart, so
--- without this a restarted qbclothing leaves the player's saved skin
--- un-applied until they relog. Mirrors qbhud's client/bridge/qbcore.lua --
+-- without this a restarted kora_clothing leaves the player's saved skin
+-- un-applied until they relog. Mirrors kora_hud's client/bridge/qbcore.lua --
 -- watch the server-owned login state bag directly rather than the legacy
 -- lifecycle event, and reconcile immediately at chunk load to cover the
 -- already-logged-in case, since a bag-change handler only observes future
@@ -708,27 +708,27 @@ RegisterNetEvent('qbclothing:client:wearItem', function(model, skin)
 end)
 
 -- The unambiguous "a character was just created" signal in this codebase:
--- qbcore's compat (qb-multicharacter:server:createCharacter handler) fires
+-- kora_core's compat (qb-multicharacter:server:createCharacter handler) fires
 -- this client event ONLY on successful character creation, never on an
 -- existing-character login (that path goes through qb-spawn instead).
 --
--- It is NOT, however, a "you are in the world" signal. qbmultichar answers it
+-- It is NOT, however, a "you are in the world" signal. kora_multichar answers it
 -- by opening the mandatory cinematic spawn carousel, and the fitting room must
 -- not land on top of that -- nor on the teleport/resurrect/fade-in that
 -- follows the player's choice. So this handler only arms the flow; the actual
--- open waits for qbmultichar to say the spawn finished.
+-- open waits for kora_multichar to say the spawn finished.
 local firstCharacterArmed = false
 
 -- Whether the multichar handling this login is our own, and so whether a
 -- completion event is coming at all. Asked at arm time, not at chunk load:
--- qbclothing and qbmultichar start in the same batch, so a chunk-load read can
--- catch qbmultichar as 'starting' and silently strand the session on the
+-- kora_clothing and kora_multichar start in the same batch, so a chunk-load read can
+-- catch kora_multichar as 'starting' and silently strand the session on the
 -- fallback path. By the time a character has been created both are running.
 -- Preferred over sniffing the `qbmultichar:mode` state bag, which answers a
 -- timing question ("has the mode replicated yet") rather than the capability
 -- question actually being asked here.
 local function hasSpawnCompleteSignal()
-    return GetResourceState('qbmultichar') == 'started'
+    return GetResourceState('kora_multichar') == 'started'
 end
 
 RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
@@ -749,7 +749,7 @@ RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
     end)
 end)
 
--- qbmultichar fires this once the ped has been placed, resurrected, revealed
+-- kora_multichar fires this once the ped has been placed, resurrected, revealed
 -- and unfrozen and the fade-in has completed -- i.e. the player can genuinely
 -- see themselves. `isNew` is its own record of which path the spawn came from;
 -- the armed flag is checked as well so that an ordinary login can never open
@@ -771,8 +771,8 @@ RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
     openSession('shop', type(shopType) == 'table' and shopType or { shopId = tonumber(shopType) or 1 })
 end)
 
--- Used by qbadmin's self-service clothing entry.  Keeping the nearest-shop
--- selection inside qbclothing means external callers never have to duplicate
+-- Used by kora_admin's self-service clothing entry.  Keeping the nearest-shop
+-- selection inside kora_clothing means external callers never have to duplicate
 -- this resource's shop ordering; the server still performs the authoritative
 -- distance check when it receives requestSession('shop', index).
 RegisterNetEvent('qbclothing:client:openNearestShop', function(service)
@@ -818,7 +818,7 @@ RegisterNetEvent('qb-clothing:client:loadOutfit', function(outfit)
     applyModel(outfit.model or Shared.models.male, outfit.skin)
 end)
 
--- Public modern form: exports.qbclothing:OpenClothingRoom({ shopId = 1 }).
+-- Public modern form: exports.kora_clothing:OpenClothingRoom({ shopId = 1 }).
 -- The numeric form remains for existing qb-clothing consumers.
 exports('OpenClothingRoom', function(options)
     openSession('shop', type(options) == 'table' and options or { shopId = tonumber(options) or 1 })
@@ -852,7 +852,7 @@ end)
 --
 -- Note the shape difference against addEntity/addModel: the zone APIs take ONE
 -- opts table with `options` INSIDE it, where addEntity takes the options array
--- as its own positional argument (see qbtarget/client/state.lua).
+-- as its own positional argument (see kora_target/client/state.lua).
 CreateThread(function()
     for index, shop in ipairs(Config.shops) do
         local options = {
@@ -866,7 +866,7 @@ CreateThread(function()
         local zone = shop.zone or Config.shopZoneDefault
 
         if zone.points then
-            exports.qbtarget:addPolyZone({
+            exports.kora_target:addPolyZone({
                 points = zone.points,
                 thickness = zone.thickness,
                 minZ = zone.minZ,
@@ -875,7 +875,7 @@ CreateThread(function()
                 distance = Config.interactDistance,
             })
         else
-            exports.qbtarget:addBoxZone({
+            exports.kora_target:addBoxZone({
                 -- shop.coords is a vector4 (heading in .w) and addBoxZone only
                 -- reads x/y/z off it, so the heading is passed separately as
                 -- the box's own rotation rather than being read from coords.
@@ -924,7 +924,7 @@ AddEventHandler('onResourceStop', function(resource)
     end
 end)
 
--- Deliberately absent in production. Same pattern as qbtarget's
+-- Deliberately absent in production. Same pattern as kora_target's
 -- Config.target.testMode -> Target._testRuntime: lets the standalone smoke
 -- suite exercise applySkin's index bounds-checking without a running client.
 if Config.testMode then
