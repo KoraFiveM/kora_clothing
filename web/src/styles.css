@@ -47,6 +47,13 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .rail { position: absolute; top: 84px; bottom: 108px; z-index: 2; width: 268px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
 .rail-left { left: 20px; }
 .rail-right { right: 20px; }
+/* The rail is a fixed-height column. Without these two rules its flex children
+   shrink below their content (squashing the Hair Color panel) and the overflow
+   of the rest (eyebrows palette) is clipped. Panels keep their natural height
+   and the rail scrolls instead; the wheel bubbles up from any panel, and the
+   gaps stay click-through because the rail itself has pointer-events: none. */
+.rail { overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+.rail > * { flex-shrink: 0; }
 
 .panel { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); box-shadow: 0 14px 40px rgb(0 0 0 / .4); }
 .panel-pad { padding: 12px; }
