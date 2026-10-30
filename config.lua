@@ -329,6 +329,15 @@ Config.tattooStrip = {
 
 Config.interactDistance = 2.0
 
+-- Hides the minimap while any clothing menu (shop, barber, tattoo, creator,
+-- wardrobe) is open and restores it afterwards. Only used when kora_hud is not
+-- running; kora_hud hides the radar itself.
+Config.hideRadarInMenu = config and config.boolean(true, {
+    label = 'Hide radar in menus',
+    description = 'Hides the minimap while a clothing, barber, tattoo or character creation menu is open, then shows it again. Only applies when kora_hud is not running, because kora_hud already hides the radar itself.',
+    live = true,
+}) or true
+
 -- How players open a shop. 'target' uses a kora_target zone option; 'textui'
 -- shows "[E] Open <shop>" through kora_lib's TextUI while inside the shop zone
 -- and opens on E. Read when the resource starts.

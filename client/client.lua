@@ -27,6 +27,22 @@ local function restoreHudForSession(session)
     pcall(function() exports['kora_hud']:show() end)
 end
 
+-- Fallback for servers without kora_hud, which hides the radar with the rest of
+-- the HUD. Only a radar this session hid is brought back, so a radar the player
+-- or another resource had already hidden stays hidden.
+local function hideRadarForSession()
+    if not Config.hideRadarInMenu then return false end
+    if type(GetResourceState) == 'function' and GetResourceState('kora_hud') == 'started' then return false end
+    if type(IsRadarHidden) == 'function' and IsRadarHidden() then return false end
+
+    DisplayRadar(false)
+    return true
+end
+
+local function restoreRadarForSession(session)
+    if session and session.radarHidden == true then DisplayRadar(true) end
+end
+
 -- Session-local mirror of the two hair-palette indices currently on the ped.
 -- Held here rather than read back with GetPedHairColor/GetPedHairHighlightColor
 -- for the same reason previewTattoos is: there is no reliable getter for what
@@ -429,6 +445,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         previousAppearance = { model = payload.model, skin = payload.skin },
     }
     activeSession.hudHidden = hideHudForSession()
+    activeSession.radarHidden = hideRadarForSession()
 
     -- After the real skin is applied, not before -- this has to override
     -- what the player actually walked in wearing, not whatever the ped's
@@ -516,6 +533,7 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     local session = activeSession
     activeSession = nil
     restoreHudForSession(session)
+    restoreRadarForSession(session)
     if refreshShopPrompt then refreshShopPrompt() end
 end)
 
@@ -1020,6 +1038,7 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if activeSession then
         restoreHudForSession(activeSession)
+        restoreRadarForSession(activeSession)
         Camera.stop()
         stopControlLock()
         SetNuiFocus(false, false)
