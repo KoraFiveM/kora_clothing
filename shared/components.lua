@@ -91,3 +91,73 @@ function Shared.clampHairColor(value)
     if value > Shared.maxHairColorIndex then return Shared.maxHairColorIndex end
     return value
 end
+
+-- Head overlays editable beyond the hair component. `style` is the saved head
+-- field, so `beard` keeps its original name for old saves; `overlay` is the GTA
+-- head overlay index passed to SetPedHeadOverlay. List order is UI order.
+Shared.headOverlays = {
+    { key = 'facialHair', overlay = 1, style = 'beard', opacity = 'beardOpacity', color = 'beardColor', maxStyle = 28 },
+    { key = 'eyebrows', overlay = 2, style = 'eyebrows', opacity = 'eyebrowsOpacity', color = 'eyebrowsColor', maxStyle = 33 },
+}
+
+local function clampNumber(value, minimum, maximum, default)
+    value = tonumber(value)
+    -- `value ~= value` is the NaN test.
+    if not value or value ~= value then return default end
+    return math.min(maximum, math.max(minimum, value))
+end
+
+---Normalises a saved/requested head table. Missing keys (saves from before an
+---overlay existed) take their defaults: no style, full opacity, and colour -1,
+---which means "follow the hair colour" as facial hair always has.
+---@param raw any
+---@return table
+function Shared.sanitiseHead(raw)
+    raw = type(raw) == 'table' and raw or {}
+    local head = { skinTone = math.floor(clampNumber(raw.skinTone, 0, 45, 0)) }
+    for _, overlay in ipairs(Shared.headOverlays) do
+        head[overlay.style] = math.floor(clampNumber(raw[overlay.style], -1, overlay.maxStyle, -1))
+        head[overlay.opacity] = math.floor(clampNumber(raw[overlay.opacity], 0, 1, 1) * 100 + 0.5) / 100
+        head[overlay.color] = math.floor(clampNumber(raw[overlay.color], -1, Shared.maxHairColorIndex, -1))
+    end
+    return head
+end
+
+---Whether a service may edit one head overlay, read live from
+---Config.headOverlays. Creation/admin sessions use `creator`; sessions that
+---can edit the hair component (barber, hairdresser) use `barber`. A config
+---without the table keeps the original behaviour: creator facial hair only.
+---@param policy table Config.services entry
+---@param key string 'facialHair' | 'eyebrows'
+---@return boolean
+function Shared.headOverlayEnabled(policy, key)
+    local entry = (Config.headOverlays or {})[key]
+    if entry == nil then return policy.all == true and key == 'facialHair' end
+    if policy.all then return entry.creator == true end
+    for _, id in ipairs(policy.components or {}) do
+        if id == 2 then return entry.barber == true end
+    end
+    return false
+end
+
+---Whether the service may see any head control at all.
+function Shared.headEditable(policy)
+    if policy.all then return true end
+    for _, overlay in ipairs(Shared.headOverlays) do
+        if Shared.headOverlayEnabled(policy, overlay.key) then return true end
+    end
+    return false
+end
+
+---Applies a requested head onto the current one, keeping every part the
+---service may not change (skin tone outside creation, disabled overlays).
+---@return table sanitised head
+function Shared.mergeHead(policy, current, requested)
+    current, requested = Shared.sanitiseHead(current), Shared.sanitiseHead(requested)
+    local merged = { skinTone = policy.all and requested.skinTone or current.skinTone }
+    for _, overlay in ipairs(Shared.headOverlays) do
+        local source = Shared.headOverlayEnabled(policy, overlay.key) and requested or current
+        merged[overlay.style], merged[overlay.opacity], merged[overlay.color] = source[overlay.style], source[overlay.opacity], source[overlay.color]
+    end
+    return merged
+end

@@ -5,6 +5,11 @@
 
 Config = {}
 
+-- Descriptors make a setting editable in kora_lib's config workspace and are
+-- resolved back to plain values by QB.config.adopt at the end of this file.
+-- Without kora_lib's config module the plain defaults after `or` are used.
+local config = QB and QB.config
+
 -- Every fitting-room bucket is `Config.bucket.base + source`. `source` is a
 -- small per-connection integer (FiveM reuses low slot numbers), so this stays
 -- far below any world/instance bucket another resource might use starting
@@ -38,6 +43,37 @@ Config.services = {
     -- Character creation is the only normal flow that exposes face, clothing,
     -- hair, and tattoos together. It is always free and mandatory.
     creation = { all = true, tattoos = true },
+}
+
+-- Which head overlays players can edit, per kind of session: `creator` is
+-- character creation (and admin sessions), `barber` is the barber/hairdresser.
+-- A category set to false is hidden in the menu and ignored by the client and
+-- the server. Skin tone stays creation-only and is not configurable here.
+Config.headOverlays = {
+    eyebrows = {
+        creator = config and config.boolean(true, {
+            label = 'Eyebrows in character creation',
+            description = 'Lets players choose eyebrow style, opacity and colour while creating a character. Turn off to hide eyebrow options from creation.',
+            live = true,
+        }) or true,
+        barber = config and config.boolean(true, {
+            label = 'Eyebrows at the barber',
+            description = 'Lets players change eyebrow style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide eyebrow options there.',
+            live = true,
+        }) or true,
+    },
+    facialHair = {
+        creator = config and config.boolean(true, {
+            label = 'Facial hair in character creation',
+            description = 'Lets players choose facial hair style, opacity and colour while creating a character. Turn off to hide facial hair options from creation.',
+            live = true,
+        }) or true,
+        barber = config and config.boolean(true, {
+            label = 'Facial hair at the barber',
+            description = 'Lets players change facial hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide facial hair options there.',
+            live = true,
+        }) or true,
+    },
 }
 
 Config.wardrobe = {

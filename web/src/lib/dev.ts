@@ -41,6 +41,10 @@ const sample: OpenPayload = {
         { id: "hipster_anchor", label: "Anchor", group: "Arms", price: 130 },
     ],
     hair: { palette: hairPalette, color: 2, highlight: 8 },
+    head: {
+        skinTone: 0, beard: -1, beardOpacity: 1, beardColor: -1, eyebrows: -1, eyebrowsOpacity: 1, eyebrowsColor: -1,
+        skinToneEditable: false, overlays: { facialHair: true, eyebrows: true },
+    },
     selectedTattoos: [],
     outfits: [
         { id: 1, outfitname: "Interview fit", model: "mp_m_freemode_01" },

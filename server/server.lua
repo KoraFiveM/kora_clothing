@@ -189,14 +189,12 @@ local function sanitiseSkin(rawSkin, model)
     -- 500) handed to SetPedHairColor is not "no hair colour" -- it is an
     -- out-of-palette read. Always present, defaulting to index 0, so every
     -- downstream diff/equality check can compare them unconditionally.
-    local skin = { components = {}, props = {}, tattoos = {}, hairColor = 0, hairHighlight = 0, head = { skinTone = 0, beard = -1 } }
+    local skin = { components = {}, props = {}, tattoos = {}, hairColor = 0, hairHighlight = 0, head = Shared.sanitiseHead() }
     if type(rawSkin) ~= 'table' then return skin end
 
     skin.hairColor = Shared.clampHairColor(rawSkin.hairColor)
     skin.hairHighlight = Shared.clampHairColor(rawSkin.hairHighlight)
-    local head = type(rawSkin.head) == 'table' and rawSkin.head or {}
-    skin.head.skinTone = QB.util.clamp(math.floor(tonumber(head.skinTone) or 0), 0, 45)
-    skin.head.beard = QB.util.clamp(math.floor(tonumber(head.beard) or -1), -1, 28)
+    skin.head = Shared.sanitiseHead(rawSkin.head)
 
     local components = type(rawSkin.components) == 'table' and rawSkin.components or {}
     for id in pairs(Shared.components) do
@@ -246,7 +244,11 @@ end
 -- a barber visit into a clothing editor.
 local function mergeServiceSkin(before, requested, service, model)
     local policy = serviceConfig(service)
-    if policy.all then return requested end
+    if policy.all then
+        -- Even creation honours Config.headOverlays, so a hidden overlay cannot be forced by a modified client.
+        requested.head = Shared.mergeHead(policy, before and before.head, requested.head)
+        return requested
+    end
     if not before then return requested end
 
     local merged = { components = {}, props = {}, tattoos = {} }
@@ -263,7 +265,8 @@ local function mergeServiceSkin(before, requested, service, model)
     -- this a clothing shop could recolour hair a barber charges for.
     local hairSource = idAllowed(policy.components, 2) and requested or before
     merged.hairColor, merged.hairHighlight = hairSource.hairColor, hairSource.hairHighlight
-    merged.head = policy.all and requested.head or before.head
+    -- Skin tone stays creation-only; overlays follow Config.headOverlays.barber.
+    merged.head = Shared.mergeHead(policy, before.head, requested.head)
     merged.tattoos = policy.tattoos and requested.tattoos or before.tattoos
     return sanitiseSkin(merged, model)
 end
@@ -294,6 +297,15 @@ local function priceDiff(previousSkin, newSkin, prices)
     -- only recoloured the hair would be free.
     if previousSkin.hairColor ~= newSkin.hairColor or previousSkin.hairHighlight ~= newSkin.hairHighlight then
         touchedCategories[Shared.components[2].category] = true
+    end
+
+    -- Eyebrow/facial-hair edits are grooming, priced with the hair category.
+    local previousHead, newHead = Shared.sanitiseHead(previousSkin.head), Shared.sanitiseHead(newSkin.head)
+    for _, overlay in ipairs(Shared.headOverlays) do
+        if previousHead[overlay.style] ~= newHead[overlay.style] or previousHead[overlay.opacity] ~= newHead[overlay.opacity]
+            or previousHead[overlay.color] ~= newHead[overlay.color] then
+            touchedCategories[Shared.components[2].category] = true
+        end
     end
 
     local total = 0
@@ -349,8 +361,11 @@ local function skinsMatch(a, b)
     local aColor, aHighlight = hairOf(a)
     local bColor, bHighlight = hairOf(b)
     if aColor ~= bColor or aHighlight ~= bHighlight then return false end
-    local aHead, bHead = a.head or {}, b.head or {}
-    if (aHead.skinTone or 0) ~= (bHead.skinTone or 0) or (aHead.beard or -1) ~= (bHead.beard or -1) then return false end
+    -- Legacy rows lack the overlay keys; sanitiseHead gives both sides the same defaults.
+    local aHead, bHead = Shared.sanitiseHead(a.head), Shared.sanitiseHead(b.head)
+    for key, value in pairs(aHead) do
+        if bHead[key] ~= value then return false end
+    end
 
     return bagsMatch(Shared.components, a.components or {}, b.components or {})
         and bagsMatch(Shared.props, a.props or {}, b.props or {})

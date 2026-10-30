@@ -61,9 +61,22 @@ export interface HairPayload {
     highlight: number
 }
 
-export interface HeadPayload {
+/** Saved head values. Opacity is 0..1; a colour of -1 follows the hair colour. */
+export interface HeadValues {
     skinTone: number
     beard: number
+    beardOpacity: number
+    beardColor: number
+    eyebrows: number
+    eyebrowsOpacity: number
+    eyebrowsColor: number
+}
+
+export interface HeadPayload extends HeadValues {
+    /** Skin tone is creation-only. */
+    skinToneEditable?: boolean
+    /** Which overlays this service may edit (Config.headOverlays). */
+    overlays?: { facialHair: boolean; eyebrows: boolean }
 }
 
 export interface OpenPayload {
@@ -123,8 +136,8 @@ export interface SetHairColorResponse {
     highlight?: number
 }
 
-export interface SetHeadPayload { skinTone: number; beard: number }
-export interface SetHeadResponse extends Partial<HeadPayload> { ok: boolean }
+export type SetHeadPayload = HeadValues
+export interface SetHeadResponse { ok: boolean; head?: HeadValues }
 
 export interface RotatePayload {
     deltaDeg: number

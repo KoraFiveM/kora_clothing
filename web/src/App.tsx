@@ -13,6 +13,7 @@ import type {
     ErrorPayload,
     HairPayload,
     HeadPayload,
+    HeadValues,
     HairSwatch,
     LoadOutfitResponse,
     OpenPayload,
@@ -29,6 +30,7 @@ import type {
     TattooItem,
     ZoomPayload,
 } from "@/lib/types"
+import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, mergeHeadValues, showFaceSkinPanel } from "@/lib/panels"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
@@ -48,10 +50,6 @@ const ZONES: { zone: Zone; label: string; icon: typeof Maximize2 }[] = [
 // group without a dedicated zoom (Arms, Back) falls back to the closest
 // available framing rather than staying wherever the toolbar was last left.
 const TATTOO_ZONE: Record<string, Zone> = { Head: "face", Torso: "torso", Back: "torso", Arms: "torso", Legs: "legs" }
-
-// Component 2 (shared/components.lua). The hair-colour grids belong to this
-// one component and nothing else, so they are shown only while it is selected.
-const HAIR_COMPONENT_ID = 2
 
 function itemKey(item: Pick<ClothingCategoryItem, "kind" | "id">) {
     return `${item.kind}:${item.id}`
@@ -244,18 +242,69 @@ function HairColorPanel({ hair, onChange }: {
     </div>
 }
 
-function HeadPanel({ head, onChange }: { head: HeadPayload; onChange: (next: HeadPayload) => void }) {
-    const step = (label: string, value: number, min: number, max: number, set: (value: number) => void) => <div className="stepper">
+function Stepper({ label, text, canPrev, canNext, onPrev, onNext }: {
+    label: string
+    text: string
+    canPrev: boolean
+    canNext: boolean
+    onPrev: () => void
+    onNext: () => void
+}) {
+    return <div className="stepper">
         <label>{label}</label>
-        <button type="button" className="step-btn" aria-label={`Previous ${label}`} disabled={value <= min} onClick={() => set(value - 1)}><ChevronLeft size={16} /></button>
-        <span>{value < 0 ? "None" : `${value + 1} / ${max + 1}`}</span>
-        <button type="button" className="step-btn" aria-label={`Next ${label}`} disabled={value >= max} onClick={() => set(value + 1)}><ChevronRight size={16} /></button>
+        <button type="button" className="step-btn" aria-label={`Previous ${label}`} disabled={!canPrev} onClick={onPrev}><ChevronLeft size={16} /></button>
+        <span>{text}</span>
+        <button type="button" className="step-btn" aria-label={`Next ${label}`} disabled={!canNext} onClick={onNext}><ChevronRight size={16} /></button>
     </div>
+}
+
+/** Skin tone, shown with the Face item only. */
+function FaceSkinPanel({ head, onChange }: { head: HeadPayload; onChange: (next: HeadValues) => void }) {
     return <div className="panel panel-pad head-panel">
         <p className="section-title">Face & Skin</p>
-        {step("Skin tone", head.skinTone, 0, 45, (skinTone) => onChange({ ...head, skinTone }))}
-        {step("Facial hair", head.beard, -1, 28, (beard) => onChange({ ...head, beard }))}
+        <Stepper
+            label="Skin tone" text={`${head.skinTone + 1} / 46`}
+            canPrev={head.skinTone > 0} canNext={head.skinTone < 45}
+            onPrev={() => onChange({ ...head, skinTone: head.skinTone - 1 })} onNext={() => onChange({ ...head, skinTone: head.skinTone + 1 })}
+        />
     </div>
+}
+
+const OPACITY_STEP = 0.1
+
+/** Style, opacity and colour for each overlay the server allows here, shown
+ * with the Hair item beside the hair colour. Colour reuses the hair palette;
+ * with none selected the overlay follows the hair colour. */
+function HeadOverlayPanel({ head, overlays, palette, onChange }: {
+    head: HeadPayload
+    overlays: ReturnType<typeof enabledOverlays>
+    palette: HairSwatch[]
+    onChange: (next: HeadValues) => void
+}) {
+    return <>
+        {overlays.map((overlay) => {
+            const style = head[overlay.style]
+            const opacity = head[overlay.opacity]
+            return <div key={overlay.key} className="panel panel-pad head-panel">
+                <p className="section-title">{overlay.label}</p>
+                <Stepper
+                    label={`${overlay.label} style`} text={style < 0 ? "None" : `${style + 1} / ${overlay.maxStyle + 1}`}
+                    canPrev={style > -1} canNext={style < overlay.maxStyle}
+                    onPrev={() => onChange({ ...head, [overlay.style]: style - 1 })} onNext={() => onChange({ ...head, [overlay.style]: style + 1 })}
+                />
+                <Stepper
+                    label={`${overlay.label} opacity`} text={`${Math.round(opacity * 100)}%`}
+                    canPrev={opacity > 0} canNext={opacity < 1}
+                    onPrev={() => onChange({ ...head, [overlay.opacity]: Math.max(0, Math.round((opacity - OPACITY_STEP) * 100) / 100) })}
+                    onNext={() => onChange({ ...head, [overlay.opacity]: Math.min(1, Math.round((opacity + OPACITY_STEP) * 100) / 100) })}
+                />
+                {style >= 0 && palette.length > 0 && <HairColorGrid
+                    label={`${overlay.label} colour`} palette={palette} value={head[overlay.color]}
+                    onSelect={(index) => onChange({ ...head, [overlay.color]: index })}
+                />}
+            </div>
+        })}
+    </>
 }
 
 function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
@@ -317,6 +366,7 @@ export default function App() {
     // from `categories`: the price shown has to be a diff against what the
     // player walked in with, and `hair` moves with every swatch click.
     const [baselineHair, setBaselineHair] = useState<{ color: number; highlight: number } | null>(null)
+    const [baselineHead, setBaselineHead] = useState<HeadPayload | null>(null)
     const [baselineTattoos, setBaselineTattoos] = useState<string[]>([])
     const [baseline, setBaseline] = useState<Map<string, { drawable: number; texture: number }>>(new Map())
     // Set right after loading a saved outfit via "Wear", cleared on any
@@ -340,7 +390,7 @@ export default function App() {
 
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
-        setHair(null); setHead(null); setBaselineHair(null)
+        setHair(null); setHead(null); setBaselineHair(null); setBaselineHead(null)
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
     }, [])
@@ -356,6 +406,7 @@ export default function App() {
         setBaselineTattoos(payload.selectedTattoos ?? [])
         setHair(payload.hair ?? null)
         setHead(payload.head ?? null)
+        setBaselineHead(payload.head ?? null)
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
@@ -373,6 +424,7 @@ export default function App() {
     const groupsPresent = useMemo(() => new Set(categories.map((item) => item.category)), [categories])
     const itemsInActiveGroup = useMemo(() => categories.filter((item) => item.category === activeGroup), [categories, activeGroup])
     const selectedItem = useMemo(() => categories.find((item) => itemKey(item) === selectedKey), [categories, selectedKey])
+    const overlays = enabledOverlays(selectedItem, head)
 
     const changedTotal = useMemo(() => {
         if (!open || open.free || ownedSnapshot) return 0
@@ -388,6 +440,13 @@ export default function App() {
         if (baselineHair && hair && (hair.color !== baselineHair.color || hair.highlight !== baselineHair.highlight)) {
             changedGroups.add("body")
         }
+        // Eyebrow/facial-hair edits are priced with the hair category, as the server does.
+        if (baselineHead && head && HEAD_OVERLAYS.some((overlay) =>
+            head[overlay.style] !== baselineHead[overlay.style]
+            || head[overlay.opacity] !== baselineHead[overlay.opacity]
+            || head[overlay.color] !== baselineHead[overlay.color])) {
+            changedGroups.add("body")
+        }
         let total = 0
         for (const group of changedGroups) total += priceOf(open.prices, group)
         const baselineTattooSet = new Set(baselineTattoos)
@@ -395,7 +454,7 @@ export default function App() {
             if (!baselineTattooSet.has(id)) total += open.tattoos.find((tattoo) => tattoo.id === id)?.price ?? 0
         }
         return total
-    }, [baseline, baselineHair, baselineTattoos, categories, hair, open, ownedSnapshot, selectedTattoos])
+    }, [baseline, baselineHair, baselineHead, baselineTattoos, categories, hair, head, open, ownedSnapshot, selectedTattoos])
 
     const selectGroup = useCallback((group: CategoryGroup) => {
         setActiveGroup(group)
@@ -435,9 +494,13 @@ export default function App() {
         })
     }, [])
 
-    const setHeadAppearance = useCallback(async (next: HeadPayload) => {
+    const setHeadAppearance = useCallback(async (next: HeadValues) => {
         const response = await sendIntent<SetHeadPayload, SetHeadResponse>("qbclothing:nui:setHead", next)
-        if (response.ok) setHead({ skinTone: response.skinTone ?? next.skinTone, beard: response.beard ?? next.beard })
+        if (response.ok && response.head) {
+            const confirmed = response.head
+            setHead((current) => current && mergeHeadValues(current, confirmed))
+            setOwnedSnapshot(false)
+        }
     }, [])
 
     const changeZone = useCallback((next: Zone) => {
@@ -560,7 +623,10 @@ export default function App() {
             {hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
                 <HairColorPanel hair={hair} onChange={(next) => void setHairColor(next)} />
             )}
-            {head && activeGroup === "body" && <HeadPanel head={head} onChange={(next) => void setHeadAppearance(next)} />}
+            {/* Each head panel belongs to one Style item (src/lib/panels.ts), not
+                to the whole Style group, so Mask no longer shows Face & Skin. */}
+            {head && showFaceSkinPanel(selectedItem, head) && <FaceSkinPanel head={head} onChange={(next) => void setHeadAppearance(next)} />}
+            {head && <HeadOverlayPanel head={head} overlays={overlays} palette={hair?.palette ?? []} onChange={(next) => void setHeadAppearance(next)} />}
         </div>}
 
         <div className="bottom-bar">

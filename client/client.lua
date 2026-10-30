@@ -36,27 +36,33 @@ local previewHair = { color = 0, highlight = 0 }
 -- GTA facial features are head data, not drawable components.  Keep them in
 -- the same session-local form as hair so creation previews are persisted with
 -- the rest of the appearance instead of being lost after the menu closes.
-local previewHead = { skinTone = 0, beard = -1 }
+local previewHead = Shared.sanitiseHead()
 
-local function clampHeadIndex(value, minimum, maximum)
-    value = tonumber(value)
-    if not value then return minimum end
-    return math.min(maximum, math.max(minimum, math.floor(value)))
+-- Style, opacity and colour for each Shared.headOverlays entry (facial hair,
+-- eyebrows). Colour -1 follows the hair colour, as facial hair always has, so
+-- this also runs after a hair recolour.
+local function applyHeadOverlays(ped)
+    for _, overlay in ipairs(Shared.headOverlays) do
+        local style = previewHead[overlay.style]
+        SetPedHeadOverlay(ped, overlay.overlay, style, previewHead[overlay.opacity])
+        if style >= 0 and type(SetPedHeadOverlayColor) == 'function' then
+            local color = previewHead[overlay.color]
+            color = color >= 0 and color or previewHair.color
+            SetPedHeadOverlayColor(ped, overlay.overlay, 1, color, color)
+        end
+    end
 end
 
 local function applyHead(ped, head)
     -- Test harnesses and old FiveM artifacts may not expose the head natives;
     -- the rest of an appearance must still be applicable in that environment.
     if type(SetPedHeadBlendData) ~= 'function' or type(SetPedHeadOverlay) ~= 'function' then return end
-    head = type(head) == 'table' and head or {}
-    previewHead.skinTone = clampHeadIndex(head.skinTone, 0, 45)
-    previewHead.beard = clampHeadIndex(head.beard, -1, 28)
+    previewHead = Shared.sanitiseHead(head)
     -- The parent ids are GTA's skin palette entries.  Using the selected entry
     -- for both parents gives the skin-tone control a predictable, full-strength
     -- result while leaving facial shape to the selected freemode model.
     SetPedHeadBlendData(ped, 0, 0, 0, previewHead.skinTone, previewHead.skinTone, 0, 0.0, 0.0, 0.0, false)
-    SetPedHeadOverlay(ped, 1, previewHead.beard, 1.0) -- overlay 1: facial hair/beard
-    if previewHead.beard >= 0 and type(SetPedHeadOverlayColor) == 'function' then SetPedHeadOverlayColor(ped, 1, 1, previewHair.color, previewHair.color) end
+    applyHeadOverlays(ped)
 end
 
 -- Session-local, never sent to the server or persisted: what a tattoo/barber/
@@ -210,7 +216,7 @@ local function currentSkinSnapshot(ped)
     local skin = {
         components = {}, props = {}, tattoos = previewTattoos,
         hairColor = previewHair.color, hairHighlight = previewHair.highlight,
-        head = { skinTone = previewHead.skinTone, beard = previewHead.beard },
+        head = previewHead,
     }
     for id in pairs(Shared.components) do
         skin.components[tostring(id)] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
@@ -245,9 +251,18 @@ local function hairPayload(service)
     return { palette = buildHairPalette(), color = previewHair.color, highlight = previewHair.highlight }
 end
 
+-- The current head plus what this service may edit, so the NUI shows only
+-- those controls. Nil when the service can edit nothing about the head.
 local function headPayload(service)
-    if not servicePolicy(service).all then return nil end
-    return { skinTone = previewHead.skinTone, beard = previewHead.beard }
+    local policy = servicePolicy(service)
+    if not Shared.headEditable(policy) then return nil end
+    local payload = Shared.sanitiseHead(previewHead)
+    payload.skinToneEditable = policy.all == true
+    payload.overlays = {}
+    for _, overlay in ipairs(Shared.headOverlays) do
+        payload.overlays[overlay.key] = Shared.headOverlayEnabled(policy, overlay.key)
+    end
+    return payload
 end
 
 local function buildCategoryPayload(ped, service)
@@ -556,17 +571,20 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     local ped = PlayerPedId()
     refreshHairVariation(ped)
     applyHairColor(ped, data.color, data.highlight)
-    if previewHead.beard >= 0 and type(SetPedHeadOverlayColor) == 'function' then
-        SetPedHeadOverlayColor(ped, 1, 1, previewHair.color, previewHair.color)
-    end
+    if type(SetPedHeadOverlay) == 'function' then applyHeadOverlays(ped) end
     cb({ ok = true, color = previewHair.color, highlight = previewHair.highlight })
 end)
 
 RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
-    if not activeSession or type(data) ~= 'table' or not servicePolicy(activeSession.service).all then cb({ ok = false }); return end
+    if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
+    local policy = servicePolicy(activeSession.service)
+    if not Shared.headEditable(policy) then cb({ ok = false }); return end
     local ped = PlayerPedId()
-    applyHead(ped, data)
-    cb({ ok = true, skinTone = previewHead.skinTone, beard = previewHead.beard })
+    -- Same merge the server applies at confirm time, so the preview never
+    -- shows skin tone or an overlay this service would discard.
+    applyHead(ped, Shared.mergeHead(policy, previewHead, data))
+    -- skinTone/beard stay top-level for the original response shape.
+    cb({ ok = true, head = previewHead, skinTone = previewHead.skinTone, beard = previewHead.beard })
 end)
 
 RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
@@ -929,5 +947,8 @@ end)
 -- suite exercise applySkin's index bounds-checking without a running client.
 if Config.testMode then
     QBClothing = QBClothing or {}
-    QBClothing._testRuntime = { applySkin = applySkin, refreshHairVariation = refreshHairVariation }
+    QBClothing._testRuntime = {
+        applySkin = applySkin, refreshHairVariation = refreshHairVariation,
+        currentSkinSnapshot = currentSkinSnapshot, headPayload = headPayload,
+    }
 end
