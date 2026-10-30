@@ -8,3 +8,4 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/shop_zones.lua
 "${LUA:-lua}" test/smoke/session_open.lua
 "${LUA:-lua}" test/smoke/head_overlays.lua
+"${LUA:-lua}" test/smoke/camera_category.lua

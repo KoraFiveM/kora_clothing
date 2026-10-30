@@ -4,6 +4,8 @@ import { openDevHarness } from "@/lib/dev"
 import { sendIntent } from "@/lib/nui"
 import type {
     CameraPayload,
+    CategoryCameraPayload,
+    CategoryCameraResponse,
     CancelResponse,
     CategoryGroup,
     ClothingCategoryItem,
@@ -45,11 +47,6 @@ const ZONES: { zone: Zone; label: string; icon: typeof Maximize2 }[] = [
     { zone: "legs", label: "Legs", icon: PersonStanding },
     { zone: "shoes", label: "Shoes", icon: Footprints },
 ]
-
-// Config.camera.zones (client/camera.lua) has no per-limb preset, so a tattoo
-// group without a dedicated zoom (Arms, Back) falls back to the closest
-// available framing rather than staying wherever the toolbar was last left.
-const TATTOO_ZONE: Record<string, Zone> = { Head: "face", Torso: "torso", Back: "torso", Arms: "torso", Legs: "legs" }
 
 function itemKey(item: Pick<ClothingCategoryItem, "kind" | "id">) {
     return `${item.kind}:${item.id}`
@@ -456,11 +453,19 @@ export default function App() {
         return total
     }, [baseline, baselineHair, baselineHead, baselineTattoos, categories, hair, head, open, ownedSnapshot, selectedTattoos])
 
+    // The game resolves the framing (Config.camera.categoryZones, and whether
+    // to move the camera at all) and reports the zone now in effect.
+    const frameCategory = useCallback(async (category: string) => {
+        const response = await sendIntent<CategoryCameraPayload, CategoryCameraResponse>("qbclothing:nui:camera", { category })
+        if (response.zone) setZone(response.zone)
+    }, [])
+
     const selectGroup = useCallback((group: CategoryGroup) => {
         setActiveGroup(group)
         const first = categories.find((item) => item.category === group)
         setSelectedKey(first ? itemKey(first) : undefined)
-    }, [categories])
+        frameCategory(group)
+    }, [categories, frameCategory])
 
     const applyVariationResponse = useCallback((target: ClothingCategoryItem, response: SetVariationResponse) => {
         if (!response.ok) return
@@ -525,12 +530,11 @@ export default function App() {
     }, [activeGroup])
 
     const toggleTattoo = useCallback(async (id: string) => {
-        // Jump the camera to wherever this tattoo actually sits -- the
-        // toolbar's zoom otherwise stays wherever it was last left (often
-        // "Face" or "Full body"), so a Torso/Arms tattoo could be toggled
-        // without ever being in frame to see the result.
+        // Frame wherever this tattoo actually sits -- the toolbar's zoom
+        // otherwise stays wherever it was last left, so a Torso/Arms tattoo
+        // could be toggled without ever being in frame to see the result.
         const group = open?.tattoos.find((tattoo) => tattoo.id === id)?.group
-        if (group && TATTOO_ZONE[group]) changeZone(TATTOO_ZONE[group])
+        if (group) void frameCategory(group)
 
         const next = selectedTattoos.includes(id) ? selectedTattoos.filter((value) => value !== id) : [...selectedTattoos, id]
         const response = await sendIntent<{ tattoos: string[] }, SetTattoosResponse>("qbclothing:nui:setTattoos", { tattoos: next })
@@ -538,7 +542,7 @@ export default function App() {
             setOwnedSnapshot(false)
             setSelectedTattoos(response.tattoos)
         }
-    }, [selectedTattoos, open, changeZone])
+    }, [selectedTattoos, open, frameCategory])
 
     const deleteOutfit = useCallback((id: number) => {
         void sendIntent<{ id: number }, object>("qbclothing:nui:deleteOutfit", { id })

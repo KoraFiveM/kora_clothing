@@ -120,6 +120,14 @@ export interface CameraPayload {
     zone: "full" | "face" | "torso" | "legs" | "shoes"
 }
 
+/** A clothing group or tattoo group; the game maps it to a zone. */
+export interface CategoryCameraPayload {
+    category: string
+}
+export interface CategoryCameraResponse {
+    zone?: CameraPayload["zone"]
+}
+
 /** Wheel notches, not pixels -- see the comment on useZoom in App.tsx. */
 export interface ZoomPayload {
     delta: number

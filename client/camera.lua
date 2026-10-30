@@ -70,6 +70,33 @@ local function cameraAnchor(ped)
     return GetEntityCoords(ped)
 end
 
+-- Vertical limits of the ped relative to the camera anchor, measured from the
+-- model's own bounding box when the camera starts. Presets are authored for an
+-- average freemode ped, so without this a tall preset (the face zone) can aim
+-- above the head. The defaults only apply where the native is unavailable.
+local pedBounds = { low = -1.3, high = 0.65 }
+
+-- The face centre sits about this far below the top of the head.
+local HEAD_MARGIN = 0.15
+
+local function measurePedBounds(ped)
+    if type(GetModelDimensions) ~= 'function' then return end
+    local minimum, maximum = GetModelDimensions(GetEntityModel(ped))
+    if not minimum or not maximum then return end
+
+    local anchor, root = cameraAnchor(ped), GetEntityCoords(ped)
+    pedBounds.low = root.z + minimum.z - anchor.z
+    pedBounds.high = root.z + maximum.z - anchor.z
+end
+
+-- Look-at and camera heights for a zone, relative to the anchor, kept inside
+-- the ped. The camera keeps the preset's height above its look-at point.
+local function zoneHeights(zoneCfg)
+    local target = clamp(zoneCfg.boneOffset.z, pedBounds.low, pedBounds.high - HEAD_MARGIN)
+    local height = clamp(target + zoneCfg.camOffset.z, pedBounds.low, pedBounds.high)
+    return target, height
+end
+
 local function traceCameraPath(subject, candidate)
     local handle = StartShapeTestCapsule(
         subject.x, subject.y, subject.z,
@@ -93,7 +120,8 @@ local function candidatePoint(pedCoords, heading, radius, height, angle, lift)
     return vector3(
         pedCoords.x - math.sin(rad) * radius,
         pedCoords.y - math.cos(rad) * radius,
-        pedCoords.z + height + lift
+        -- The occlusion lift may raise the camera, but never above the head.
+        pedCoords.z + math.min(height + lift, math.max(height, pedBounds.high))
     )
 end
 
@@ -104,12 +132,12 @@ local function resolveOcclusion()
     local pedCoords = cameraAnchor(pedRef)
     local heading = GetEntityHeading(pedRef)
     local radius = goalRadius(zoneCfg)
-    local height = zoneCfg.boneOffset.z + zoneCfg.camOffset.z
+    local targetOffset, height = zoneHeights(zoneCfg)
 
     -- Traced from the point the camera is actually aimed at, not the ped's
     -- feet: a waist-high shop counter is not between a face-framed camera and
     -- the ped's head, and tracing from floor level would insist that it is.
-    local subject = vector3(pedCoords.x, pedCoords.y, pedCoords.z + zoneCfg.boneOffset.z)
+    local subject = vector3(pedCoords.x, pedCoords.y, pedCoords.z + targetOffset)
 
     local firstImpact
     for index, angle in ipairs(CAMERA_FAN_ANGLES) do
@@ -149,9 +177,11 @@ function Camera.start(ped)
     if cam then Camera.stop() end
     pedRef = ped
     active = true
+    measurePedBounds(ped)
 
     local first = Config.camera.zones.full
-    state.radius, state.height, state.fov, state.angle = first.camOffset.y, first.boneOffset.z + first.camOffset.z, first.fov, 0.0
+    local _, firstHeight = zoneHeights(first)
+    state.radius, state.height, state.fov, state.angle = first.camOffset.y, firstHeight, first.fov, 0.0
     target.zone, target.angle, target.zoomOffset = 'full', 0.0, 0.0
     occlusion.angle, occlusion.lift, occlusion.radiusScale = 0.0, 0.0, 1.0
     occlusionDirty = false
@@ -185,14 +215,15 @@ function Camera.start(ped)
             local zoneCfg = Config.camera.zones[target.zone] or Config.camera.zones.full
             local zoomRate = math.min(1.0, dt * (1000.0 / math.max(50, Config.camera.transitionMs)))
             state.radius = lerp(state.radius, goalRadius(zoneCfg), zoomRate)
-            state.height = lerp(state.height, zoneCfg.boneOffset.z + zoneCfg.camOffset.z, zoomRate)
+            local targetOffset, goalHeight = zoneHeights(zoneCfg)
+            state.height = lerp(state.height, goalHeight, zoomRate)
             state.fov = lerp(state.fov, zoneCfg.fov, zoomRate)
             state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))
 
             if pedRef and DoesEntityExist(pedRef) then
                 local pedCoords = cameraAnchor(pedRef)
                 local heading = GetEntityHeading(pedRef)
-                local targetHeight = pedCoords.z + zoneCfg.boneOffset.z
+                local targetHeight = pedCoords.z + targetOffset
                 local camPoint = candidatePoint(
                     pedCoords, heading,
                     state.radius * occlusion.radiusScale, state.height,
@@ -224,6 +255,18 @@ end
 ---@param deltaDeg number added to the current orbit angle (positive = clockwise)
 function Camera.rotate(deltaDeg)
     target.angle = (target.angle + (tonumber(deltaDeg) or 0.0)) % 360.0
+end
+
+---Frames a menu category (a clothing group like 'shoes' or a tattoo group like
+---'Head') using Config.camera.categoryZones. Setting the zone also drops any
+---wheel zoom. Does nothing when Config.camera.resetOnCategoryChange is false,
+---so the player's manual camera is kept. Returns the zone now in effect.
+---@param category string
+---@return string
+function Camera.setCategory(category)
+    local zone = Config.camera.categoryZones[category]
+    if Config.camera.resetOnCategoryChange and zone then Camera.setZone(zone) end
+    return target.zone
 end
 
 ---@param delta number wheel notches; negative pulls the camera towards the ped
@@ -259,6 +302,10 @@ function Camera.stop()
     pedRef = nil
 end
 
+function Camera.currentZone()
+    return target.zone
+end
+
 function Camera.isActive()
     return active
 end
@@ -271,6 +318,9 @@ if Config.testMode then
         goalRadius = goalRadius,
         lerpAngle = lerpAngle,
         zoomOffset = function() return target.zoomOffset end,
+        zone = function() return target.zone end,
+        zoneHeights = zoneHeights,
+        setPedBounds = function(low, high) pedBounds.low, pedBounds.high = low, high end,
         setZoomOffset = function(value) target.zoomOffset = value end,
     }
 end

@@ -588,8 +588,15 @@ RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
 end)
 
 RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
-    if type(data) == 'table' and data.zone then Camera.setZone(data.zone) end
-    cb({})
+    if type(data) ~= 'table' then cb({}); return end
+    -- `category` is a clothing or tattoo group picked in the menu; `zone` is
+    -- the toolbar's explicit choice and always applies.
+    if data.zone then
+        Camera.setZone(data.zone)
+    elseif data.category then
+        Camera.setCategory(data.category)
+    end
+    cb({ zone = Camera.currentZone() })
 end)
 
 RegisterNUICallback('qbclothing:nui:rotate', function(data, cb)

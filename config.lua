@@ -352,6 +352,22 @@ Config.camera = {
         max = 4.5,
         step = 0.12,
     },
+    -- Which zone each menu category frames when the player picks it. Clothing
+    -- groups and tattoo groups are looked up by their exact UI names. Arms and
+    -- Back fall back to the torso framing because there is no per-limb preset.
+    categoryZones = {
+        tops = 'torso', legs = 'legs', shoes = 'shoes', body = 'face', accessories = 'full',
+        Head = 'face', Torso = 'torso', Arms = 'torso', Back = 'torso', Legs = 'legs',
+    },
+    -- When true, choosing a category (or a tattoo) jumps the camera to that
+    -- category's zone and drops any wheel zoom, so a close-up from one
+    -- category never carries over to the next. When false the camera stays
+    -- exactly where the player left it until they use the zone buttons.
+    resetOnCategoryChange = config and config.boolean(true, {
+        label = 'Reset camera when changing category',
+        description = 'Moves the fitting-room camera to the framing for each clothing or tattoo category when it is selected, and clears any mouse-wheel zoom. Turn off to keep the camera where the player put it.',
+        live = true,
+    }) or true,
     -- Orbit rotation and zoom-transition speeds, tuned for the "smooth, not a
     -- jump-cut" illenium-style feel called for by UX.
     orbitDegPerSec = 90.0,
