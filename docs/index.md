@@ -26,7 +26,7 @@ using another HUD need no configuration; the integration is optional.
 
 ## Requirements
 
-- [qblib](https://qbcore2.github.io/kora_lib/)
+- [kora_lib](https://qbcore2.github.io/kora_lib/)
 - [qbsql](https://qbcore2.github.io/kora_sql/)
 - [qbcore](https://qbcore2.github.io/kora_core/)
 - [qbtarget](https://qbcore2.github.io/kora_target/) — shops are targeted through kora_target zones
@@ -260,7 +260,7 @@ interaction prompt.
 
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
-- [qblib](https://qbcore2.github.io/kora_lib/) — shared helper library
+- [kora_lib](https://qbcore2.github.io/kora_lib/) — shared helper library
 - [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
 - [qbcore](https://qbcore2.github.io/kora_core/) — framework core
 - [qbinventory](https://qbcore2.github.io/kora_inventory/) — headless inventory

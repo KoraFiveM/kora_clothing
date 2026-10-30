@@ -48,7 +48,7 @@ for index, shop in ipairs(Config.shops) do
             H.ok(isCoordsLike(point), ('%s polyzone point %d is a table with numeric x/y/z'):format(where, pointIndex))
         end
         -- Without one of these kora_lib falls back to Config.zones.defaultPolyThickness,
-        -- which is a qblib-wide number that has nothing to do with this shop's
+        -- which is a kora_lib-wide number that has nothing to do with this shop's
         -- ceiling: a store traced on one floor would silently reach through it.
         H.ok(type(zone.thickness) == 'number' or (type(zone.minZ) == 'number' and type(zone.maxZ) == 'number'),
             ('%s polyzone states its own height band (thickness, or minZ+maxZ)'):format(where))
@@ -68,7 +68,7 @@ for index, shop in ipairs(Config.shops) do
     local blip = shop.blip
     if blip and blip.enabled then
         H.equal(blip.category, categoryByService[shop.service], ('%s uses its canonical map category'):format(where))
-        H.equal(blip.label, nil, ('%s leaves display-label composition to qblib'):format(where))
+        H.equal(blip.label, nil, ('%s leaves display-label composition to kora_lib'):format(where))
         if shop.service == 'clothing' then
             H.equal(blip.name, shop.label, ('%s supplies its storefront name separately'):format(where))
         else

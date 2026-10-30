@@ -35,7 +35,7 @@ end
 -- Session state is the sole authority for bucket restore and mandatory-mode
 -- enforcement -- never trust client-submitted session identity.
 H.ok(server:find('local sessions = {}', 1, true), 'server keeps its own session table')
-H.ok(server:find("QB.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through qblib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
+H.ok(server:find("QB.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through kora_lib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
 H.ok(server:find("if sessions[src] then return end", 1, true), 'duplicate session requests are rejected')
 H.ok(server:find('local session = sessions[src]', 1, true), 'confirm/cancel/delete look up session server-side')
 H.ok(server:find('if not session or session.mandatory then return end', 1, true), 'mandatory first-character sessions cannot be cancelled')
@@ -210,7 +210,7 @@ do
     -- QB.nui.* must NOT be used here -- that explanatory text itself contains
     -- the substring and would otherwise false-positive this check.
     local codeOnly = client:gsub("%-%-[^\n]*", '')
-    H.ok(not codeOnly:find('QB.nui.', 1, true), 'client never routes its own NUI through qblib\'s proxy')
+    H.ok(not codeOnly:find('QB.nui.', 1, true), 'client never routes its own NUI through kora_lib\'s proxy')
 end
 H.ok(not server:find('SendNUIMessage', 1, true) and not server:find('RegisterNUICallback', 1, true), 'server has no NUI authority')
 
@@ -273,7 +273,7 @@ H.ok(config:find("service = 'tattoo'", 1, true) and config:find("category = 'Tat
 local groomingCategories = select(2, config:gsub("category = 'Grooming'", ''))
 H.equal(groomingCategories, 4, 'barbers and hairdressers share one Grooming category')
 for blip in config:gmatch('blip = ({[^\n]+})') do
-    H.ok(not blip:find('label =', 1, true), 'qblib composes each shop map label from category and optional name')
+    H.ok(not blip:find('label =', 1, true), 'kora_lib composes each shop map label from category and optional name')
 end
 
 -- Camera never leaks a render-cams state or a stuck control lock.
