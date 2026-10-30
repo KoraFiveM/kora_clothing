@@ -358,6 +358,15 @@ Config.showTargetHints = config and config.optional(nil, config.boolean(true), {
     description = "Forces the world icon on shop target zones on (set) or off. Leave unset to follow kora_target's own icon setting. Applies after the resource restarts.",
 }) or nil
 
+-- Captures the mouse while dragging to rotate the ped so the cursor cannot leave
+-- the screen. Read each time the menu opens; the NUI falls back to a plain drag
+-- if the game refuses the lock.
+Config.rotatePointerLock = config and config.boolean(true, {
+    label = 'Capture mouse while rotating',
+    description = 'Locks the mouse while you hold click to rotate the character in clothing, barber, tattoo and creation menus, so rotation continues without lifting the button. Turn off to use a plain drag.',
+    live = true,
+}) or true
+
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
 -- callback. Offsets are relative to the ped's mid-spine bone in the ped's own
 -- forward-facing frame; client/camera.lua turns these into world-space coords

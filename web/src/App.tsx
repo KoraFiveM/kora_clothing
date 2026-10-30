@@ -2,6 +2,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, M
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { sendIntent } from "@/lib/nui"
+import { listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import type {
     CameraPayload,
     CategoryCameraPayload,
@@ -110,13 +111,30 @@ function useZoom() {
     }, [flush])
 }
 
-function Viewport({ onRotate, onZoom }: { onRotate: (deltaDeg: number) => void; onZoom: (notches: number) => void }) {
+function Viewport({ onRotate, onZoom, pointerLock }: { onRotate: (deltaDeg: number) => void; onZoom: (notches: number) => void; pointerLock: boolean }) {
     const dragging = useRef(false)
+    const locked = useRef(false)
+    const release = useCallback(() => {
+        dragging.current = false
+        if (!locked.current) return
+        locked.current = false
+        releaseRotateLock(document)
+    }, [])
+    // Unmount covers the menu closing; blur and Escape cover losing the focus mid-drag.
+    useEffect(() => {
+        const stop = listenForLockRelease(window, release)
+        return () => { stop(); release() }
+    }, [release])
     return <div
         className="clothing-viewport"
-        onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId) }}
-        onPointerUp={(event) => { dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId) }}
-        onPointerCancel={() => { dragging.current = false }}
+        onPointerDown={(event) => {
+            dragging.current = true
+            event.currentTarget.setPointerCapture(event.pointerId)
+            // Checked on every drag start so a changed setting applies immediately.
+            locked.current = requestRotateLock(event.currentTarget, pointerLock)
+        }}
+        onPointerUp={(event) => { release(); event.currentTarget.releasePointerCapture(event.pointerId) }}
+        onPointerCancel={release}
         onPointerMove={(event) => { if (dragging.current) onRotate(-event.movementX * DRAG_ROTATION_DEG_PER_PIXEL) }}
         onWheel={(event) => onZoom(Math.sign(event.deltaY))}
         aria-hidden="true"
@@ -573,7 +591,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport onRotate={rotate} onZoom={zoom} />
+        <Viewport onRotate={rotate} onZoom={zoom} pointerLock={open.rotatePointerLock === true} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

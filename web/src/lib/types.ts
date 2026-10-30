@@ -84,6 +84,7 @@ export interface OpenPayload {
     service: string
     free: boolean
     mandatory: boolean
+    rotatePointerLock?: boolean
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]
