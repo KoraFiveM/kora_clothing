@@ -6,6 +6,7 @@
 
 local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
 local disableControlsThread = false
+local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
 local previewTattoos = {}
 
 -- kora_hud is optional: kora_clothing can still run on servers with a different HUD.
@@ -515,6 +516,7 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     local session = activeSession
     activeSession = nil
     restoreHudForSession(session)
+    if refreshShopPrompt then refreshShopPrompt() end
 end)
 
 -- --- NUI callbacks ---
@@ -867,6 +869,51 @@ end)
 
 -- --- shop targets ---
 
+-- Config.interactionMode = 'textui' replaces the target option with kora_lib's
+-- "[E] Open <shop>" prompt while the player is inside the shop zone. It is read
+-- once at registration, so changing it needs a resource restart.
+local textUiShop -- { index, label, handle } while inside a shop zone, else nil
+
+local function hideShopPrompt()
+    if textUiShop and textUiShop.handle then
+        QB.textui.hide(textUiShop.handle)
+        textUiShop.handle = nil
+    end
+end
+
+local function showShopPrompt()
+    if not textUiShop or activeSession then return end
+    hideShopPrompt()
+    textUiShop.handle = QB.textui.show(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
+end
+
+local function registerTextUiShop(index, shop, zone)
+    local callbacks = {
+        onEnter = function()
+            textUiShop = { index = index, label = shop.label }
+            showShopPrompt()
+        end,
+        onExit = function()
+            hideShopPrompt()
+            textUiShop = nil
+        end,
+    }
+
+    if zone.points then
+        QB.zones.poly({
+            points = zone.points, thickness = zone.thickness, minZ = zone.minZ, maxZ = zone.maxZ,
+            onEnter = callbacks.onEnter, onExit = callbacks.onExit,
+        })
+        return
+    end
+    QB.zones.box({
+        coords = vector3(shop.coords.x, shop.coords.y, shop.coords.z),
+        size = zone.size or Config.shopZoneDefault.size,
+        rotation = zone.rotation or shop.coords.w,
+        onEnter = callbacks.onEnter, onExit = callbacks.onExit,
+    })
+end
+
 -- The target is the storefront itself, not a clerk. A ped-bound target dies
 -- with the ped: an unstreamed model, a player shoving the clerk out of place,
 -- or another resource deleting stray peds all leave the shop silently
@@ -878,38 +925,69 @@ end)
 -- Note the shape difference against addEntity/addModel: the zone APIs take ONE
 -- opts table with `options` INSIDE it, where addEntity takes the options array
 -- as its own positional argument (see kora_target/client/state.lua).
-CreateThread(function()
-    for index, shop in ipairs(Config.shops) do
-        local options = {
-            {
-                label = ('Open %s'):format(shop.label),
-                icon = 'Shirt',
-                distance = Config.interactDistance,
-                onSelect = function() openSession('shop', { shopId = index }) end,
-            },
-        }
-        local zone = shop.zone or Config.shopZoneDefault
+local function registerTargetShop(index, shop, zone)
+    local options = {
+        {
+            label = ('Open %s'):format(shop.label),
+            icon = 'Shirt',
+            distance = Config.interactDistance,
+            onSelect = function() openSession('shop', { shopId = index }) end,
+        },
+    }
+    -- A polygon's centroid can sit inside a wall, so the sprite is anchored on
+    -- the shop's own interaction point. drawSprite stays nil by default so
+    -- kora_target's global sprites setting decides; true/false force it.
+    local spriteCoords = vector3(shop.coords.x, shop.coords.y, shop.coords.z)
 
-        if zone.points then
-            exports.kora_target:addPolyZone({
-                points = zone.points,
-                thickness = zone.thickness,
-                minZ = zone.minZ,
-                maxZ = zone.maxZ,
-                options = options,
-                distance = Config.interactDistance,
-            })
+    if zone.points then
+        exports.kora_target:addPolyZone({
+            points = zone.points,
+            thickness = zone.thickness,
+            minZ = zone.minZ,
+            maxZ = zone.maxZ,
+            options = options,
+            distance = Config.interactDistance,
+            spriteCoords = spriteCoords,
+            drawSprite = Config.showTargetHints,
+        })
+        return
+    end
+    exports.kora_target:addBoxZone({
+        -- shop.coords is a vector4 (heading in .w) and addBoxZone only
+        -- reads x/y/z off it, so the heading is passed separately as
+        -- the box's own rotation rather than being read from coords.
+        coords = shop.coords,
+        size = zone.size or Config.shopZoneDefault.size,
+        rotation = zone.rotation or shop.coords.w,
+        options = options,
+        distance = Config.interactDistance,
+        spriteCoords = spriteCoords,
+        drawSprite = Config.showTargetHints,
+    })
+end
+
+CreateThread(function()
+    local textUiMode = Config.interactionMode == 'textui'
+    if textUiMode then
+        refreshShopPrompt = showShopPrompt
+        QB.keybind.add({
+            name = 'kora_clothing_open_shop',
+            description = 'Open the clothing shop you are standing in',
+            defaultKey = 'E',
+            onPressed = function()
+                if not textUiShop or activeSession then return end
+                hideShopPrompt()
+                openSession('shop', { shopId = textUiShop.index })
+            end,
+        })
+    end
+
+    for index, shop in ipairs(Config.shops) do
+        local zone = shop.zone or Config.shopZoneDefault
+        if textUiMode then
+            registerTextUiShop(index, shop, zone)
         else
-            exports.kora_target:addBoxZone({
-                -- shop.coords is a vector4 (heading in .w) and addBoxZone only
-                -- reads x/y/z off it, so the heading is passed separately as
-                -- the box's own rotation rather than being read from coords.
-                coords = shop.coords,
-                size = zone.size or Config.shopZoneDefault.size,
-                rotation = zone.rotation or shop.coords.w,
-                options = options,
-                distance = Config.interactDistance,
-            })
+            registerTargetShop(index, shop, zone)
         end
 
         if Config.shopPeds then

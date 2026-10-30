@@ -329,6 +329,26 @@ Config.tattooStrip = {
 
 Config.interactDistance = 2.0
 
+-- How players open a shop. 'target' uses a kora_target zone option; 'textui'
+-- shows "[E] Open <shop>" through kora_lib's TextUI while inside the shop zone
+-- and opens on E. Read when the resource starts.
+Config.interactionMode = config and config.enum('target', {
+    label = 'Shop interaction',
+    description = 'Chooses how players open a shop. Target Zone uses the kora_target prompt; Text Prompt shows an [E] Open message while standing inside the shop area. Changes apply after the resource restarts.',
+    options = {
+        { value = 'target', label = 'Target Zone' },
+        { value = 'textui', label = 'Text Prompt' },
+    },
+}) or 'target'
+
+-- Whether shop target zones draw their world icon. nil follows kora_target's
+-- own icon setting; true always draws it for shop zones; false never does.
+-- Read when the zones are registered at resource start.
+Config.showTargetHints = config and config.optional(nil, config.boolean(true), {
+    label = 'Show shop target icons',
+    description = "Forces the world icon on shop target zones on (set) or off. Leave unset to follow kora_target's own icon setting. Applies after the resource restarts.",
+}) or nil
+
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
 -- callback. Offsets are relative to the ped's mid-spine bone in the ped's own
 -- forward-facing frame; client/camera.lua turns these into world-space coords
