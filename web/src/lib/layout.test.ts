@@ -17,3 +17,12 @@ test("rail children never shrink below their content", () => {
 test("colour palette panels keep a bounded height with their own scroll", () => {
     assert.match(rule(".hair-panel"), /max-height: \d+px; overflow: auto/)
 })
+
+test("the shipped bundle carries the rail scroll fix (creator and barber share it)", () => {
+    const html = readFileSync(new URL("../../build/index.html", import.meta.url), "utf8")
+    const href = /assets\/(index-[\w-]+\.css)/.exec(html)?.[1]
+    assert.ok(href, "built index.html links a stylesheet")
+    const built = readFileSync(new URL(`../../build/assets/${href}`, import.meta.url), "utf8")
+    assert.match(built, /\.rail\{[^}]*overflow-y:auto/)
+    assert.match(built, /\.rail>\*\{flex-shrink:0\}/)
+})

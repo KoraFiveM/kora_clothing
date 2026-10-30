@@ -486,6 +486,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             free = payload.free == true,
             mandatory = activeSession.mandatory,
             rotatePointerLock = Config.rotatePointerLock ~= false,
+            rotateDragGuard = Config.rotateDragGuard ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
             -- if the requested model failed to stream in time, this must
@@ -669,6 +670,13 @@ end)
 
 RegisterNUICallback('qbclothing:nui:rotate', function(data, cb)
     if type(data) == 'table' then Camera.rotate(data.deltaDeg) end
+    cb({})
+end)
+
+-- The NUI says the drag is over (button up, cursor left the window, focus
+-- lost): settle the orbit where it is so nothing keeps rotating.
+RegisterNUICallback('qbclothing:nui:rotateEnd', function(_, cb)
+    Camera.rotateEnd()
     cb({})
 end)
 

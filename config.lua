@@ -367,6 +367,16 @@ Config.rotatePointerLock = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- Ends a rotate drag whenever the mouse button release cannot be seen: the cursor
+-- left the game window, focus was lost, or a move arrives with the button up.
+-- Without it the camera keeps spinning until the player clicks again. Read each
+-- time the menu opens.
+Config.rotateDragGuard = config and config.boolean(true, {
+    label = 'End rotate drag when the mouse is lost',
+    description = 'Stops rotating the character when the cursor leaves the game window, the window loses focus, or the mouse button is released out of sight. Turn off to use the plain press/release drag.',
+    live = true,
+}) or true
+
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
 -- callback. Offsets are relative to the ped's mid-spine bone in the ped's own
 -- forward-facing frame; client/camera.lua turns these into world-space coords

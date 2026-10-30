@@ -257,6 +257,12 @@ function Camera.rotate(deltaDeg)
     target.angle = (target.angle + (tonumber(deltaDeg) or 0.0)) % 360.0
 end
 
+---Drag finished: stop the orbit at the angle it has reached instead of easing
+---on towards a target the player is no longer pulling.
+function Camera.rotateEnd()
+    target.angle = state.angle % 360.0
+end
+
 ---Frames a menu category (a clothing group like 'shoes' or a tattoo group like
 ---'Head') using Config.camera.categoryZones. Setting the zone also drops any
 ---wheel zoom. Does nothing when Config.camera.resetOnCategoryChange is false,
@@ -322,5 +328,7 @@ if Config.testMode then
         zoneHeights = zoneHeights,
         setPedBounds = function(low, high) pedBounds.low, pedBounds.high = low, high end,
         setZoomOffset = function(value) target.zoomOffset = value end,
+        targetAngle = function() return target.angle end,
+        setAngles = function(live, goal) state.angle, target.angle = live, goal end,
     }
 end
