@@ -9,6 +9,15 @@ local disableControlsThread = false
 local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
 local previewTattoos = {}
 
+-- Component 0 is the freemode head drawable. On its own it does nothing
+-- visible, because the face is drawn from head blend data. So the "Head"
+-- category in the menu drives the face shape: the chosen drawable index is used
+-- as the head-blend shape id (see faceShapeFromDrawable / applyHead). The
+-- drawable is already saved with the outfit as component "0", so the face
+-- persists with no extra schema.
+local HEAD_COMPONENT = 0
+local MAX_FACE_SHAPE = 45 -- freemode head blend shape ids are 0..45
+
 -- kora_hud is optional: kora_clothing can still run on servers with a different HUD.
 -- Remember whether this session actually hid a visible kora_hud instance so its
 -- close path never reveals a HUD another resource (or the player) had hidden.
@@ -70,15 +79,26 @@ local function applyHeadOverlays(ped)
     end
 end
 
+-- The face shape is whatever head drawable (component 0) is currently on the
+-- ped, clamped to the valid head-blend shape range.
+local function faceShapeFromDrawable(ped)
+    local drawable = GetPedDrawableVariation(ped, HEAD_COMPONENT)
+    if type(drawable) ~= 'number' or drawable < 0 then return 0 end
+    return math.min(drawable, MAX_FACE_SHAPE)
+end
+
 local function applyHead(ped, head)
+    -- Plain print + json so this is visible regardless of how QB.print.debug
+    -- formats a leading entity handle.
     -- Test harnesses and old FiveM artifacts may not expose the head natives;
     -- the rest of an appearance must still be applicable in that environment.
     if type(SetPedHeadBlendData) ~= 'function' or type(SetPedHeadOverlay) ~= 'function' then return end
     previewHead = Shared.sanitiseHead(head)
-    -- The parent ids are GTA's skin palette entries.  Using the selected entry
-    -- for both parents gives the skin-tone control a predictable, full-strength
-    -- result while leaving facial shape to the selected freemode model.
-    SetPedHeadBlendData(ped, 0, 0, 0, previewHead.skinTone, previewHead.skinTone, 0, 0.0, 0.0, 0.0, false)
+    local shape = faceShapeFromDrawable(ped)
+    -- Both shape parents use the selected face, and both skin parents use the
+    -- selected skin-palette entry, so each control gives a predictable,
+    -- full-strength result.
+    SetPedHeadBlendData(ped, shape, shape, 0, previewHead.skinTone, previewHead.skinTone, 0, 0.0, 0.0, 0.0, false)
     applyHeadOverlays(ped)
 end
 
@@ -289,14 +309,14 @@ local function buildCategoryPayload(ped, service)
         if policyAllows(policy, policy.components, id) then
             local drawable = GetPedDrawableVariation(ped, id)
             categories[#categories + 1] = {
-            kind = 'component',
-            id = id,
-            label = meta.label,
-            category = meta.category,
-            drawable = drawable,
-            texture = GetPedTextureVariation(ped, id),
-            drawableCount = GetNumberOfPedDrawableVariations(ped, id),
-            textureCount = GetNumberOfPedTextureVariations(ped, id, drawable),
+                kind = 'component',
+                id = id,
+                label = meta.label,
+                category = meta.category,
+                drawable = drawable,
+                texture = GetPedTextureVariation(ped, id),
+                drawableCount = GetNumberOfPedDrawableVariations(ped, id),
+                textureCount = GetNumberOfPedTextureVariations(ped, id, drawable),
             }
         end
     end
@@ -304,24 +324,21 @@ local function buildCategoryPayload(ped, service)
         if policyAllows(policy, policy.props, id) then
             local drawable = GetPedPropIndex(ped, id)
             categories[#categories + 1] = {
-            kind = 'prop',
-            id = id,
-            label = meta.label,
-            category = meta.category,
-            clearable = meta.clearable,
-            drawable = drawable,
-            texture = drawable >= 0 and GetPedPropTextureIndex(ped, id) or 0,
-            drawableCount = GetNumberOfPedPropDrawableVariations(ped, id),
-            textureCount = drawable >= 0 and GetNumberOfPedPropTextureVariations(ped, id, drawable) or 0,
+                kind = 'prop',
+                id = id,
+                label = meta.label,
+                category = meta.category,
+                clearable = meta.clearable,
+                drawable = drawable,
+                texture = drawable >= 0 and GetPedPropTextureIndex(ped, id) or 0,
+                drawableCount = GetNumberOfPedPropDrawableVariations(ped, id),
+                textureCount = drawable >= 0 and GetNumberOfPedPropTextureVariations(ped, id, drawable) or 0,
             }
         end
     end
     return categories
 end
 
--- Reads the model back off the live ped rather than trusting whatever was
--- last requested -- the source of truth for what to report to the NUI/server,
--- since a requested model swap can fail to stream in time (see applyModel).
 local function currentModelName(ped)
     return GetEntityModel(ped) == joaat(Shared.models.female) and Shared.models.female or Shared.models.male
 end
@@ -455,6 +472,11 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     startControlLock()
     Camera.start(ped)
 
+    local head = headPayload(activeSession.service)
+    -- If this prints null, the service's policy can't edit the head at all, so
+    -- the NUI is never given head controls (check Config.services[...] and
+    -- Shared.headEditable). skinTone additionally needs policy.all == true.
+
     QBTheme.refresh()
     SendNUIMessage({
         action = 'qbclothing:nui:open',
@@ -471,7 +493,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             model = currentModelName(ped),
             categories = buildCategoryPayload(ped, activeSession.service),
             hair = hairPayload(activeSession.service),
-            head = headPayload(activeSession.service),
+            head = head,
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
             outfits = payload.outfits or {},
@@ -545,7 +567,27 @@ RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
     local ped = PlayerPedId()
     local id = tonumber(data.id)
 
-    if data.kind == 'component' and id and Shared.components[id] then
+    if data.kind == 'component' and id == HEAD_COMPONENT and Shared.components[id] then
+        -- Face change: keep the drawable in range (an out-of-range index faults
+        -- the game), store it on the ped so it saves with the outfit, then
+        -- rebuild the head blend so the face actually changes on screen.
+        local drawableCount = GetNumberOfPedDrawableVariations(ped, id)
+        local drawable = math.max(0, tonumber(data.drawable) or 0)
+        if drawable >= drawableCount then drawable = 0 end
+        local textureCount = GetNumberOfPedTextureVariations(ped, id, drawable)
+        local texture = math.max(0, tonumber(data.texture) or 0)
+        if texture >= textureCount then texture = 0 end
+
+        SetPedComponentVariation(ped, id, drawable, texture, 0)
+        applyHead(ped, previewHead)
+        cb({
+            ok = true,
+            drawable = drawable,
+            texture = GetPedTextureVariation(ped, id),
+            drawableCount = drawableCount,
+            textureCount = textureCount,
+        })
+    elseif data.kind == 'component' and id and Shared.components[id] then
         local drawable = math.max(0, tonumber(data.drawable) or 0)
         SetPedComponentVariation(ped, id, drawable, math.max(0, tonumber(data.texture) or 0), 0)
         cb({
@@ -597,9 +639,14 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
 end)
 
 RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
+    -- Printed before any guard so you can tell "the NUI never called this"
+    -- apart from "this ran and a guard below refused it".
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local policy = servicePolicy(activeSession.service)
-    if not Shared.headEditable(policy) then cb({ ok = false }); return end
+    if not Shared.headEditable(policy) then
+        cb({ ok = false })
+        return
+    end
     local ped = PlayerPedId()
     -- Same merge the server applies at confirm time, so the preview never
     -- shows skin tone or an overlay this service would discard.
