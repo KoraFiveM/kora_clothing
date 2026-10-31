@@ -9,6 +9,7 @@ local disableControlsThread = false
 local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
 local previewTattoos = {}
 local startUndressDeathWatch -- assigned below triggerOrError; cancels a tattoo session if the player dies in it
+local setTattooPedsFaded -- assigned in the tattoo artist section at the end of the file
 
 -- Component 0 is the freemode head drawable. On its own it does nothing
 -- visible, because the face is drawn from head blend data. So the "Head"
@@ -599,6 +600,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     startControlLock()
     Camera.start(ped)
     if activeSession.service == 'tattoo' then
+        setTattooPedsFaded(true)
         startUndressDeathWatch(activeSession)
     end
 
@@ -654,6 +656,7 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     if not activeSession then return end
     Camera.stop()
     stopControlLock()
+    setTattooPedsFaded(false)
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'qbclothing:nui:close' })
     FreezeEntityPosition(PlayerPedId(), false)
@@ -1217,6 +1220,120 @@ local function registerTargetShop(index, shop, zone)
     })
 end
 
+-- --- tattoo artist peds (Config.tattoo.peds) ---
+--
+-- A client-local, frozen artist per tattoo shop, only while the player is near.
+-- It carries a kora_target "Get tattooed" option that opens the same session as
+-- the shop's storefront zone (which stays registered, so both work). While the
+-- studio menu is open the artist is faded out so it does not block the camera.
+local tattooPeds = {} -- shop index -> { ped = entity, targetId = id | nil }
+local tattooPedsFaded = false
+
+local function tattooPedsEnabled()
+    local peds = Config.tattoo and Config.tattoo.peds
+    return type(peds) == 'table' and peds.enabled == true
+end
+
+---@return string? model, table? coords, string? scenario  -- nil when this shop gets no artist
+local function tattooPedSpec(shop)
+    if shop.service ~= 'tattoo' or shop.tattooPed == false then return nil end
+    local peds = Config.tattoo.peds
+    local override = type(shop.tattooPed) == 'table' and shop.tattooPed or {}
+    local model = override.model or shop.ped or peds.model
+    local coords = override.coords or shop.coords
+    if type(model) ~= 'string' or not coords then return nil end
+    return model, coords, override.scenario or peds.scenario
+end
+
+local function applyTattooPedAlpha(ped, faded)
+    if not DoesEntityExist(ped) then return end
+    if faded then
+        SetEntityAlpha(ped, math.max(0, math.min(255, math.floor(tonumber(Config.tattoo.peds.alpha) or 0))), false)
+    else
+        ResetEntityAlpha(ped)
+    end
+end
+
+setTattooPedsFaded = function(faded)
+    tattooPedsFaded = faded == true and tattooPedsEnabled()
+    for _, entry in pairs(tattooPeds) do applyTattooPedAlpha(entry.ped, tattooPedsFaded) end
+end
+
+local function removeTattooPed(index)
+    local entry = tattooPeds[index]
+    if not entry then return end
+    tattooPeds[index] = nil
+    if entry.targetId then
+        pcall(function() exports.kora_target:removeEntity(entry.ped, entry.targetId) end)
+    end
+    if DoesEntityExist(entry.ped) then DeleteEntity(entry.ped) end
+end
+
+local function spawnTattooPed(index, model, coords, scenario)
+    local hash = joaat(model)
+    if not IsModelInCdimage(hash) then return end
+    RequestModel(hash)
+    local deadline = GetGameTimer() + 5000
+    while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(25) end
+    if not HasModelLoaded(hash) then return end
+
+    local ped = CreatePed(4, hash, coords.x, coords.y, coords.z, coords.w or 0.0, false, false)
+    SetModelAsNoLongerNeeded(hash)
+    if ped == 0 or not DoesEntityExist(ped) then return end
+
+    SetEntityInvincible(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    FreezeEntityPosition(ped, true)
+    if type(scenario) == 'string' and scenario ~= '' then TaskStartScenarioInPlace(ped, scenario, 0, true) end
+
+    local entry = { ped = ped }
+    tattooPeds[index] = entry
+    if tattooPedsFaded then applyTattooPedAlpha(ped, true) end
+
+    local ok, targetId = pcall(function()
+        return exports.kora_target:addEntity(ped, {
+            {
+                label = 'Get tattooed',
+                icon = 'Pen',
+                distance = Config.interactDistance,
+                onSelect = function() openSession('shop', { shopId = index }) end,
+            },
+        }, Config.interactDistance)
+    end)
+    if ok then entry.targetId = targetId end
+end
+
+-- One pass: spawn artists the player is near, delete the ones they left (with
+-- a margin so a player on the edge does not flicker one in and out).
+local function syncTattooPeds()
+    if not tattooPedsEnabled() then
+        for index in pairs(tattooPeds) do removeTattooPed(index) end
+        return
+    end
+
+    local player = GetEntityCoords(PlayerPedId())
+    local radius = tonumber(Config.tattoo.peds.scopeRadius) or 40.0
+    for index, shop in ipairs(Config.shops) do
+        local model, coords, scenario = tattooPedSpec(shop)
+        if model then
+            local distance = #(player - vector3(coords.x, coords.y, coords.z))
+            local entry = tattooPeds[index]
+            if entry and (distance > radius + 5.0 or not DoesEntityExist(entry.ped)) then
+                removeTattooPed(index)
+                entry = nil
+            end
+            if not entry and distance <= radius then spawnTattooPed(index, model, coords, scenario) end
+        end
+    end
+end
+
+CreateThread(function()
+    while true do
+        syncTattooPeds()
+        Wait(1500)
+    end
+end)
+
 CreateThread(function()
     local textUiMode = Config.interactionMode == 'textui'
     if textUiMode then
@@ -1241,7 +1358,9 @@ CreateThread(function()
             registerTargetShop(index, shop, zone)
         end
 
-        if Config.shopPeds then
+        -- An enabled tattoo artist (above) takes the clerk's place at its shop.
+        local ownsTattooPed = tattooPedsEnabled() and tattooPedSpec(shop) ~= nil
+        if Config.shopPeds and not ownsTattooPed then
             -- The storefront zone above owns the interaction. The clerk is
             -- cosmetic, so keep it client-local and only create it while this
             -- player is near the shop rather than at every shop on startup.
@@ -1269,6 +1388,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
+    for index in pairs(tattooPeds) do removeTattooPed(index) end
     if activeSession then
         restoreHudForSession(activeSession)
         restoreRadarForSession(activeSession)
@@ -1289,5 +1409,6 @@ if Config.testMode then
     QBClothing._testRuntime = {
         applySkin = applySkin, refreshHairVariation = refreshHairVariation,
         currentSkinSnapshot = currentSkinSnapshot, headPayload = headPayload,
+        syncTattooPeds = syncTattooPeds, tattooPeds = tattooPeds,
     }
 end

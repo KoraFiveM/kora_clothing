@@ -258,11 +258,16 @@ H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return 
 -- Shop interaction is geometry, not a ped: a ped-bound target dies with the
 -- ped (unstreamed model, shoved out of place, deleted by another resource) and
 -- leaves the shop silently unopenable.
-H.ok(not client:find('exports.kora_target:addEntity', 1, true), 'shops are no longer targeted through a spawned clerk entity')
+-- The one ped-bound target is the optional tattoo artist (Config.tattoo.peds,
+-- off by default), an extra way in next to the storefront zone, never a
+-- replacement for it.
+local _, entityTargets = client:gsub('exports.kora_target:addEntity', '')
+H.equal(entityTargets, 1, 'the only ped-bound target is the optional tattoo artist')
+H.ok(client:find('local function tattooPedsEnabled()', 1, true) and client:find('if not tattooPedsEnabled() then', 1, true), 'the artist is spawned only when Config.tattoo.peds.enabled')
 H.ok(client:find('exports.kora_target:addBoxZone({', 1, true) and client:find('exports.kora_target:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
 H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
-H.ok(client:find('if Config.shopPeds then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
+H.ok(client:find('if Config.shopPeds and not ownsTattooPed then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
 H.ok(config:find('Config.shopPedScopeRadius = 75.0', 1, true), 'decorative clerks use a configured local scope radius')
 H.ok(client:find('QB.entities.createScoped(shop.ped', 1, true), 'decorative clerks spawn only while the client is nearby')
 H.ok(client:find('QB.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')

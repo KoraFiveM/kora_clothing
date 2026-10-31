@@ -347,6 +347,11 @@ Config.tattooStrip = {
 -- sent to the server, never saved into the outfit and never charged, and the
 -- original clothing is put back exactly when the menu closes (confirm, cancel,
 -- Esc, death or a resource stop).
+--
+-- `peds`    : an optional tattoo artist standing in each tattoo shop. Targeting
+-- the artist ("Get tattooed") opens the same studio as the shop's zone, which
+-- keeps working. While the studio is open the artist is faded out locally so
+-- they do not block the view.
 Config.tattoo = {
     undress = {
         -- Off falls back to the old behaviour: the studio always strips to
@@ -423,6 +428,51 @@ Config.tattoo = {
         end)(),
     },
 
+    peds = {
+        -- Off by default: servers with their own tattoo MLO or artist ped would
+        -- otherwise get a second artist standing in the same spot. When on,
+        -- every shop with service = 'tattoo' gets one (see below). Read while
+        -- the player is moving about, so it can be flipped without a restart.
+        enabled = config and config.boolean(false, {
+            label = 'Tattoo artist peds',
+            description = 'Spawns a frozen tattoo artist ped in each tattoo shop (client side, only while you are nearby). Targeting the artist with "Get tattooed" opens the tattoo studio. The artist is faded out while you are in the studio so they do not block the view. Leave off if your map or MLO already has its own artist. The decorative shop clerk for these shops is not spawned while this is on, to avoid two peds in one spot.',
+            live = true,
+        }) or false,
+        -- Opacity (0 invisible .. 255 fully visible) of the artist while the
+        -- studio menu is open. Local to the player in the studio.
+        alpha = config and config.integer(0, {
+            min = 0, max = 255,
+            label = 'Artist opacity in the studio',
+            description = 'How visible the tattoo artist ped is while you are in the studio menu: 0 is invisible, 255 is fully visible. Only you see the change.',
+            live = true,
+        }) or 0,
+        -- Players within this many metres of the shop have the artist spawned;
+        -- it is deleted again beyond it (plus a small margin).
+        scopeRadius = config and config.number(40.0, {
+            min = 5.0, max = 300.0,
+            label = 'Artist spawn distance',
+            description = 'Distance in metres at which the tattoo artist ped appears for you. It is removed again when you walk away.',
+            live = true,
+        }) or 40.0,
+        -- Fallback model when a shop sets neither `tattooPed.model` nor `ped`.
+        model = config and config.string('u_m_y_tattoo_01', {
+            label = 'Default artist model',
+            description = 'Ped model used for the tattoo artist when a shop does not set its own. The default shops already name u_m_y_tattoo_01.',
+            live = true,
+        }) or 'u_m_y_tattoo_01',
+        -- Optional ambient scenario for the artist, e.g. 'WORLD_HUMAN_STAND_IMPATIENT'.
+        -- nil leaves the ped idle.
+        scenario = config and config.optional(nil, config.string('WORLD_HUMAN_STAND_IMPATIENT'), {
+            label = 'Artist scenario',
+            description = 'Optional GTA scenario the artist plays while standing there, for example WORLD_HUMAN_STAND_IMPATIENT. Leave unset for a plain idle ped.',
+            live = true,
+        }) or nil,
+        -- Per shop, in Config.shops: `tattooPed = { model = '...', coords = vector4(...), scenario = '...' }`
+        -- overrides the model (default: the shop's own `ped`), the position
+        -- (default: the shop's `coords`) and the scenario; `tattooPed = false`
+        -- gives that shop no artist. Keep the artist within a metre or two of
+        -- the shop's `coords`: the server only opens a session for players near them.
+    },
 }
 
 Config.interactDistance = 2.0

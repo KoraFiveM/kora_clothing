@@ -16,9 +16,13 @@ _G.RegisterNUICallback = function() end
 
 -- Every CreateThread this test's code paths reach (the reconcile's own
 -- callback-trigger thread, and the shop-ped spawn loop at chunk load -- see
--- Config.shops override below) never calls Wait, so running the body
--- synchronously is enough; no coroutine plumbing needed.
-_G.CreateThread = function(fn) fn() end
+-- Config.shops override below) never calls Wait, so they run to completion
+-- synchronously. The tattoo artist poll loop does call Wait: a thread runs in
+-- a coroutine and simply parks at its first Wait.
+_G.CreateThread = function(fn)
+    local ok, err = coroutine.resume(coroutine.create(fn))
+    if not ok then error(err, 0) end
+end
 
 _G.exports = setmetatable({}, {
     __call = function() end,
@@ -50,7 +54,7 @@ _G.SetPlayerModel = function() end
 _G.SetModelAsNoLongerNeeded = function() end
 _G.SetPedDefaultComponentVariation = function() end
 _G.GetGameTimer = function() return 0 end
-_G.Wait = function() end
+_G.Wait = function() if coroutine.isyieldable() then coroutine.yield() end end
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
 
