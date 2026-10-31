@@ -8,6 +8,7 @@ local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while th
 local disableControlsThread = false
 local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
 local previewTattoos = {}
+local startUndressDeathWatch -- assigned below triggerOrError; cancels a tattoo session if the player dies in it
 
 -- Component 0 is the freemode head drawable. On its own it does nothing
 -- visible, because the face is drawn from head blend data. So the "Head"
@@ -264,6 +265,17 @@ local function currentSkinSnapshot(ped)
             skin.props[tostring(id)] = { d = drawable, t = GetPedPropTextureIndex(ped, id) }
         end
     end
+    -- Whatever a session bared for preview (tattoo undress buttons, barber
+    -- hat/mask) is reported as what the player was wearing, so a confirm can
+    -- never save the bare look.
+    if temporaryOverride then
+        for id, variation in pairs(temporaryOverride.components) do
+            skin.components[tostring(id)] = { d = variation.d, t = variation.t }
+        end
+        for id, variation in pairs(temporaryOverride.props) do
+            skin.props[tostring(id)] = variation and { d = variation.d, t = variation.t } or nil
+        end
+    end
     return skin
 end
 
@@ -358,6 +370,116 @@ local function applyModel(model, skin)
     return true
 end
 
+-- --- tattoo studio undress buttons (preview only) ---
+--
+-- Built on `temporaryOverride`: that table already records the original
+-- component/prop of everything a session bared, and every close path already
+-- puts it back (confirm -> restoreTemporaryOverride, cancel/ESC/death ->
+-- applyModel of the pre-session appearance). Nothing here is sent to the
+-- server, and the confirm snapshot is patched back to the originals (see
+-- currentSkinSnapshot), so a bared part can never be saved or charged.
+local undressActive = {} -- part id -> true while that part is bared
+
+local function undressConfig()
+    local cfg = Config.tattoo and Config.tattoo.undress
+    if type(cfg) ~= 'table' or cfg.enabled ~= true then return nil end
+    return cfg
+end
+
+local function undressPartById(cfg, id)
+    for _, part in ipairs(cfg.parts or {}) do
+        if part.id == id then return part end
+    end
+end
+
+-- Bounds-checked like applySkin: an out-of-range drawable faults the game.
+local function setBareComponent(ped, entry, override)
+    local id, drawable, texture = tonumber(entry.id), tonumber(entry.d), tonumber(entry.t) or 0
+    if not id or not drawable or drawable < 0 then return end
+    if drawable >= GetNumberOfPedDrawableVariations(ped, id) then return end
+    if texture < 0 or texture >= GetNumberOfPedTextureVariations(ped, id, drawable) then texture = 0 end
+    if not override.components[id] then
+        override.components[id] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
+    end
+    SetPedComponentVariation(ped, id, drawable, texture, 0)
+end
+
+local function setPartUndressed(ped, model, part, undressed)
+    temporaryOverride = temporaryOverride or { components = {}, props = {} }
+    local override = temporaryOverride
+
+    for _, entry in ipairs(part[Shared.modelGender(model)] or {}) do
+        if undressed then
+            setBareComponent(ped, entry, override)
+        else
+            local saved = override.components[entry.id]
+            if saved then
+                SetPedComponentVariation(ped, entry.id, saved.d, saved.t, 0)
+                override.components[entry.id] = nil
+            end
+        end
+    end
+
+    for _, id in ipairs(part.props or {}) do
+        if undressed then
+            if override.props[id] == nil then
+                local drawable = GetPedPropIndex(ped, id)
+                override.props[id] = drawable >= 0 and { d = drawable, t = GetPedPropTextureIndex(ped, id) } or false
+            end
+            ClearPedProp(ped, id)
+        else
+            local saved = override.props[id]
+            if saved ~= nil then
+                if saved then SetPedPropIndex(ped, id, saved.d, saved.t, true) else ClearPedProp(ped, id) end
+                override.props[id] = nil
+            end
+        end
+    end
+
+    undressActive[part.id] = undressed or nil
+end
+
+local function activeUndressParts(cfg)
+    local active = {}
+    for _, part in ipairs(cfg.parts or {}) do
+        if undressActive[part.id] then active[#active + 1] = part.id end
+    end
+    return active
+end
+
+---What the NUI needs to draw the buttons; nil when this session has none.
+local function undressPayload(service)
+    local cfg = undressConfig()
+    if not cfg or service ~= 'tattoo' then return nil end
+    local parts = {}
+    for _, part in ipairs(cfg.parts or {}) do
+        parts[#parts + 1] = { id = part.id, label = part.label or part.id }
+    end
+    return { parts = parts, active = activeUndressParts(cfg) }
+end
+
+local function applyAutoUndress(ped, model)
+    local cfg = undressConfig()
+    if not cfg then return false end
+    for _, id in ipairs(cfg.autoUndressOnOpen or {}) do
+        local part = undressPartById(cfg, id)
+        if part then setPartUndressed(ped, model, part, true) end
+    end
+    return true
+end
+
+---Puts the parts that were bared before a full appearance swap (loading an
+---outfit) back to bare, capturing the new look as the originals.
+local function reapplyUndress(ped, model, active)
+    local cfg = undressConfig()
+    temporaryOverride, undressActive = nil, {}
+    if not cfg then return end
+    for _, id in ipairs(active) do
+        local part = undressPartById(cfg, id)
+        if part then setPartUndressed(ped, model, part, true) end
+    end
+end
+
 -- --- temporary strip for tattoo/barber/hairdresser sessions ---
 
 ---@return table|false  -- { d, t } if a hat was worn, else false (nothing to restore)
@@ -384,6 +506,10 @@ local function applyTemporaryStrip(ped, service, model)
     temporaryOverride = nil
 
     if service == 'tattoo' then
+        -- The undress buttons replace the fixed strip below: they bare the
+        -- Config.tattoo.undress.autoUndressOnOpen parts instead.
+        if applyAutoUndress(ped, model) then return end
+
         local strip = Config.tattooStrip[Shared.modelGender(model)]
         if not strip then return end
 
@@ -461,6 +587,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         -- open to re-apply the saved skin.
         previousAppearance = { model = payload.model, skin = payload.skin },
     }
+    undressActive = {}
     activeSession.hudHidden = hideHudForSession()
     activeSession.radarHidden = hideRadarForSession()
 
@@ -471,6 +598,9 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
 
     startControlLock()
     Camera.start(ped)
+    if activeSession.service == 'tattoo' then
+        startUndressDeathWatch(activeSession)
+    end
 
     local head = headPayload(activeSession.service)
     -- If this prints null, the service's policy can't edit the head at all, so
@@ -496,6 +626,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             categories = buildCategoryPayload(ped, activeSession.service),
             hair = hairPayload(activeSession.service),
             head = head,
+            undress = undressPayload(activeSession.service),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
             outfits = payload.outfits or {},
@@ -557,6 +688,7 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     end
     local session = activeSession
     activeSession = nil
+    undressActive = {}
     restoreHudForSession(session)
     restoreRadarForSession(session)
     if refreshShopPrompt then refreshShopPrompt() end
@@ -627,6 +759,27 @@ RegisterNUICallback('qbclothing:nui:setTattoos', function(data, cb)
     cb({ ok = true, tattoos = previewTattoos })
 end)
 
+-- Preview-only clothing buttons in the tattoo studio. `part` is a part id from
+-- Config.tattoo.undress.parts, or 'all'; `undressed` says which way. The reply
+-- carries the parts now bared so the buttons always show the real state.
+RegisterNUICallback('qbclothing:nui:setUndress', function(data, cb)
+    local cfg = undressConfig()
+    if not activeSession or activeSession.service ~= 'tattoo' or not cfg or type(data) ~= 'table' then
+        cb({ ok = false }); return
+    end
+    local ped = PlayerPedId()
+    local model = currentModelName(ped)
+    local undressed = data.undressed == true
+    if data.part == 'all' then
+        for _, part in ipairs(cfg.parts or {}) do setPartUndressed(ped, model, part, undressed) end
+    else
+        local part = undressPartById(cfg, data.part)
+        if not part then cb({ ok = false }); return end
+        setPartUndressed(ped, model, part, undressed)
+    end
+    cb({ ok = true, active = activeUndressParts(cfg) })
+end)
+
 RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     -- Same gate the server applies at confirm time, so the preview can never
@@ -690,10 +843,16 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local model, skin = QB.callback.trigger('qbclothing:server:getOutfitSkin', tonumber(data.id))
     if not model then cb({ ok = false }); return end
+    local wasUndressed = {}
+    for id in pairs(undressActive) do wasUndressed[#wasUndressed + 1] = id end
     applyModel(model, skin)
     local ped = PlayerPedId()
+    -- The outfit replaced every component, so the recorded originals are stale:
+    -- re-bare whatever was bared against the newly loaded look.
+    if activeSession.service == 'tattoo' then reapplyUndress(ped, currentModelName(ped), wasUndressed) end
     cb({
         ok = true,
+        undress = undressPayload(activeSession.service),
         model = currentModelName(ped),
         categories = buildCategoryPayload(ped, activeSession.service),
         hair = hairPayload(activeSession.service),
@@ -735,6 +894,23 @@ RegisterNUICallback('qbclothing:nui:cancel', function(_, cb)
     triggerOrError('qbclothing:server:cancelSession')
     cb({ ok = true })
 end)
+
+-- A player who dies in the studio would otherwise be stuck on a menu with a
+-- half-undressed corpse: put the preview clothing back and end the session.
+-- A mandatory session cannot be cancelled, so it only restores the clothing.
+startUndressDeathWatch = function(session)
+    CreateThread(function()
+        while activeSession == session do
+            if IsEntityDead(PlayerPedId()) then
+                restoreTemporaryOverride(PlayerPedId())
+                undressActive = {}
+                if not session.mandatory then triggerOrError('qbclothing:server:cancelSession') end
+                return
+            end
+            Wait(500)
+        end
+    end)
+end
 
 -- --- open triggers ---
 
@@ -1100,6 +1276,8 @@ AddEventHandler('onResourceStop', function(resource)
         stopControlLock()
         SetNuiFocus(false, false)
         FreezeEntityPosition(PlayerPedId(), false)
+        -- Put back anything the session bared (tattoo undress, barber hat).
+        restoreTemporaryOverride(PlayerPedId())
     end
 end)
 

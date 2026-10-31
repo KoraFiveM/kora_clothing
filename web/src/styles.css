@@ -44,6 +44,14 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .zone-toolbar button:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
 .zone-toolbar button[aria-pressed="true"] { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
 
+/* Tattoo studio clothing buttons: a second pill above the bottom bar, same look as the zone toolbar. */
+.undress-toolbar { position: absolute; bottom: 92px; left: 50%; z-index: 2; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 5px; background: hsl(var(--surface)); box-shadow: 0 10px 30px rgb(0 0 0 / .45); }
+.undress-toolbar button { display: grid; place-items: center; min-height: 0; height: 36px; min-width: 36px; border: 1px solid transparent; border-radius: 999px; padding: 0; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1); }
+.undress-toolbar button:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+.undress-toolbar button[aria-pressed="true"] { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); background: hsl(var(--brand-soft)); }
+.undress-toolbar .undress-all { display: flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 12px; font-weight: 600; }
+.undress-toolbar button > svg { display: block; flex: none; }
+
 /* Lucide SVGs are inline by default. FiveM's CEF can reserve a text
    baseline for inline graphics, which makes otherwise centered icon controls
    look a pixel off. Make every standalone menu icon a block so flex/grid

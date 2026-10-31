@@ -1,3 +1,5 @@
+import type { UndressPayload } from "./undress.ts"
+
 export interface NuiWireMessage<T = unknown> {
     action: string
     data: T
@@ -93,6 +95,8 @@ export interface OpenPayload {
     categories: ClothingCategoryItem[]
     hair?: HairPayload | null
     head?: HeadPayload | null
+    /** Tattoo studio clothing buttons (Config.tattoo.undress); absent elsewhere. */
+    undress?: UndressPayload | null
     tattoos: TattooItem[]
     selectedTattoos: string[]
     outfits: OutfitSummary[]
@@ -162,6 +166,7 @@ export interface LoadOutfitResponse {
     hair?: HairPayload | null
     head?: HeadPayload | null
     selectedTattoos?: string[]
+    undress?: UndressPayload | null
 }
 
 export interface ConfirmPayload {

@@ -253,10 +253,27 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.shopPedScopeRadius` (75.0m) — the radius that creates a decorative clerk for the local player; independent of the interaction range
 - `Config.shopZoneDefault` — fallback box for a shop entry added without its own `zone`
 - `Config.tattoos` — the base-game overlay catalogue with per-tattoo pricing
+- `Config.tattoo.undress.enabled` (default `true`) — clothing buttons in the tattoo studio (see [Tattoo studio](#tattoo-studio)); `false` returns to the fixed `Config.tattooStrip` with no buttons
+- `Config.tattoo.undress.autoUndressOnOpen` (default `{ 'top', 'legs', 'headwear' }`) — part ids bared when the studio opens; `{}` opens fully dressed
+- `Config.tattoo.undress.parts` — one button per part: the bare component drawables per freemode model (`male` / `female`) and the prop slots cleared
 - `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and kora_target zone range
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
+
+## Tattoo studio
+
+### Clothing buttons
+
+The studio previews tattoos on bare skin, so the torso, arms and legs are visible. A small bar above the bottom bar lets the player take clothing off and put it back while they look: Top (jacket, undershirt, arms/gloves), Legs, Shoes, Hat/mask/glasses, and Undress all / Dress.
+
+- **Preview only.** The change is made on the local ped. It is never sent to the server, never saved into the outfit and never charged: the confirm request carries the clothing the player walked in wearing.
+- **Restored exactly.** Whatever the player wore comes back on confirm, cancel, Esc, death (the session is cancelled) and when the resource stops.
+- **Which parts start off.** `Config.tattoo.undress.autoUndressOnOpen` (default top, legs and head cover, which is what the studio always did). Shoes stay on unless added.
+- **Bare drawables.** `Config.tattoo.undress.parts` holds a `male` and a `female` list of `{ id, d, t }` (GTA component id, bare drawable, texture) and a `props` list of cleared prop slots (0 hat, 1 glasses, 2 ear piece). The defaults are the stock freemode drawables; adjust them if a clothing pack changes what looks bare. A drawable the ped does not have is skipped.
+- **Off.** `Config.tattoo.undress.enabled = false` shows no buttons and keeps the fixed `Config.tattooStrip`.
+
+The camera zone buttons work the same with parts bared.
 
 ## Pause-map blips
 

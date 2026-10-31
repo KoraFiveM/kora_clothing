@@ -1,10 +1,12 @@
-import { ChevronDown, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, X } from "lucide-react"
+import { ChevronDown, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
 import { resolveStepEdit } from "@/lib/stepper"
+import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
+import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import type {
     CameraPayload,
@@ -186,6 +188,30 @@ function ControlsHint({ visible }: { visible: boolean }) {
         <span><Move size={13} />Drag to rotate</span>
         <span className="controls-hint-dot">·</span>
         <span><Mouse size={13} />Scroll to zoom</span>
+    </div>
+}
+
+/** Icon per part id from Config.tattoo.undress.parts; a custom part gets the generic one. */
+const UNDRESS_ICON: Record<string, typeof Shirt> = { top: Shirt, legs: PersonStanding, shoes: Footprints, headwear: Glasses }
+
+function UndressToolbar({ parts, active, onToggle, onToggleAll }: {
+    parts: UndressPart[]
+    active: string[]
+    onToggle: (part: string) => void
+    onToggleAll: () => void
+}) {
+    const everything = allUndressed(parts, active)
+    return <div className="undress-toolbar" role="group" aria-label="Preview clothing">
+        {parts.map((part) => {
+            const Icon = UNDRESS_ICON[part.id] ?? Shirt
+            const bare = active.includes(part.id)
+            return <button key={part.id} type="button" title={bare ? `Put on: ${part.label}` : `Take off: ${part.label}`} aria-label={part.label} aria-pressed={bare} onClick={() => onToggle(part.id)}>
+                <Icon size={16} />
+            </button>
+        })}
+        <button type="button" className="undress-all" aria-label={everything ? "Dress" : "Undress all"} onClick={onToggleAll}>
+            <UserRound size={16} /><span>{everything ? "Dress" : "Undress all"}</span>
+        </button>
     </div>
 }
 
@@ -500,6 +526,7 @@ export default function App() {
     const [activeGroup, setActiveGroup] = useState<CategoryGroup>("tops")
     const [selectedKey, setSelectedKey] = useState<string>()
     const [zone, setZone] = useState<Zone>("full")
+    const [undressActive, setUndressActive] = useState<string[]>([])
     const [error, setError] = useState<string>()
     const [saveName, setSaveName] = useState("")
     const [outfitsExpanded, setOutfitsExpanded] = useState(false)
@@ -512,7 +539,7 @@ export default function App() {
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
         setHair(null); setHead(null); setBaselineHair(null); setBaselineHead(null)
-        setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
+        setSelectedKey(undefined); setZone("full"); setUndressActive([]); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false); setHintDismissed(false)
     }, [])
 
@@ -528,6 +555,7 @@ export default function App() {
         setHair(payload.hair ?? null)
         setHead(payload.head ?? null)
         setBaselineHead(payload.head ?? null)
+        setUndressActive(activeParts(payload.undress?.active))
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
@@ -637,6 +665,13 @@ export default function App() {
         void sendIntent<CameraPayload, object>("qbclothing:nui:camera", { zone: next })
     }, [])
 
+    // Preview-only: the game bares or restores the parts on the local ped and
+    // answers with what is bared now; nothing here reaches the saved outfit.
+    const sendUndress = useCallback(async (request: SetUndressPayload) => {
+        const response = await sendIntent<SetUndressPayload, SetUndressResponse>("qbclothing:nui:setUndress", request)
+        if (response.ok) setUndressActive(activeParts(response.active))
+    }, [])
+
     const wearOutfit = useCallback(async (id: number) => {
         const response = await sendIntent<{ id: number }, LoadOutfitResponse>("qbclothing:nui:loadOutfit", { id })
         if (response.ok && response.categories) {
@@ -644,6 +679,7 @@ export default function App() {
             setSelectedTattoos(response.selectedTattoos ?? [])
             if (response.hair) setHair(response.hair)
             setHead(response.head ?? null)
+            if (response.undress) setUndressActive(activeParts(response.undress.active))
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -714,6 +750,13 @@ export default function App() {
         </div>
 
         <ZoneToolbar zone={zone} onSelect={changeZone} />
+
+        {undressVisible(open.undress) && <UndressToolbar
+            parts={open.undress.parts}
+            active={undressActive}
+            onToggle={(part) => void sendUndress(togglePart(part, undressActive))}
+            onToggleAll={() => void sendUndress(toggleAll(open.undress!.parts, undressActive))}
+        />}
 
         <ControlsHint visible={hintVisible(hintOn, hintDismissed)} />
 

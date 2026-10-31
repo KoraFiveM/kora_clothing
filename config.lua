@@ -328,15 +328,101 @@ Config.tattooStrip = {
         [3]  = { d = 15, t = 0 }, -- torso: bare chest
         [4]  = { d = 21, t = 0 }, -- legs: boxers
         [8]  = { d = 15, t = 0 }, -- undershirt: none
-        [11] = { d = 0,  t = 0 }, -- torso 2 (decal overlay): none
+        [11] = { d = 15, t = 0 }, -- top / jacket: none (drawable 0 is a plain t-shirt)
     },
     female = {
         [1]  = { d = 0,  t = 0 },
         [3]  = { d = 14, t = 0 },
         [4]  = { d = 15, t = 0 },
         [8]  = { d = 15, t = 0 },
-        [11] = { d = 0,  t = 0 },
+        [11] = { d = 15, t = 0 },
     },
+}
+
+-- Tattoo studio options.
+--
+-- `undress` : the studio previews tattoos on bare skin. The buttons at the
+-- bottom of the menu let the player take clothing off and put it back while
+-- they look. It is a PREVIEW ONLY: the changes live on the local ped, are never
+-- sent to the server, never saved into the outfit and never charged, and the
+-- original clothing is put back exactly when the menu closes (confirm, cancel,
+-- Esc, death or a resource stop).
+Config.tattoo = {
+    undress = {
+        -- Off falls back to the old behaviour: the studio always strips to
+        -- Config.tattooStrip on open and offers no buttons. Read each time the
+        -- studio opens.
+        enabled = config and config.boolean(true, {
+            label = 'Tattoo studio undress buttons',
+            description = 'Shows clothing buttons (top, legs, shoes, headwear, undress all) in the tattoo studio so players can see tattoos under their clothes. Preview only: nothing is saved or charged and the original clothing is restored when the menu closes. Turn off to use the fixed strip in Config.tattooStrip with no buttons.',
+            live = true,
+        }) or true,
+        -- Parts (ids from `parts` below) already removed when the studio opens.
+        -- The default matches what the studio always did before the buttons
+        -- existed (top, legs and head cover off, shoes left on), so tattoos on
+        -- the torso, arms and legs are visible straight away. Use {} to open
+        -- fully dressed, or add 'shoes' to open fully bare.
+        autoUndressOnOpen = config and config.list({ 'top', 'legs', 'headwear' }, config.string('top'), {
+            label = 'Parts removed when the studio opens',
+            description = 'Part ids from the parts list that are taken off when the tattoo studio opens: top, legs, shoes, headwear. Leave the list empty to open fully dressed. Players can still toggle every part with the buttons.',
+            live = true,
+        }) or { 'top', 'legs', 'headwear' },
+        -- Each part is one button. `male` / `female` list the freemode
+        -- components set to a bare drawable (id = GTA component id, d = drawable,
+        -- t = texture) for that ped model; `props` lists the prop slots that are
+        -- cleared (0 = hat, 1 = glasses, 2 = ear piece). 'top' covers the torso
+        -- (jacket/shirt, undershirt, arms/gloves -- GTA component 3, 8 and 11),
+        -- 'headwear' covers the mask (component 1), hat and glasses. The bare
+        -- drawables are the stock freemode ones, which DLC clothing never
+        -- renumbers; adjust per server if a clothing pack changes what looks bare.
+        parts = (function()
+            local parts = {
+                {
+                    id = 'top', label = 'Top',
+                    male = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+                    female = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+                    props = {},
+                },
+                {
+                    id = 'legs', label = 'Legs',
+                    male = { { id = 4, d = 21, t = 0 } },
+                    female = { { id = 4, d = 15, t = 0 } },
+                    props = {},
+                },
+                {
+                    id = 'shoes', label = 'Shoes',
+                    male = { { id = 6, d = 34, t = 0 } },
+                    female = { { id = 6, d = 35, t = 0 } },
+                    props = {},
+                },
+                {
+                    id = 'headwear', label = 'Hat, mask and glasses',
+                    male = { { id = 1, d = 0, t = 0 } },
+                    female = { { id = 1, d = 0, t = 0 } },
+                    props = { 0, 1 },
+                },
+            }
+            if not config then return parts end
+            local component = config.object({
+                id = config.integer(0, { min = 0 }),
+                d = config.integer(0, { min = 0 }),
+                t = config.integer(0, { min = 0 }),
+            })
+            local part = config.object({
+                id = config.string('top'),
+                label = config.string('Top'),
+                male = config.list({}, component),
+                female = config.list({}, component),
+                props = config.list({}, config.integer(0, { min = 0 })),
+            })
+            return config.list(parts, part, {
+                label = 'Tattoo studio undress parts',
+                description = 'One button per part. For each part, the male and female lists give the clothing component (id), bare drawable (d) and texture (t) used while previewing, and props lists the prop slots cleared (0 hat, 1 glasses, 2 ear piece). Only valid non-negative GTA component, drawable and texture ids; an out-of-range drawable is skipped. Never saved.',
+                live = true,
+            })
+        end)(),
+    },
+
 }
 
 Config.interactDistance = 2.0
