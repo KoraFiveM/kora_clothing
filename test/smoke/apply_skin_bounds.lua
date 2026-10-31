@@ -28,7 +28,7 @@ _G.exports = setmetatable({}, {
 -- client.lua reads the login state bag and calls PlayerId/GetPlayerServerId
 -- as soon as it loads, so these need to exist even though this test never
 -- drives a login transition. CreateThread above is a no-op stub, so the
--- actual QB.callback.trigger('qb-clothing:server:getSkin') round trip this
+-- actual Kora.callback.trigger('qb-clothing:server:getSkin') round trip this
 -- would kick off never runs here.
 _G.PlayerId = function() return 1 end
 _G.GetPlayerServerId = function() return 1 end

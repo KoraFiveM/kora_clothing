@@ -1,14 +1,14 @@
 -- Own config, self-contained -- matches kora_multichar's convention of owning
 -- its data rather than reading kora_core's shared registries. Named `Config`,
--- not a `QB`-prefixed global -- kora_lib's `@kora_lib/init.lua` already owns the
--- global `QB` as a live cross-resource proxy in this codebase.
+-- not a `Kora`-prefixed global -- kora_lib's `@kora_lib/init.lua` already owns the
+-- global `Kora` as a live cross-resource proxy in this codebase.
 
 Config = {}
 
 -- Descriptors make a setting editable in kora_lib's config workspace and are
--- resolved back to plain values by QB.config.adopt at the end of this file.
+-- resolved back to plain values by Kora.config.adopt at the end of this file.
 -- Without kora_lib's config module the plain defaults after `or` are used.
-local config = QB and QB.config
+local config = Kora and Kora.config
 
 -- Every fitting-room bucket is `Config.bucket.base + source`. `source` is a
 -- small per-connection integer (FiveM reuses low slot numbers), so this stays
@@ -134,7 +134,7 @@ Config.shopPedScopeRadius = 75.0
 -- Clothing stores are POLYGONS covering the walkable shop interior, not a
 -- counter box: the player browses the whole floor, so anywhere inside the
 -- store should open the shop rather than one 2m spot by the till. Polys are
--- captured in-game with kora_lib's zone creator (`QB.zones.poly` output pasted
+-- captured in-game with kora_lib's zone creator (`Kora.zones.poly` output pasted
 -- verbatim), so the shape matches the real map geometry. `thickness` is
 -- measured UPWARD from the lowest point, not centred on the average -- see
 -- kora_lib/modules/zones/client.lua -- so 4.0 is one storey of headroom above
@@ -684,22 +684,22 @@ Config.camera = {
 }
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
-if QB and QB.config and QB.config.adopt then
-    local tattooStripItem = QB.config.object({
-        d = QB.config.integer(0, { min = 0 }),
-        t = QB.config.integer(0, { min = 0 }),
+if Kora and Kora.config and Kora.config.adopt then
+    local tattooStripItem = Kora.config.object({
+        d = Kora.config.integer(0, { min = 0 }),
+        t = Kora.config.integer(0, { min = 0 }),
     })
-    Config.tattooStrip.male = QB.config.map(Config.tattooStrip.male, tattooStripItem, {
+    Config.tattooStrip.male = Kora.config.map(Config.tattooStrip.male, tattooStripItem, {
         keyType = 'integer',
         live = true,
         label = 'Male tattoo preview clothing',
         description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a male freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
     })
-    Config.tattooStrip.female = QB.config.map(Config.tattooStrip.female, tattooStripItem, {
+    Config.tattooStrip.female = Kora.config.map(Config.tattooStrip.female, tattooStripItem, {
         keyType = 'integer',
         live = true,
         label = 'Female tattoo preview clothing',
         description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a female freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
     })
-    Config = QB.config.adopt(Config)
+    Config = Kora.config.adopt(Config)
 end

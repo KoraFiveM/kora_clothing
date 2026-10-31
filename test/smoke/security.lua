@@ -35,7 +35,7 @@ end
 -- Session state is the sole authority for bucket restore and mandatory-mode
 -- enforcement -- never trust client-submitted session identity.
 H.ok(server:find('local sessions = {}', 1, true), 'server keeps its own session table')
-H.ok(server:find("QB.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through kora_lib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
+H.ok(server:find("Kora.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through kora_lib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
 H.ok(server:find("if sessions[src] then return end", 1, true), 'duplicate session requests are rejected')
 H.ok(server:find('local session = sessions[src]', 1, true), 'confirm/cancel/delete look up session server-side')
 H.ok(server:find('if not session or session.mandatory then return end', 1, true), 'mandatory first-character sessions cannot be cancelled')
@@ -150,11 +150,11 @@ H.ok(client:find('restoreHudForSession(session)', 1, true) and client:find('rest
     'the HUD is restored after normal close and resource-stop cleanup')
 
 -- Real qb-clothing / qb-multicharacter wire-protocol compat.
-H.ok(server:find("QB.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
+H.ok(server:find("Kora.callback.register('qb-clothing:server:getSkin'", 1, true), 'real qb-clothing getSkin callback is implemented')
 H.ok(server:find('return saved.model, sanitiseSkin(saved.skin, saved.model)', 1, true),
     'the spawn-time getSkin callback sanitises the saved skin like every other read path -- ' ..
     'it used to return the raw DB blob straight to SetPedComponentVariation/SetPedPropIndex')
-H.ok(server:find("QB.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
+H.ok(server:find("Kora.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
 H.ok(server:find('exports.kora_core:ownsCharacter(src, citizenid)', 1, true), 'character preview appearance is ownership checked before reading the skin')
 H.ok(server:find('previewCache[src]', 1, true), 'selection-session appearance reads are cached per source')
 H.ok(server:find("AddStateBagChangeHandler('qbmultichar:mode'", 1, true), 'appearance cache clears when the cinematic selection session ends')
@@ -191,7 +191,7 @@ H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'the fallback pa
 -- legitimately open while it's in flight -- a late-arriving apply must not
 -- clobber whatever the player is currently trying on.
 H.ok(client:find("RegisterNetEvent('QBCore:Client:OnPlayerLoaded'", 1, true), 'saved appearance is re-applied on every login')
-H.ok(client:find("QB.callback.trigger('qb-clothing:server:getSkin')", 1, true), 'login re-apply uses the real qb-clothing getSkin callback')
+H.ok(client:find("Kora.callback.trigger('qb-clothing:server:getSkin')", 1, true), 'login re-apply uses the real qb-clothing getSkin callback')
 H.ok(client:find('if not model or activeSession then return end', 1, true), 'a late login re-apply is dropped if a fitting-room session opened in the meantime')
 
 -- What gets reported to the NUI/server as the current model must be read
@@ -202,15 +202,15 @@ H.ok(client:find('model = currentModelName(ped),', 1, true), 'session-open paylo
 H.ok(client:find('model = currentModelName(ped),\n        categories = buildCategoryPayload(ped, activeSession.service),', 1, true), 'loadOutfit response reports the actual applied model and service-filtered categories')
 H.ok(client:find('model = currentModelName(ped),\n        skin = currentSkinSnapshot(ped),', 1, true), 'confirm submits the actual applied model')
 
--- NUI is this resource's own frame -- raw natives only, never kora_lib's QB.nui.*
+-- NUI is this resource's own frame -- raw natives only, never kora_lib's Kora.nui.*
 -- (which would dispatch into kora_lib's own VM/frame instead of this one).
 H.ok(client:find('SendNUIMessage', 1, true) and client:find('RegisterNUICallback', 1, true), 'client owns its own NUI transport')
 do
     -- Strip comments first: the file's own header explains, in prose, why
-    -- QB.nui.* must NOT be used here -- that explanatory text itself contains
+    -- Kora.nui.* must NOT be used here -- that explanatory text itself contains
     -- the substring and would otherwise false-positive this check.
     local codeOnly = client:gsub("%-%-[^\n]*", '')
-    H.ok(not codeOnly:find('QB.nui.', 1, true), 'client never routes its own NUI through kora_lib\'s proxy')
+    H.ok(not codeOnly:find('Kora.nui.', 1, true), 'client never routes its own NUI through kora_lib\'s proxy')
 end
 H.ok(not server:find('SendNUIMessage', 1, true) and not server:find('RegisterNUICallback', 1, true), 'server has no NUI authority')
 
@@ -269,8 +269,8 @@ H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INS
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
 H.ok(client:find('if Config.shopPeds and not ownsTattooPed then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
 H.ok(config:find('Config.shopPedScopeRadius = 75.0', 1, true), 'decorative clerks use a configured local scope radius')
-H.ok(client:find('QB.entities.createScoped(shop.ped', 1, true), 'decorative clerks spawn only while the client is nearby')
-H.ok(client:find('QB.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')
+H.ok(client:find('Kora.entities.createScoped(shop.ped', 1, true), 'decorative clerks spawn only while the client is nearby')
+H.ok(client:find('Kora.blips.create(shop.coords, shop.blip)', 1, true), 'the blip still works off shop.coords')
 H.ok(config:find("category = 'Clothing', name = 'Suburban'", 1, true),
     'named clothing storefronts provide category and name separately')
 H.ok(config:find("service = 'tattoo'", 1, true) and config:find("category = 'Tattoo'", 1, true),
@@ -288,7 +288,7 @@ H.ok(client:find('stopControlLock()', 1, true), 'closing a session releases the 
 
 -- Migration follows kora_inventory's exact convention: kora_sql loads and
 -- fingerprints the declared file, with the historical checksum retained.
-H.ok(persistence:find('QB.sql.migrateFiles(resource, MIGRATIONS, checksum)', 1, true), 'schema uses qbsql\'s file migrator')
+H.ok(persistence:find('Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)', 1, true), 'schema uses qbsql\'s file migrator')
 H.ok(persistence:find("{ version = 1, name = 'playerskins_outfits', file = 'sql/001_playerskins_outfits.sql' }", 1, true), 'migration list matches the shipped sql file')
 
 H.finish()

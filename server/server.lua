@@ -1,5 +1,5 @@
 -- kora_clothing server authority: fitting-room bucket isolation, skin/outfit
--- persistence, and the real qb-clothing wire protocol (net events + QB
+-- persistence, and the real qb-clothing wire protocol (net events + Kora
 -- callback names) for third-party compat.
 --
 -- Session model: `sessions[src]` exists exactly while a player is inside the
@@ -39,7 +39,7 @@ end
 -- --- persistence-backed reads/writes ---
 
 local function dbGetSkin(citizenid, src, context)
-    local row, err = QB.sql.single('SELECT `model`, `skin` FROM `playerskins` WHERE `citizenid` = ?', { citizenid })
+    local row, err = Kora.sql.single('SELECT `model`, `skin` FROM `playerskins` WHERE `citizenid` = ?', { citizenid })
     if err then
         if src and context and citizenIdFor(src) == citizenid
             and (openingSessions[src] == context or sessions[src] == context) then
@@ -52,7 +52,7 @@ local function dbGetSkin(citizenid, src, context)
 end
 
 local function dbSetSkin(citizenid, model, skin)
-    local ok, result = pcall(QB.sql.execute,
+    local ok, result = pcall(Kora.sql.execute,
         'INSERT INTO `playerskins` (`citizenid`, `model`, `skin`) VALUES (?, ?, ?) ' ..
         'ON DUPLICATE KEY UPDATE `model` = VALUES(`model`), `skin` = VALUES(`skin`)',
         { citizenid, model, encode(skin) })
@@ -60,18 +60,18 @@ local function dbSetSkin(citizenid, model, skin)
 end
 
 local function dbListOutfits(citizenid)
-    return QB.sql.query(
+    return Kora.sql.query(
         'SELECT `id`, `outfitname`, `model` FROM `playeroutfits` WHERE `citizenid` = ? ORDER BY `id` DESC',
         { citizenid }
     ) or {}
 end
 
 local function dbCountOutfits(citizenid)
-    return QB.sql.scalar('SELECT COUNT(*) FROM `playeroutfits` WHERE `citizenid` = ?', { citizenid }) or 0
+    return Kora.sql.scalar('SELECT COUNT(*) FROM `playeroutfits` WHERE `citizenid` = ?', { citizenid }) or 0
 end
 
 local function dbGetOutfit(citizenid, id)
-    return QB.sql.single(
+    return Kora.sql.single(
         'SELECT `id`, `outfitname`, `model`, `skin` FROM `playeroutfits` WHERE `citizenid` = ? AND `id` = ?',
         { citizenid, id }
     )
@@ -82,18 +82,18 @@ end
 -- for the NUI's outfit list and would waste bandwidth decoding skin JSON it
 -- never uses.
 local function dbListOutfitSkins(citizenid)
-    return QB.sql.query('SELECT `model`, `skin` FROM `playeroutfits` WHERE `citizenid` = ?', { citizenid }) or {}
+    return Kora.sql.query('SELECT `model`, `skin` FROM `playeroutfits` WHERE `citizenid` = ?', { citizenid }) or {}
 end
 
 local function dbInsertOutfit(citizenid, name, model, skin)
-    return QB.sql.insert(
+    return Kora.sql.insert(
         'INSERT INTO `playeroutfits` (`citizenid`, `outfitname`, `model`, `skin`) VALUES (?, ?, ?, ?)',
         { citizenid, name, model, encode(skin) }
     )
 end
 
 local function dbDeleteOutfit(citizenid, id)
-    local ok, result = pcall(QB.sql.execute,
+    local ok, result = pcall(Kora.sql.execute,
         'DELETE FROM `playeroutfits` WHERE `citizenid` = ? AND `id` = ?', { citizenid, id })
     return ok and result ~= nil
 end
@@ -179,7 +179,7 @@ end
 local function clampIndex(value)
     value = tonumber(value)
     if not value then return 0 end
-    return QB.util.clamp(math.floor(value), -1, 999)
+    return Kora.util.clamp(math.floor(value), -1, 999)
 end
 
 local function sanitiseSkin(rawSkin, model)
@@ -429,7 +429,7 @@ end
 
 if Config.clothingAsItem then
     CreateThread(function()
-        local coreReady = QB.resources.awaitStarted('kora_core', { timeout = 30000, interval = 200 })
+        local coreReady = Kora.resources.awaitStarted('kora_core', { timeout = 30000, interval = 200 })
         if not coreReady then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but qbcore did not start in time.')
             return
@@ -451,7 +451,7 @@ if Config.clothingAsItem then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but registering the outfit item with qbcore failed.')
         end
 
-        local inventoryReady = QB.resources.awaitStarted('kora_inventory', { timeout = 30000, interval = 200 })
+        local inventoryReady = Kora.resources.awaitStarted('kora_inventory', { timeout = 30000, interval = 200 })
         if not inventoryReady then
             print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory did not start in time.')
             return
@@ -514,7 +514,7 @@ end)
 
 -- Session open/confirm move real money (confirmSession) and gate an
 -- admin-only free fitting (requestSession's 'admin' mode) -- routed through
--- kora_lib's tokenised QB.events instead of a raw RegisterNetEvent so a static
+-- kora_lib's tokenised Kora.events instead of a raw RegisterNetEvent so a static
 -- exploit menu can't fire these guessable names directly; the server-side
 -- checks below (session state, price computed from a DB diff, re-checked
 -- admin permission) remain the actual authorization, same as before.
@@ -616,7 +616,7 @@ local function requestSession(src, mode, extra, opening)
     })
 end
 
-QB.events.register('qbclothing:server:requestSession', function(src, mode, extra)
+Kora.events.register('qbclothing:server:requestSession', function(src, mode, extra)
     if sessions[src] then return end
     if openingSessions[src] then return end
 
@@ -631,7 +631,7 @@ AddEventHandler('playerDropped', function()
     pendingAdminSessions[source] = nil
 end)
 
-QB.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
+Kora.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
     local session = sessions[src]
     if not session then return nil end
     local row = dbGetOutfit(session.citizenid, tonumber(id) or -1)
@@ -639,7 +639,7 @@ QB.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
     return row.model, decode(row.skin)
 end)
 
-QB.events.register('qbclothing:server:deleteOutfit', function(src, id)
+Kora.events.register('qbclothing:server:deleteOutfit', function(src, id)
     local session = sessions[src]
     if not session then return end
     id = tonumber(id)
@@ -656,7 +656,7 @@ local function isCurrentSession(src, session)
     return sessions[src] == session and citizenIdFor(src) == session.citizenid
 end
 
-QB.events.register('qbclothing:server:confirmSession', function(src, payload)
+Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
     local session = sessions[src]
     if not session then return end
     if type(payload) ~= 'table' then return end
@@ -765,7 +765,7 @@ QB.events.register('qbclothing:server:confirmSession', function(src, payload)
     })
 end)
 
-QB.events.register('qbclothing:server:cancelSession', function(src)
+Kora.events.register('qbclothing:server:cancelSession', function(src)
     local session = sessions[src]
     if not session or session.mandatory then return end
 
@@ -776,13 +776,13 @@ end)
 
 -- --- real qb-clothing / qb-multicharacter compat callbacks ---
 
--- Real signature: cb(model, skin). kora_lib's QB.callback is return-value based
+-- Real signature: cb(model, skin). kora_lib's Kora.callback is return-value based
 -- (see kora_core/compat/server/qb-multicharacter.lua's own getSkin stub), so a
--- handler returning `model, skin` is what QB.callback.trigger(...) surfaces
+-- handler returning `model, skin` is what Kora.callback.trigger(...) surfaces
 -- to a caller using the modern trigger style; QBCore.Functions.CreateCallback
 -- compat (kora_core/compat/server/qb-core.lua:177) is a thin wrapper over the
 -- same registry, so legacy `cb(model, skin)`-style callers work too.
-QB.callback.register('qb-clothing:server:getSkin', function(src)
+Kora.callback.register('qb-clothing:server:getSkin', function(src)
     local citizenid = citizenIdFor(src)
     if not citizenid then return nil end
     local saved = dbGetSkin(citizenid)
@@ -796,13 +796,13 @@ QB.callback.register('qb-clothing:server:getSkin', function(src)
 end)
 
 -- Overrides kora_core's own honest "no clothing module exists" stub
--- (compat/server/qb-multicharacter.lua) now that one does. QB.callback.register
+-- (compat/server/qb-multicharacter.lua) now that one does. Kora.callback.register
 -- is a plain last-writer-wins overwrite (kora_lib/local/callback/server.lua).
 -- Explicitly unregister the documented placeholder first: this replacement
 -- is intentional, so it should not emit kora_lib's cross-resource collision
 -- warning intended for accidental namespace reuse. Powers kora_multichar's
 -- character-select preview camera.
-QB.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
+Kora.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
     local src = _src
     if type(citizenid) ~= 'string' then return nil end
     local ok, owned = pcall(function() return exports.kora_core:ownsCharacter(src, citizenid) end)

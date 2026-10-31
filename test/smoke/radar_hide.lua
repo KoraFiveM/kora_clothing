@@ -23,7 +23,7 @@ _G.SetNuiFocus = function() end
 _G.SendNUIMessage = function() end
 _G.Camera = { start = function() end, stop = function() end }
 _G.QBTheme = { refresh = function() end }
-_G.QB = { notify = { send = function() end } }
+_G.Kora = { notify = { send = function() end } }
 for _, name in ipairs({ 'GetNumberOfPedDrawableVariations', 'GetNumberOfPedTextureVariations', 'GetNumberOfPedPropDrawableVariations', 'GetNumberOfPedPropTextureVariations' }) do
     _G[name] = function() return 0 end
 end

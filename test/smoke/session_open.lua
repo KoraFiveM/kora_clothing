@@ -70,7 +70,7 @@ TriggerClientEvent = function(name, src, payload)
     if name == 'qbclothing:client:closeSession' then closes[#closes + 1] = { src = src, payload = payload } end
 end
 json = { encode = function() return '{}' end }
-QB = {
+Kora = {
     util = { clamp = function(value, low, high) return math.max(low, math.min(high, value)) end },
     events = { register = function(name, callback) events[name] = callback end },
     callback = { register = function() end },
@@ -352,32 +352,32 @@ H.equal(writes, beforeWrites + 1, 'healthy confirmation retry preserves ordinary
 H.equal(buckets[7], 42)
 
 -- Successful SQL completions cannot resume a retired fitting's remaining work.
-local oldSingle, oldQuery, oldExecute = QB.sql.single, QB.sql.query, QB.sql.execute
-local oldScalar, oldInsert, oldRemove, oldAdd = QB.sql.scalar, QB.sql.insert, core.removeMoney, core.addMoney
+local oldSingle, oldQuery, oldExecute = Kora.sql.single, Kora.sql.query, Kora.sql.execute
+local oldScalar, oldInsert, oldRemove, oldAdd = Kora.sql.scalar, Kora.sql.insert, core.removeMoney, core.addMoney
 local phase
 local skinWrites, presetWrites, charges, refunds = {}, {}, {}, {}
-QB.sql.single = function(query, params)
+Kora.sql.single = function(query, params)
     if phase == 'skin' then return coroutine.yield('skin', params[1]) end
     return oldSingle(query, params)
 end
-QB.sql.query = function(query, params)
+Kora.sql.query = function(query, params)
     if not query:find('`outfitname`', 1, true) and phase == 'owned' then
         return coroutine.yield('owned', params[1])
     end
     return oldQuery(query, params)
 end
-QB.sql.execute = function(query, params)
+Kora.sql.execute = function(query, params)
     skinWrites[#skinWrites + 1] = params[1]
     local result = oldExecute(query, params)
     if phase == 'refund' then return nil end
     if phase == 'write' then return coroutine.yield('write', params[1]) end
     return result
 end
-QB.sql.scalar = function(_, params)
+Kora.sql.scalar = function(_, params)
     if phase == 'count' then return coroutine.yield('count', params[1]) end
     return 0
 end
-QB.sql.insert = function(_, params)
+Kora.sql.insert = function(_, params)
     presetWrites[#presetWrites + 1] = params[1]
     if phase == 'insert' then return coroutine.yield('insert', params[1]) end
     return 77
@@ -513,8 +513,8 @@ H.equal(grant.info.skin.components['11'].d, 2)
 H.equal(closes[#closes].payload.revertTo.model, Shared.models.male)
 H.equal(buckets[7], 42)
 Config.clothingAsItem, GetResourceState, exports.kora_inventory = false, oldResourceState, nil
-QB.sql.single, QB.sql.query, QB.sql.execute = oldSingle, oldQuery, oldExecute
-QB.sql.scalar, QB.sql.insert, core.removeMoney, core.addMoney = oldScalar, oldInsert, oldRemove, oldAdd
+Kora.sql.single, Kora.sql.query, Kora.sql.execute = oldSingle, oldQuery, oldExecute
+Kora.sql.scalar, Kora.sql.insert, core.removeMoney, core.addMoney = oldScalar, oldInsert, oldRemove, oldAdd
 players[7].citizenid, players[7].money.cash = 'first', 1000
 
 -- Character unload retires an open fitting, including mandatory creation.

@@ -22,7 +22,7 @@ _G.exports = setmetatable({
     },
 }, { __call = function() end })
 
-_G.QB = {
+_G.Kora = {
     events = { trigger = function(name, mode, extra) requests[#requests + 1] = { name = name, mode = mode, extra = extra }; return true end },
     entities = { createScoped = function() end },
     blips = { create = function() end, setInfo = function() end },

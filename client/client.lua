@@ -1,7 +1,7 @@
 -- kora_clothing client: NUI owner, ped/camera control while a fitting-room
 -- session is open, shop target zones, and the real qb-clothing client wire
 -- protocol for third-party compat. Owns its own NUI frame (own `ui_page`), so
--- this talks to it with the raw natives directly -- QB.nui.* would dispatch
+-- this talks to it with the raw natives directly -- Kora.nui.* would dispatch
 -- into kora_lib's own resource VM/frame instead of this one.
 
 local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
@@ -90,7 +90,7 @@ local function faceShapeFromDrawable(ped)
 end
 
 local function applyHead(ped, head)
-    -- Plain print + json so this is visible regardless of how QB.print.debug
+    -- Plain print + json so this is visible regardless of how Kora.print.debug
     -- formats a leading entity handle.
     -- Test harnesses and old FiveM artifacts may not expose the head natives;
     -- the rest of an appearance must still be applicable in that environment.
@@ -111,7 +111,7 @@ end
 local temporaryOverride = nil
 
 local function notify(message, kind)
-    QB.notify.send({ title = 'Clothing', message = message, type = kind or 'info' })
+    Kora.notify.send({ title = 'Clothing', message = message, type = kind or 'info' })
 end
 
 -- --- ped appearance helpers ---
@@ -353,7 +353,7 @@ local function applyModel(model, skin)
     local ped = PlayerPedId()
     local hash = joaat(model)
     if GetEntityModel(ped) ~= hash then
-        local loaded = QB.stream.loadModel(hash, nil, { timeout = 5000 })
+        local loaded = Kora.stream.loadModel(hash, nil, { timeout = 5000 })
         if not loaded then return false end
         SetPlayerModel(PlayerId(), hash)
         SetModelAsNoLongerNeeded(hash)
@@ -867,7 +867,7 @@ end)
 
 RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
-    local model, skin = QB.callback.trigger('qbclothing:server:getOutfitSkin', tonumber(data.id))
+    local model, skin = Kora.callback.trigger('qbclothing:server:getOutfitSkin', tonumber(data.id))
     if not model then cb({ ok = false }); return end
     local wasUndressed = {}
     for id in pairs(undressActive) do wasUndressed[#wasUndressed + 1] = id end
@@ -887,13 +887,13 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     })
 end)
 
--- These four fire the tokenised QB.events gateway (server/server.lua) rather
+-- These four fire the tokenised Kora.events gateway (server/server.lua) rather
 -- than a raw TriggerServerEvent -- trigger() can fail if the connect-time
 -- handshake hasn't landed yet (10s timeout), which the existing sessionError
 -- display already handles, so a failure here is surfaced the same way any
 -- other server-side rejection of these actions already is.
 local function triggerOrError(name, ...)
-    local ok, err = QB.events.trigger(name, ...)
+    local ok, err = Kora.events.trigger(name, ...)
     if not ok then TriggerEvent('qbclothing:client:sessionError', err) end
 end
 
@@ -966,7 +966,7 @@ local function applySavedSkin()
     local generation = skinApplyGeneration
 
     CreateThread(function()
-        local model, skin = QB.callback.trigger('qb-clothing:server:getSkin')
+        local model, skin = Kora.callback.trigger('qb-clothing:server:getSkin')
         if generation ~= skinApplyGeneration then return end
 
         -- The callback trigger is a network round trip -- a fitting-room
@@ -1099,7 +1099,7 @@ RegisterNetEvent('qbclothing:client:openNearestShop', function(service)
     -- accommodates ped/zone placement while the server still performs the
     -- final coordinate check before it creates a session.
     if not nearestIndex or nearestDistance > (Config.interactDistance + 1.0) then
-        QB.notify.send({ type = 'error', message = ('You are not near a %s shop'):format(service) })
+        Kora.notify.send({ type = 'error', message = ('You are not near a %s shop'):format(service) })
         return
     end
     openSession('shop', { shopId = nearestIndex })
@@ -1153,7 +1153,7 @@ local textUiShop -- { index, label, handle } while inside a shop zone, else nil
 
 local function hideShopPrompt()
     if textUiShop and textUiShop.handle then
-        QB.textui.hide(textUiShop.handle)
+        Kora.textui.hide(textUiShop.handle)
         textUiShop.handle = nil
     end
 end
@@ -1161,7 +1161,7 @@ end
 local function showShopPrompt()
     if not textUiShop or activeSession then return end
     hideShopPrompt()
-    textUiShop.handle = QB.textui.show(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
+    textUiShop.handle = Kora.textui.show(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
 end
 
 local function registerTextUiShop(index, shop, zone)
@@ -1177,13 +1177,13 @@ local function registerTextUiShop(index, shop, zone)
     }
 
     if zone.points then
-        QB.zones.poly({
+        Kora.zones.poly({
             points = zone.points, thickness = zone.thickness, minZ = zone.minZ, maxZ = zone.maxZ,
             onEnter = callbacks.onEnter, onExit = callbacks.onExit,
         })
         return
     end
-    QB.zones.box({
+    Kora.zones.box({
         coords = vector3(shop.coords.x, shop.coords.y, shop.coords.z),
         size = zone.size or Config.shopZoneDefault.size,
         rotation = zone.rotation or shop.coords.w,
@@ -1361,7 +1361,7 @@ CreateThread(function()
     local textUiMode = Config.interactionMode == 'textui'
     if textUiMode then
         refreshShopPrompt = showShopPrompt
-        QB.keybind.add({
+        Kora.keybind.add({
             name = 'kora_clothing_open_shop',
             description = 'Open the clothing shop you are standing in',
             defaultKey = 'E',
@@ -1387,7 +1387,7 @@ CreateThread(function()
             -- The storefront zone above owns the interaction. The clerk is
             -- cosmetic, so keep it client-local and only create it while this
             -- player is near the shop rather than at every shop on startup.
-            QB.entities.createScoped(shop.ped, shop.coords, {
+            Kora.entities.createScoped(shop.ped, shop.coords, {
                 radius = Config.shopPedScopeRadius,
                 freeze = true,
                 blockNonTempEvents = true,
@@ -1395,9 +1395,9 @@ CreateThread(function()
         end
 
         if shop.blip and shop.blip.enabled then
-            local blip = QB.blips.create(shop.coords, shop.blip)
+            local blip = Kora.blips.create(shop.coords, shop.blip)
             if blip and not shop.blip.info then
-                QB.blips.setInfo(blip, {
+                Kora.blips.setInfo(blip, {
                     title = shop.label,
                     rows = {
                         { kind = 'name', label = 'Service', value = shop.service },

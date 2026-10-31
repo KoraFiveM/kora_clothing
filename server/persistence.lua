@@ -1,6 +1,6 @@
 -- Schema bootstrap for playerskins/playeroutfits, following kora_inventory's
 -- exact migration convention (server/persistence.lua): read the .sql file,
--- checksum it, hand both to kora_sql's Migrator via QB.sql.migrate. kora_sql tracks
+-- checksum it, hand both to kora_sql's Migrator via Kora.sql.migrate. kora_sql tracks
 -- applied (resource, version) pairs itself -- no custom runner needed here.
 
 QbClothing = QbClothing or {}
@@ -40,14 +40,14 @@ function P.ready()
 end
 
 local function bootstrap()
-    local sqlReady, readyErr = QB.sql.ready(60000)
+    local sqlReady, readyErr = Kora.sql.ready(60000)
     if not sqlReady then
         state.lastError = readyErr or 'qbsql did not become ready'
         log('1', state.lastError)
         return
     end
 
-    local _, migrationErr = QB.sql.migrateFiles(resource, MIGRATIONS, checksum)
+    local _, migrationErr = Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)
     if migrationErr then
         state.lastError = migrationErr
         log('1', ('schema migration failed: %s'):format(migrationErr))

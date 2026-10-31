@@ -80,7 +80,7 @@ TriggerEvent('qb-clothing:client:openOutfitMenu')   -- open the wardrobe
 ### Read a citizen's saved appearance (real qb-clothing callback)
 ```lua
 -- client
-local model, skin = QB.callback.trigger('qb-clothing:server:getSkin')
+local model, skin = Kora.callback.trigger('qb-clothing:server:getSkin')
 if model then
     print(('saved look uses model %s'):format(model))
 end
@@ -113,11 +113,11 @@ TriggerEvent('qb-clothing:client:openOutfitMenu')         -- open the wardrobe
 TriggerEvent('qb-clothing:client:loadOutfit', outfit)     -- { model, skin } applied directly
 ```
 
-### Callbacks (`QB.callback`, real qb-clothing/qb-multicharacter names)
+### Callbacks (`Kora.callback`, real qb-clothing/qb-multicharacter names)
 ```lua
-QB.callback.trigger('qb-clothing:server:getSkin')                    -- -> model, skin
-QB.callback.trigger('qb-multicharacter:server:getSkin', citizenid)   -- -> model, skin (char-select preview)
-QB.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
+Kora.callback.trigger('qb-clothing:server:getSkin')                    -- -> model, skin
+Kora.callback.trigger('qb-multicharacter:server:getSkin', citizenid)   -- -> model, skin (char-select preview)
+Kora.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
 ```
 
 The multicharacter preview callback is pre-login safe: kora_core verifies that
@@ -215,15 +215,15 @@ to the hair component's category.
 
 ### Session net events
 ```lua
--- client -> server (kora_lib's tokenised QB.events gateway, not a raw
+-- client -> server (kora_lib's tokenised Kora.events gateway, not a raw
 -- RegisterNetEvent -- confirmSession moves real money and requestSession
 -- gates an admin-only free fitting, so these go through the per-session
 -- token instead of a guessable static event name; see kora_lib's
 -- local/events/docs.md)
-QB.events.trigger('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
-QB.events.trigger('qbclothing:server:confirmSession', { model, skin, saveName })
-QB.events.trigger('qbclothing:server:cancelSession')
-QB.events.trigger('qbclothing:server:deleteOutfit', outfitId)
+Kora.events.trigger('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
+Kora.events.trigger('qbclothing:server:confirmSession', { model, skin, saveName })
+Kora.events.trigger('qbclothing:server:cancelSession')
+Kora.events.trigger('qbclothing:server:deleteOutfit', outfitId)
 
 -- server -> client
 TriggerClientEvent('qbclothing:client:openSession', src, payload)

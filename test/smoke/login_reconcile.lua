@@ -75,7 +75,7 @@ _G.GetNumberOfPedPropDrawableVariations = function() return 0 end
 _G.GetNumberOfPedPropTextureVariations = function() return 0 end
 
 local getSkinCalls = 0
-_G.QB = {
+_G.Kora = {
     callback = {
         trigger = function(name)
             if name == 'qb-clothing:server:getSkin' then
@@ -89,7 +89,7 @@ _G.QB = {
 
 dofile('config.lua')
 Config.testMode = true
--- Emptied so the unrelated chunk-load shop-ped spawn thread (QB.entities.
+-- Emptied so the unrelated chunk-load shop-ped spawn thread (Kora.entities.
 -- create/exports.kora_target) is a no-op -- irrelevant to this test and not
 -- worth mocking out.
 Config.shops = {}

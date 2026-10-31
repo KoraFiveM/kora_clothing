@@ -33,7 +33,7 @@ local function lerpAngle(current, goal, rate)
     return (current + delta * rate) % 360.0
 end
 
-local clamp = QB.util.clamp
+local clamp = Kora.util.clamp
 
 -- The selected zone's preset radius plus whatever the wheel has added, clamped
 -- to the configured absolute bounds. Deliberately returned as the LERP GOAL
