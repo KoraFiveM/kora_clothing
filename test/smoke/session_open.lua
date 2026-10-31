@@ -42,6 +42,10 @@ exports = setmetatable({ kora_core = core }, {
     __call = function(_, name, callback) public[name] = callback end,
 })
 GetPlayerRoutingBucket = function(src) return buckets[src] end
+local populationCalls = {}
+SetRoutingBucketPopulationEnabled = function(bucket, enabled)
+    populationCalls[#populationCalls + 1] = { bucket = bucket, enabled = enabled }
+end
 SetPlayerRoutingBucket = function(src, bucket)
     assert(rawBucketAllowed, 'compat bucket export should be used')
     setBucket(nil, src, bucket)
@@ -554,4 +558,56 @@ cancel()
 H.equal(buckets[7], Config.bucket.base + 7, 'mandatory creation cannot be cancelled')
 emit('onResourceStop', 7, 'kora_clothing')
 H.equal(buckets[7], 42, 'resource stop retains active-session restoration')
+
+-- Population: only the first-character fitting room is emptied, on every entry.
+-- Resource stop restores buckets but keeps the session records, so clear them.
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+populationCalls = {}
+start('firstCharacter')
+H.equal(#populationCalls, 1, 'population is written once on entry')
+H.equal(populationCalls[1].bucket, Config.bucket.base + 7, 'the personal fitting bucket')
+H.equal(populationCalls[1].enabled, false, 'population disabled for the first-character fitting')
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+H.equal(buckets[7], 42, 'unload restores the previous bucket')
+H.equal(#populationCalls, 1, 'leaving does not touch population')
+
+populationCalls = {}
+start('firstCharacter')
+emit('onResourceStop', 7, 'kora_clothing')
+H.equal(buckets[7], 42, 'resource stop restores the previous bucket')
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+
+populationCalls = {}
+start('firstCharacter')
+events['qbclothing:server:confirmSession'](7, { skin = {} })
+H.equal(buckets[7], 42, 'finishing restores the previous bucket')
+
+-- A reused slot follows the current mode: shops are not emptied, and a bucket
+-- left disabled by an earlier first-character fitting is switched back on.
+saved = { model = Shared.models.male, skin = {} }
+populationCalls = {}
+start('wardrobe')
+H.equal(#populationCalls, 1)
+H.equal(populationCalls[1].enabled, true, 'shop/wardrobe keep ambient population')
+cancel()
+H.equal(buckets[7], 42)
+
+saved = nil
+local was = Config.bucket.disablePopulation
+Config.bucket.disablePopulation = false
+populationCalls = {}
+start('firstCharacter')
+H.equal(populationCalls[1].enabled, true, 'disablePopulation = false leaves population on')
+H.equal(buckets[7], Config.bucket.base + 7, 'the fitting room bucket is still used')
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+H.equal(buckets[7], 42)
+Config.bucket.disablePopulation = was
+
+-- A missing native must not break isolation.
+local native = SetRoutingBucketPopulationEnabled
+SetRoutingBucketPopulationEnabled = nil
+start('firstCharacter')
+H.equal(buckets[7], Config.bucket.base + 7, 'isolation survives a missing population native')
+emit('QBCore:Server:OnPlayerUnload', 7, 7)
+SetRoutingBucketPopulationEnabled = native
 H.finish()

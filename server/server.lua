@@ -396,9 +396,19 @@ local function setBucket(src, bucket)
     end
 end
 
-local function enterFittingRoom(src)
+-- Only the one-time first-character fitting room has ambient population
+-- switched off (Config.bucket.disablePopulation); shop, wardrobe and admin
+-- sessions share the same personal bucket but keep the world's traffic. It is
+-- written on every entry, true or false, because source numbers are reused: a
+-- bucket left disabled by an earlier first-character fitting must follow the
+-- current mode and config. There is no restore on leave -- nobody is in the
+-- bucket afterwards and the next entry rewrites it.
+local function enterFittingRoom(src, mode)
     local previousBucket = GetPlayerRoutingBucket(src)
-    setBucket(src, Config.bucket.base + src)
+    local bucket = Config.bucket.base + src
+    setBucket(src, bucket)
+    local disable = mode == 'firstCharacter' and Config.bucket.disablePopulation ~= false
+    pcall(SetRoutingBucketPopulationEnabled, bucket, not disable)
     return previousBucket
 end
 
@@ -591,7 +601,7 @@ local function requestSession(src, mode, extra, opening)
     if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
 
     -- Finish all database reads before capturing the bucket and publishing the session.
-    local previousBucket = enterFittingRoom(src)
+    local previousBucket = enterFittingRoom(src, mode)
     sessions[src] = {
         mode = mode,
         mandatory = mode == 'firstCharacter',

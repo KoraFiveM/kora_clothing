@@ -243,6 +243,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 ## Config highlights (`config.lua`)
 
 - `Config.bucket.base` (1,000,000) — fitting-room routing bucket offset, `base + source`
+- `Config.bucket.disablePopulation` (true) — switches ambient peds/vehicles off in the first-character fitting room bucket only; shops, barbers and wardrobes keep the world population
 - `Config.shop.currency` — account charged for purchases (default `cash`)
 - `Config.services` — per-service (`clothing`/`barber`/`hairdresser`/`tattoo`/`creation`) component/prop whitelists, prices and gender restrictions
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen

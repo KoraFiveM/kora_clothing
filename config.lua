@@ -14,8 +14,20 @@ local config = QB and QB.config
 -- small per-connection integer (FiveM reuses low slot numbers), so this stays
 -- far below any world/instance bucket another resource might use starting
 -- from 0, while remaining unique per concurrent session.
+--   disablePopulation : turn ambient peds and vehicles (traffic, jet skis,
+--                       pedestrians) off inside the first-character fitting
+--                       room bucket, so they do not wander through the
+--                       background of character creation. Only that personal
+--                       bucket is affected, never the normal world. Shop,
+--                       barber and wardrobe sessions keep their population.
+--                       Read each time a fitting room is entered.
 Config.bucket = {
     base = 1000000,
+    disablePopulation = config and config.boolean(true, {
+        label = 'Disable ambient population in the first-character fitting room',
+        description = 'When enabled, ambient peds and vehicles (traffic, jet skis, pedestrians) are switched off inside the private routing bucket used for the one-time first-character fitting room, so they do not wander through the creation scene. Only that personal bucket is affected, never the normal world, and shop, barber and wardrobe sessions are unchanged. Applies the next time a first-character fitting room opens.',
+        live = true,
+    }) or true,
 }
 
 -- Currency is shared by every paid service. Prices live beside the service
