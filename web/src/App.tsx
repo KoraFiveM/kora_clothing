@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
+import { resolveStepEdit } from "@/lib/stepper"
 import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import type {
     CameraPayload,
@@ -216,6 +217,7 @@ function VariationDetail({ item, onChange, onClear }: {
     if (!item) return <div className="empty-panel"><User size={26} /><span>Pick an item from the list to adjust it.</span></div>
 
     const removed = item.kind === "prop" && item.drawable < 0
+    const clearable = item.kind === "prop" && item.clearable === true
     const canPrevDrawable = item.kind === "prop" && item.clearable ? item.drawable > -1 : item.drawable > 0
     const canNextDrawable = item.drawable < item.drawableCount - 1
     const canPrevTexture = !removed && item.texture > 0
@@ -225,19 +227,23 @@ function VariationDetail({ item, onChange, onClear }: {
         <h3 className="detail-title">{item.label}</h3>
         <p className="detail-sub">{item.kind === "component" ? "Clothing item" : "Accessory"}</p>
 
-        <div className="stepper">
-            <label>Style</label>
-            <button type="button" className="step-btn" aria-label="Previous style" disabled={!canPrevDrawable} onClick={() => onChange({ drawable: item.drawable - 1, texture: 0 })}><ChevronLeft size={16} /></button>
-            <span>{removed ? "None" : `${item.drawable + 1} / ${item.drawableCount}`}</span>
-            <button type="button" className="step-btn" aria-label="Next style" disabled={!canNextDrawable} onClick={() => onChange({ drawable: item.drawable + 1, texture: 0 })}><ChevronRight size={16} /></button>
-        </div>
+        <Stepper
+            label="Style"
+            text={removed ? "None" : `${item.drawable + 1} / ${item.drawableCount}`}
+            canPrev={canPrevDrawable} canNext={canNextDrawable}
+            onPrev={() => onChange({ drawable: item.drawable - 1, texture: 0 })}
+            onNext={() => onChange({ drawable: item.drawable + 1, texture: 0 })}
+            typed={{ value: removed ? 0 : item.drawable + 1, min: clearable ? 0 : 1, max: item.drawableCount, onCommit: (value) => onChange({ drawable: value - 1, texture: 0 }) }}
+        />
 
-        <div className="stepper">
-            <label>Color</label>
-            <button type="button" className="step-btn" aria-label="Previous color" disabled={!canPrevTexture} onClick={() => onChange({ drawable: item.drawable, texture: item.texture - 1 })}><ChevronLeft size={16} /></button>
-            <span>{removed ? "--" : `${item.texture + 1} / ${Math.max(item.textureCount, 1)}`}</span>
-            <button type="button" className="step-btn" aria-label="Next color" disabled={!canNextTexture} onClick={() => onChange({ drawable: item.drawable, texture: item.texture + 1 })}><ChevronRight size={16} /></button>
-        </div>
+        <Stepper
+            label="Color"
+            text={removed ? "--" : `${item.texture + 1} / ${Math.max(item.textureCount, 1)}`}
+            canPrev={canPrevTexture} canNext={canNextTexture}
+            onPrev={() => onChange({ drawable: item.drawable, texture: item.texture - 1 })}
+            onNext={() => onChange({ drawable: item.drawable, texture: item.texture + 1 })}
+            typed={removed ? undefined : { value: item.texture + 1, min: 1, max: Math.max(item.textureCount, 1), onCommit: (value) => onChange({ drawable: item.drawable, texture: value - 1 }) }}
+        />
 
         {item.kind === "prop" && item.clearable && !removed && (
             <button type="button" className="remove-action" onClick={onClear}>Remove</button>
@@ -290,18 +296,68 @@ function HairColorPanel({ hair, onChange }: {
     </div>
 }
 
-function Stepper({ label, text, canPrev, canNext, onPrev, onNext }: {
+/** The "n / max" readout. With `typed` the number is an input: click it, type a
+ * value, Enter or click away to apply, Escape to revert. Without it (None, or
+ * nothing to choose) the text is shown as before. */
+interface TypedStep {
+    /** Shown value, 1-based (0 for "None"). */
+    value: number
+    min: number
+    max: number
+    onCommit: (value: number) => void
+}
+
+function StepValue({ text, typed }: { text: string; typed?: TypedStep }) {
+    const [draft, setDraft] = useState<string | null>(null)
+    // Enter commits and then blurs; the ref stops that blur committing twice.
+    const editing = useRef(false)
+    if (!typed) return <span>{text}</span>
+
+    const finish = (end: "enter" | "blur" | "escape") => {
+        if (!editing.current) return
+        editing.current = false
+        const next = resolveStepEdit(draft ?? "", end, { min: typed.min, max: typed.max, current: typed.value })
+        setDraft(null)
+        if (next !== null) typed.onCommit(next)
+    }
+
+    return <span className="step-value">
+        <input
+            className="step-input"
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            aria-label={`${text} (type a number)`}
+            value={draft ?? String(typed.value)}
+            style={{ width: `${Math.max(2, String(typed.max).length)}ch` }}
+            onFocus={(event) => { editing.current = true; setDraft(String(typed.value)); event.currentTarget.select() }}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={() => finish("blur")}
+            onKeyDown={(event) => {
+                // Typing must never reach the menu's own shortcuts (Escape closes it).
+                event.stopPropagation()
+                if (event.key === "Enter") { finish("enter"); event.currentTarget.blur() }
+                else if (event.key === "Escape") { finish("escape"); event.currentTarget.blur() }
+            }}
+            onKeyUp={(event) => event.stopPropagation()}
+        />
+        <span className="step-max">/ {typed.max}</span>
+    </span>
+}
+
+function Stepper({ label, text, canPrev, canNext, onPrev, onNext, typed }: {
     label: string
     text: string
     canPrev: boolean
     canNext: boolean
     onPrev: () => void
     onNext: () => void
+    typed?: TypedStep
 }) {
     return <div className="stepper">
         <label>{label}</label>
         <button type="button" className="step-btn" aria-label={`Previous ${label}`} disabled={!canPrev} onClick={onPrev}><ChevronLeft size={16} /></button>
-        <span>{text}</span>
+        <StepValue text={text} typed={typed} />
         <button type="button" className="step-btn" aria-label={`Next ${label}`} disabled={!canNext} onClick={onNext}><ChevronRight size={16} /></button>
     </div>
 }
@@ -312,6 +368,7 @@ function FaceSkinPanel({ head, onChange }: { head: HeadPayload; onChange: (next:
         <p className="section-title">Face & Skin</p>
         <Stepper
             label="Skin tone" text={`${head.skinTone + 1} / 46`}
+            typed={{ value: head.skinTone + 1, min: 1, max: 46, onCommit: (value) => onChange({ ...head, skinTone: value - 1 }) }}
             canPrev={head.skinTone > 0} canNext={head.skinTone < 45}
             onPrev={() => onChange({ ...head, skinTone: head.skinTone - 1 })} onNext={() => onChange({ ...head, skinTone: head.skinTone + 1 })}
         />
@@ -337,6 +394,7 @@ function HeadOverlayPanel({ head, overlays, palette, onChange }: {
                 <p className="section-title">{overlay.label}</p>
                 <Stepper
                     label={`${overlay.label} style`} text={style < 0 ? "None" : `${style + 1} / ${overlay.maxStyle + 1}`}
+                    typed={{ value: style + 1, min: 0, max: overlay.maxStyle + 1, onCommit: (value) => onChange({ ...head, [overlay.style]: value - 1 }) }}
                     canPrev={style > -1} canNext={style < overlay.maxStyle}
                     onPrev={() => onChange({ ...head, [overlay.style]: style - 1 })} onNext={() => onChange({ ...head, [overlay.style]: style + 1 })}
                 />

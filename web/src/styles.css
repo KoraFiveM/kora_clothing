@@ -89,6 +89,11 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .stepper { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin-bottom: 10px; }
 .stepper span { color: hsl(var(--foreground)); font-size: 12px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
 .stepper label { grid-column: 1 / -1; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.step-value { display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; min-width: 0; }
+.stepper .step-value > span, .stepper .step-value .step-max { color: hsl(var(--muted-foreground)); font-weight: 700; }
+.step-input { box-sizing: content-box; min-width: 2ch; max-width: 7ch; height: 22px; border: 1px solid transparent; border-radius: 5px; padding: 0 4px; outline: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; cursor: text; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1), background 160ms cubic-bezier(0.16,1,0.3,1); }
+.step-input:hover { border-color: hsl(var(--border)); }
+.step-input:focus { border-color: hsl(var(--brand-border)); background: hsl(var(--muted)); }
 .step-btn { display: grid; place-items: center; width: 30px; height: 30px; min-height: 0; border: 1px solid hsl(var(--border)); border-radius: 7px; padding: 0; background: hsl(var(--muted)); color: hsl(var(--foreground)); cursor: pointer; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); }
 .step-btn:hover:not(:disabled) { border-color: hsl(var(--brand-border)); color: hsl(var(--primary)); }
 .step-btn:disabled { opacity: .4; cursor: not-allowed; }
