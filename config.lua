@@ -409,30 +409,37 @@ Config.tattoo = {
         -- drawables are the stock freemode ones, which DLC clothing never
         -- renumbers; adjust per server if a clothing pack changes what looks bare.
         parts = (function()
+            -- An empty untyped table is dropped by the config adopter, which would
+            -- leave the part without its required `props` list, so slot lists are
+            -- declared explicitly.
+            local function slots(list)
+                if not config then return list end
+                return config.list(list, config.integer(0, { min = 0 }))
+            end
             local parts = {
                 {
                     id = 'top', label = 'Top',
                     male = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
                     female = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
-                    props = {},
+                    props = slots({}),
                 },
                 {
                     id = 'legs', label = 'Legs',
                     male = { { id = 4, d = 21, t = 0 } },
                     female = { { id = 4, d = 15, t = 0 } },
-                    props = {},
+                    props = slots({}),
                 },
                 {
                     id = 'shoes', label = 'Shoes',
                     male = { { id = 6, d = 34, t = 0 } },
                     female = { { id = 6, d = 35, t = 0 } },
-                    props = {},
+                    props = slots({}),
                 },
                 {
                     id = 'headwear', label = 'Hat, mask and glasses',
                     male = { { id = 1, d = 0, t = 0 } },
                     female = { { id = 1, d = 0, t = 0 } },
-                    props = { 0, 1 },
+                    props = slots({ 0, 1 }),
                 },
             }
             if not config then return parts end
