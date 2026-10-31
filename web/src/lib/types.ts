@@ -86,6 +86,8 @@ export interface OpenPayload {
     mandatory: boolean
     rotatePointerLock?: boolean
     rotateDragGuard?: boolean
+    /** Config.ui.showControlsHint; absent means on. */
+    showControlsHint?: boolean
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]

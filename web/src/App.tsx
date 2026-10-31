@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, X } from "lucide-react"
+import { ChevronDown, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
+import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
 import { resolveStepEdit } from "@/lib/stepper"
 import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import type {
@@ -121,10 +122,12 @@ function useZoom() {
     }, [flush])
 }
 
-function Viewport({ onRotate, onRotateEnd, onZoom, pointerLock, dragGuard }: {
+function Viewport({ onRotate, onRotateEnd, onZoom, onInteract, pointerLock, dragGuard }: {
     onRotate: (deltaDeg: number) => void
     onRotateEnd: () => void
     onZoom: (notches: number) => void
+    /** First real rotate or zoom: the player has found the controls. */
+    onInteract: () => void
     pointerLock: boolean
     dragGuard: boolean
 }) {
@@ -169,10 +172,21 @@ function Viewport({ onRotate, onRotateEnd, onZoom, pointerLock, dragGuard }: {
             // The button came up somewhere we could not see (outside the window).
             if (dragGuard && primaryReleased(event)) { release(); return }
             onRotate(-event.movementX * DRAG_ROTATION_DEG_PER_PIXEL)
+            onInteract()
         }}
-        onWheel={(event) => onZoom(Math.sign(event.deltaY))}
+        onWheel={(event) => { onZoom(Math.sign(event.deltaY)); onInteract() }}
         aria-hidden="true"
     />
+}
+
+/** Small, muted, click-through reminder that the character can be dragged and
+ * zoomed. It fades rather than unmounts so the layout never shifts. */
+function ControlsHint({ visible }: { visible: boolean }) {
+    return <div className={visible ? "controls-hint" : "controls-hint is-hidden"} aria-hidden="true">
+        <span><Move size={13} />Drag to rotate</span>
+        <span className="controls-hint-dot">·</span>
+        <span><Mouse size={13} />Scroll to zoom</span>
+    </div>
 }
 
 function ZoneToolbar({ zone, onSelect }: { zone: Zone; onSelect: (zone: Zone) => void }) {
@@ -490,6 +504,7 @@ export default function App() {
     const [saveName, setSaveName] = useState("")
     const [outfitsExpanded, setOutfitsExpanded] = useState(false)
     const [confirmPending, setConfirmPending] = useState(false)
+    const [hintDismissed, setHintDismissed] = useState(false)
 
     const { rotate, end: rotateEnd } = useRotate()
     const zoom = useZoom()
@@ -498,7 +513,7 @@ export default function App() {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
         setHair(null); setHead(null); setBaselineHair(null); setBaselineHead(null)
         setSelectedKey(undefined); setZone("full"); setError(undefined); setSaveName("")
-        setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false)
+        setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false); setHintDismissed(false)
     }, [])
 
     useNuiEvent<OpenPayload>("qbclothing:nui:open", (payload) => {
@@ -669,6 +684,14 @@ export default function App() {
         void sendIntent<object, CancelResponse>("qbclothing:nui:cancel", {})
     }, [])
 
+    // Fades out on its own if the player never touches the camera.
+    const hintOn = open !== null && hintEnabled(open)
+    useEffect(() => {
+        if (!hintOn) return
+        return startHintTimer(() => setHintDismissed(true))
+    }, [hintOn, open])
+    const dismissHint = useCallback(() => setHintDismissed(true), [])
+
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape" && open && !open.mandatory) cancel()
@@ -682,7 +705,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport onRotate={rotate} onRotateEnd={rotateEnd} onZoom={zoom} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} />
+        <Viewport onRotate={rotate} onRotateEnd={rotateEnd} onZoom={zoom} onInteract={dismissHint} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}
@@ -691,6 +714,8 @@ export default function App() {
         </div>
 
         <ZoneToolbar zone={zone} onSelect={changeZone} />
+
+        <ControlsHint visible={hintVisible(hintOn, hintDismissed)} />
 
         {error && <div className="error-banner" role="alert">
             <CircleAlert size={16} />
