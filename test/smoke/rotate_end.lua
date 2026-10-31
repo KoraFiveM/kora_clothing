@@ -67,6 +67,12 @@ H.equal(open().rotateDragGuard, true, 'sent on by default')
 Config.rotateDragGuard = false
 H.equal(open().rotateDragGuard, false, 'read live on the next open')
 
+H.equal(Config.ui.showControlsHint, true, 'controls hint is on by default')
+H.equal(open().showControlsHint, true, 'hint option is sent on by default')
+Config.ui.showControlsHint = false
+H.equal(open().showControlsHint, false, 'hint option is read live on the next open')
+Config.ui.showControlsHint = true
+
 local replied
 callbacks['qbclothing:nui:rotateEnd']({}, function(value) replied = value end)
 H.equal(ended, 1, 'rotateEnd callback settles the camera')

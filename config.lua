@@ -377,6 +377,19 @@ Config.rotateDragGuard = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- Menu (NUI) options.
+Config.ui = {
+    -- Shows a small "Drag to rotate · Scroll to zoom" hint near the bottom of
+    -- the screen when a clothing, barber, tattoo or creator menu opens. It does
+    -- not take mouse input or cover any panel, and fades after the first rotate
+    -- drag or wheel zoom, or after about 8 seconds. Read each time a menu opens.
+    showControlsHint = config and config.boolean(true, {
+        label = 'Show camera controls hint',
+        description = 'Shows a short Drag to rotate / Scroll to zoom reminder when a clothing, barber, tattoo or creator menu opens. It fades after the first rotate or zoom, or after about 8 seconds. Turn off to never show it.',
+        live = true,
+    }) or true,
+}
+
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
 -- callback. Offsets are relative to the ped's mid-spine bone in the ped's own
 -- forward-facing frame; client/camera.lua turns these into world-space coords

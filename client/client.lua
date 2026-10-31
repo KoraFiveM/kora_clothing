@@ -487,6 +487,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             mandatory = activeSession.mandatory,
             rotatePointerLock = Config.rotatePointerLock ~= false,
             rotateDragGuard = Config.rotateDragGuard ~= false,
+            showControlsHint = (Config.ui or {}).showControlsHint ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
             -- if the requested model failed to stream in time, this must
