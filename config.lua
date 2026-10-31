@@ -409,13 +409,40 @@ Config.camera = {
     },
     -- When true, choosing a category (or a tattoo) jumps the camera to that
     -- category's zone and drops any wheel zoom, so a close-up from one
-    -- category never carries over to the next. When false the camera stays
-    -- exactly where the player left it until they use the zone buttons.
-    resetOnCategoryChange = config and config.boolean(true, {
-        label = 'Reset camera when changing category',
-        description = 'Moves the fitting-room camera to the framing for each clothing or tattoo category when it is selected, and clears any mouse-wheel zoom. Turn off to keep the camera where the player put it.',
+    -- category never carries over to the next. When false (the default) the
+    -- camera stays exactly where the player left it until they use the zone
+    -- buttons at the top; the player already has full camera control, so a
+    -- forced move on every tab click is more irritating than helpful. Read
+    -- each time a category is chosen.
+    resetOnCategoryChange = config and config.boolean(false, {
+        label = 'Move camera when changing category',
+        description = 'Moves the fitting-room camera to the framing for each clothing or tattoo category when it is selected, and clears any mouse-wheel zoom. Off by default so the camera stays where the player put it; the camera buttons at the top always work.',
         live = true,
-    }) or true,
+    }) or false,
+    -- Where the camera starts when a clothing, barber, tattoo or creator menu
+    -- opens. 'front' places it in front of the ped, looking at the face, so
+    -- the player sees the character face-on. 'current' keeps the older
+    -- behaviour of starting at an orbit angle of 0 relative to the ped's
+    -- heading, which looks side-on or from behind for most headings. The
+    -- player can drag to rotate either way. Read each time a menu opens.
+    initialView = config and config.enum('front', {
+        label = 'Starting camera view',
+        description = 'Where the camera starts when a clothing, barber, tattoo or creator menu opens. Front puts it in front of the character, face-on; Previous keeps the old starting angle, which is often side-on.',
+        options = {
+            { value = 'front', label = 'Front (face-on)' },
+            { value = 'current', label = 'Previous behaviour' },
+        },
+        live = true,
+    }) or 'front',
+    -- Which entry of `zones` the camera starts framing. 'full' shows the whole
+    -- body (the widest preset, so the player sees the ped they are about to
+    -- dress and can zoom in); use 'face' or 'torso' for a closer start. An
+    -- unknown name falls back to 'full'. Read each time a menu opens.
+    initialPreset = config and config.string('full', {
+        label = 'Starting camera preset',
+        description = 'Name of the camera preset used when a menu opens: full, face, torso, legs or shoes. Full shows the whole body face-on. An unknown name uses full.',
+        live = true,
+    }) or 'full',
     -- Orbit rotation and zoom-transition speeds, tuned for the "smooth, not a
     -- jump-cut" illenium-style feel called for by UX.
     orbitDegPerSec = 90.0,

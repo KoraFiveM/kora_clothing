@@ -131,6 +131,17 @@ selection session.
 The preview camera orbits the ped and lerps between the five body-region zoom
 presets in `Config.camera.zones` (full body / face / torso / legs / shoes).
 
+**Starting view.** The camera opens in front of the ped, face-on, framing the
+whole body. `Config.camera.initialView` (`'front'` default, `'current'` for the
+old angle-0 start, which is often side-on) and `Config.camera.initialPreset`
+(a key of `Config.camera.zones`, default `'full'`) control this; both are read
+each time a menu opens.
+
+**Categories.** Choosing a category does not move the camera by default, so the
+player's own rotation and zoom survive tab changes and the preset buttons stay
+the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
+`Config.camera.categoryZones` on every category change.
+
 **Free zoom.** The mouse wheel zooms continuously, as an offset on top of
 whichever preset is selected — `Config.camera.zoom` sets the step per wheel
 notch and the radius bounds it is clamped to. The presets remain jump-to

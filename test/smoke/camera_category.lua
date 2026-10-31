@@ -13,6 +13,19 @@ Config.testMode = true
 dofile('client/camera.lua')
 local runtime = Camera._testRuntime
 
+-- Default: choosing a category does NOT move the camera (the player has full
+-- camera control and the preset buttons); the framing below needs the option on.
+H.equal(Config.camera.resetOnCategoryChange, false, 'default leaves the camera alone')
+Camera.setZone('legs')
+Camera.zoom(-5)
+local keptZoom = runtime.zoomOffset()
+H.equal(Camera.setCategory('shoes'), 'legs', 'default keeps the zone on a category change')
+H.equal(runtime.zoomOffset(), keptZoom, 'and the manual zoom')
+Camera.setZone('face')
+H.equal(runtime.zone(), 'face', 'the preset buttons still move the camera')
+H.equal(runtime.zoomOffset(), 0.0, 'and still drop the wheel zoom')
+Config.camera.resetOnCategoryChange = true
+
 local function frame(category)
     Camera.setZone('full') -- known starting point
     runtime.setZoomOffset(-1.0) -- manual wheel zoom to be cleared
@@ -48,7 +61,32 @@ local zoom = runtime.zoomOffset()
 H.equal(Camera.setCategory('shoes'), 'face', 'false keeps the current zone')
 H.equal(runtime.zoomOffset(), zoom, 'and the manual zoom')
 Config.camera.resetOnCategoryChange = true
-H.equal(Config.camera.resetOnCategoryChange, true, 'default is on')
+
+-- Initial view: 'front' puts the camera in front of the ped at ANY heading,
+-- 'current' keeps the old angle of 0.
+local function cameraDotForward(heading, angle)
+    local rad = math.rad(heading + angle)
+    local cx, cy = -math.sin(rad), -math.cos(rad) -- offset used by candidatePoint
+    local hr = math.rad(heading)
+    return cx * -math.sin(hr) + cy * math.cos(hr)
+end
+H.equal(Config.camera.initialView, 'front', 'default starts face-on')
+for _, heading in ipairs({ 0.0, 37.5, 90.0, 180.0, 271.0, 359.0 }) do
+    local angle = runtime.initialAngle(heading)
+    H.ok(angle >= 0.0 and angle < 360.0, 'angle is normalised at ' .. heading)
+    H.ok(math.abs(cameraDotForward(heading, angle) - 1.0) < 1e-9, 'camera is in front at heading ' .. heading)
+end
+Config.camera.initialView = 'current'
+H.equal(runtime.initialAngle(37.5), 0.0, "'current' keeps the old starting angle")
+Config.camera.initialView = 'front'
+
+H.equal(Config.camera.initialPreset, 'full', 'default preset is the whole body')
+H.equal(runtime.initialZone(), 'full')
+Config.camera.initialPreset = 'face'
+H.equal(runtime.initialZone(), 'face', 'a configured preset is used')
+Config.camera.initialPreset = 'nope'
+H.equal(runtime.initialZone(), 'full', 'an unknown preset falls back to full')
+Config.camera.initialPreset = 'full'
 
 -- Every mapped zone exists.
 for category, zone in pairs(Config.camera.categoryZones) do

@@ -173,16 +173,43 @@ local function resolveOcclusion()
     occlusion.angle, occlusion.lift, occlusion.radiusScale = 0.0, 0.0, 1.0
 end
 
+-- Orbit angle that puts the camera in front of a ped facing `heading`. The orbit
+-- places the camera at (-sin(heading + angle), -cos(heading + angle)) around the
+-- ped, which only lands in front of it for headings of 90 and 270 degrees; at
+-- other headings an angle of 0 shows the ped side-on or from behind. Solving
+-- the two for the ped's forward vector (-sin(heading), cos(heading)) gives
+-- 180 - 2 * heading. Rotation input is relative, so drag direction is unchanged.
+local function frontAngle(heading)
+    return (180.0 - 2.0 * (tonumber(heading) or 0.0)) % 360.0
+end
+
+-- Config.camera.initialView: 'front' faces the ped's face, anything else keeps
+-- the historical angle of 0 relative to the ped's heading.
+local function initialAngle(heading)
+    if Config.camera.initialView == 'current' then return 0.0 end
+    return frontAngle(heading)
+end
+
+-- Config.camera.initialPreset, falling back to the whole-body preset when the
+-- configured name is not one of Config.camera.zones.
+local function initialZone()
+    local name = Config.camera.initialPreset
+    if type(name) == 'string' and Config.camera.zones[name] then return name end
+    return 'full'
+end
+
 function Camera.start(ped)
     if cam then Camera.stop() end
     pedRef = ped
     active = true
     measurePedBounds(ped)
 
-    local first = Config.camera.zones.full
+    local zone = initialZone()
+    local first = Config.camera.zones[zone]
     local _, firstHeight = zoneHeights(first)
-    state.radius, state.height, state.fov, state.angle = first.camOffset.y, firstHeight, first.fov, 0.0
-    target.zone, target.angle, target.zoomOffset = 'full', 0.0, 0.0
+    local angle = initialAngle(GetEntityHeading(ped))
+    state.radius, state.height, state.fov, state.angle = first.camOffset.y, firstHeight, first.fov, angle
+    target.zone, target.angle, target.zoomOffset = zone, angle, 0.0
     occlusion.angle, occlusion.lift, occlusion.radiusScale = 0.0, 0.0, 1.0
     occlusionDirty = false
 
@@ -265,8 +292,8 @@ end
 
 ---Frames a menu category (a clothing group like 'shoes' or a tattoo group like
 ---'Head') using Config.camera.categoryZones. Setting the zone also drops any
----wheel zoom. Does nothing when Config.camera.resetOnCategoryChange is false,
----so the player's manual camera is kept. Returns the zone now in effect.
+---wheel zoom. Does nothing unless Config.camera.resetOnCategoryChange is true
+---(the default is false), so the player's manual camera is kept. Returns the zone now in effect.
 ---@param category string
 ---@return string
 function Camera.setCategory(category)
@@ -329,6 +356,9 @@ if Config.testMode then
         setPedBounds = function(low, high) pedBounds.low, pedBounds.high = low, high end,
         setZoomOffset = function(value) target.zoomOffset = value end,
         targetAngle = function() return target.angle end,
+        frontAngle = frontAngle,
+        initialAngle = initialAngle,
+        initialZone = initialZone,
         setAngles = function(live, goal) state.angle, target.angle = live, goal end,
     }
 end
