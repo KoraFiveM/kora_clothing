@@ -1,14 +1,16 @@
 import { ChevronDown, Copy, Minus, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
-import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
+import { listenForDragEnd } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
 import { resolveStepEdit } from "@/lib/stepper"
 import { countOf, duplicateTattoo, instanceLabel, instancePrice, removeTattooInstance, stackLimit, tattooTotal, toggleTattoo as toggleTattooId } from "@/lib/tattoos"
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
-import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
+import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
+import { RotateDrag } from "@/lib/rotateDrag"
+import type { DragIO, RotateMode } from "@/lib/rotateDrag"
 import type {
     CameraPayload,
     CategoryCameraPayload,
@@ -80,7 +82,7 @@ const DRAG_ROTATION_DEG_PER_PIXEL = 0.15
 
 /** Drag-to-rotate needs to feel continuous but must not spam the NUI
  * callback on every pointermove -- coalesce into at most one call per frame. */
-function useRotate() {
+function useRotate(): DragIO {
     const pending = useRef(0)
     const frame = useRef<number | null>(null)
     const flush = useCallback(() => {
@@ -101,7 +103,14 @@ function useRotate() {
         if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
         void sendIntent<object, object>("qbclothing:nui:rotateEnd", {})
     }, [])
-    return { rotate, end }
+    // Config.rotateMode = "controls": Lua takes over the mouse until the button is released.
+    const start = useCallback(async (button: number, x: number, y: number) => {
+        const response = await sendIntent<{ button: number; x: number; y: number }, { active?: boolean }>("qbclothing:nui:rotateStart", { button, x, y })
+        return response?.active === true
+    }, [])
+    // Config.rotateMode = "recenter": Lua moves the cursor back to the screen centre.
+    const recenter = useCallback(() => { void sendIntent<object, object>("qbclothing:nui:recenter", {}) }, [])
+    return useMemo(() => ({ rotate, end, start, recenter }), [rotate, end, start, recenter])
 }
 
 /** Free zoom on the wheel, coalesced per frame like the drag above. Only the
@@ -126,57 +135,71 @@ function useZoom() {
     }, [flush])
 }
 
-function Viewport({ onRotate, onRotateEnd, onZoom, onInteract, pointerLock, dragGuard }: {
-    onRotate: (deltaDeg: number) => void
-    onRotateEnd: () => void
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton }: {
+    io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
     onInteract: () => void
+    mode: RotateMode
+    /** Config.rotatePointerLock; only used in "pointer" mode. */
     pointerLock: boolean
     dragGuard: boolean
+    rightButton: boolean
 }) {
-    const dragging = useRef(false)
+    const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL, guard: dragGuard, rightButton }
+    const dragRef = useRef<RotateDrag | null>(null)
+    if (!dragRef.current) dragRef.current = new RotateDrag(io, options)
+    const drag = dragRef.current
+    // Checked on every render so a changed setting applies on the next drag.
+    drag.setOptions(options)
     const locked = useRef(false)
-    // Every way a drag can finish funnels through here, so a lost mouseup can
-    // never leave the camera rotating. Safe to call when no drag is active.
-    const release = useCallback(() => {
-        const wasDragging = dragging.current
-        dragging.current = false
-        if (locked.current) {
-            locked.current = false
-            releaseRotateLock(document)
-        }
-        if (wasDragging && dragGuard) onRotateEnd()
-    }, [dragGuard, onRotateEnd])
-    // Unmount covers the menu closing; blur and Escape cover losing the focus mid-drag.
+    const unlock = useCallback(() => {
+        if (!locked.current) return
+        locked.current = false
+        releaseRotateLock(document)
+    }, [])
+    // Escape and unmount end a drag unconditionally; blur, leaving the window and a
+    // lost capture go through lost(), which Lua-owned (controls mode) drags ignore
+    // because the focus switch itself blurs the page.
     useEffect(() => {
-        const stop = listenForLockRelease(window, release)
-        const stopGuard = dragGuard ? listenForDragEnd(window, document, release) : () => {}
+        const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { drag.cancel(); unlock() } }
+        const onBlur = () => { drag.lost(true); unlock() }
+        window.addEventListener("keydown", onKey)
+        window.addEventListener("blur", onBlur)
+        const stopGuard = dragGuard ? listenForDragEnd(window, document, () => { drag.lost(); unlock() }) : () => {}
         // Lock lost mid-drag ends the drag; a refused lock keeps the plain drag.
-        const stopLock = listenForLockChange(document, () => { if (locked.current) release() }, () => { locked.current = false })
-        return () => { stop(); stopGuard(); stopLock(); release() }
-    }, [release, dragGuard])
+        const stopLock = listenForLockChange(document, () => { if (locked.current) { drag.cancel(); unlock() } }, () => { locked.current = false })
+        return () => {
+            window.removeEventListener("keydown", onKey)
+            window.removeEventListener("blur", onBlur)
+            stopGuard(); stopLock()
+            drag.cancel(); unlock()
+        }
+    }, [drag, dragGuard, unlock])
+    // Lua ended a controls-mode drag (button released, safety stop): nothing more to send.
+    useNuiEvent<object>("qbclothing:nui:rotateStopped", () => { drag.luaStopped(); unlock() })
+    const sample = (event: { clientX: number; clientY: number; button?: number; buttons?: number; movementX?: number }) => ({
+        button: event.button, buttons: event.buttons, movementX: event.movementX,
+        clientX: event.clientX, clientY: event.clientY, width: window.innerWidth, height: window.innerHeight,
+    })
     return <div
         className="clothing-viewport"
+        onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
-            if (event.button !== 0) return
-            dragging.current = true
+            if (!drag.down(sample(event.nativeEvent))) return
             event.currentTarget.setPointerCapture(event.pointerId)
-            // Checked on every drag start so a changed setting applies immediately.
-            locked.current = requestRotateLock(event.currentTarget, pointerLock)
+            if (mode === "pointer") locked.current = requestRotateLock(event.currentTarget, pointerLock)
         }}
         onPointerUp={(event) => {
-            release()
+            drag.up()
+            unlock()
             if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
         }}
-        onPointerCancel={release}
-        onLostPointerCapture={() => { if (dragGuard) release() }}
+        onPointerCancel={() => { drag.lost(); unlock() }}
+        onLostPointerCapture={() => { if (dragGuard) { drag.lost(); unlock() } }}
         onPointerMove={(event) => {
-            if (!dragging.current) return
-            // The button came up somewhere we could not see (outside the window).
-            if (dragGuard && primaryReleased(event)) { release(); return }
-            onRotate(-event.movementX * DRAG_ROTATION_DEG_PER_PIXEL)
-            onInteract()
+            if (drag.move(sample(event.nativeEvent))) onInteract()
+            if (!drag.dragging) unlock()
         }}
         onWheel={(event) => { onZoom(Math.sign(event.deltaY)); onInteract() }}
         aria-hidden="true"
@@ -546,7 +569,7 @@ export default function App() {
     const [confirmPending, setConfirmPending] = useState(false)
     const [hintDismissed, setHintDismissed] = useState(false)
 
-    const { rotate, end: rotateEnd } = useRotate()
+    const rotateIO = useRotate()
     const zoom = useZoom()
 
     const resetLocalState = useCallback(() => {
@@ -752,7 +775,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport onRotate={rotate} onRotateEnd={rotateEnd} onZoom={zoom} onInteract={dismissHint} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

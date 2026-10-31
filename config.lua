@@ -553,6 +553,44 @@ Config.rotateDragGuard = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- How drag-to-rotate keeps working when the cursor reaches the screen edge.
+-- 'controls' hides the cursor for the drag and reads the mouse as a game control
+-- (works even where browser pointer lock is ignored); 'recenter' moves the cursor
+-- back to the screen centre near an edge; 'pointer' asks the browser for pointer
+-- lock (see rotatePointerLock; unreliable in FiveM NUI); 'plain' captures nothing.
+-- Read each time the menu opens.
+Config.rotateMode = config and config.enum('controls', {
+    options = { 'controls', 'recenter', 'pointer', 'plain' },
+    label = 'Rotate drag mode',
+    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. controls: the cursor is hidden while you hold the button and mouse movement turns the character (most reliable). recenter: the cursor is moved back to the centre near the edge. pointer: browser pointer lock, which FiveM may ignore. plain: no capture.",
+    live = true,
+}) or 'controls'
+
+-- Also lets the right mouse button rotate the character, in every rotateMode.
+Config.rotateRightButton = config and config.boolean(true, {
+    label = 'Right mouse button rotates',
+    description = 'Holding the right mouse button over the character rotates it, like the left button. Turn off to rotate with the left button only.',
+    live = true,
+}) or true
+
+-- rotateMode = 'controls' only. Degrees turned per unit of mouse movement as the
+-- game reports it (INPUT_LOOK_LR, -1..1 per frame). Raise it if turning feels slow.
+Config.rotateControlsSensitivity = config and config.number(8.0, {
+    min = 0.5, max = 60.0,
+    label = 'Rotate sensitivity (controls mode)',
+    description = 'Degrees the character turns per unit of mouse movement while rotating in controls mode. Higher turns faster.',
+    live = true,
+}) or 8.0
+
+-- rotateMode = 'controls' only. Hard stop for one drag, so a missed button
+-- release can never leave the menu stuck without a cursor.
+Config.rotateControlsMaxSeconds = config and config.number(30.0, {
+    min = 2.0, max = 300.0,
+    label = 'Longest single rotate drag (controls mode)',
+    description = 'Safety limit in seconds: a rotate drag in controls mode always ends, and the cursor returns, after this long even if no button release was detected.',
+    live = true,
+}) or 30.0
+
 -- Menu (NUI) options.
 Config.ui = {
     -- Shows a small "Drag to rotate · Scroll to zoom" hint near the bottom of

@@ -558,6 +558,13 @@ local function stopControlLock()
     disableControlsThread = false
 end
 
+-- Ends a controls-mode rotate drag (client/rotate.lua) so NUI focus is never left
+-- on the cursorless setting. 'close' leaves focus to the caller.
+local function stopRotate(reason)
+    if RotateControl then return RotateControl.stop(reason) end
+    return false
+end
+
 -- --- session lifecycle ---
 
 RegisterNetEvent('qbclothing:client:openSession', function(payload)
@@ -612,6 +619,8 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             mandatory = activeSession.mandatory,
             rotatePointerLock = Config.rotatePointerLock ~= false,
             rotateDragGuard = Config.rotateDragGuard ~= false,
+            rotateMode = RotateControl and RotateControl.mode() or 'pointer',
+            rotateRightButton = Config.rotateRightButton ~= false,
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
@@ -648,6 +657,7 @@ end)
 
 RegisterNetEvent('qbclothing:client:closeSession', function(result)
     if not activeSession then return end
+    stopRotate('close')
     Camera.stop()
     stopControlLock()
     setTattooPedsFaded(false)
@@ -828,7 +838,26 @@ end)
 -- lost): settle the orbit where it is so nothing keeps rotating.
 RegisterNUICallback('qbclothing:nui:rotateEnd', function(_, cb)
     Camera.rotateEnd()
+    stopRotate('nui')
     cb({})
+end)
+
+-- Config.rotateMode = 'controls': the NUI hands the drag to Lua, which reads the
+-- mouse as a game control until the button is released (client/rotate.lua).
+-- `active = false` means the NUI keeps its own cursor drag.
+RegisterNUICallback('qbclothing:nui:rotateStart', function(data, cb)
+    local started = false
+    if activeSession and type(data) == 'table' and RotateControl then
+        started = RotateControl.start(data.button, data.x, data.y)
+    end
+    cb({ active = started })
+end)
+
+-- Config.rotateMode = 'recenter': the cursor got close to a screen edge mid-drag.
+RegisterNUICallback('qbclothing:nui:recenter', function(_, cb)
+    local moved = false
+    if activeSession and RotateControl then moved = RotateControl.recenter() end
+    cb({ moved = moved })
 end)
 
 RegisterNUICallback('qbclothing:nui:zoom', function(data, cb)
@@ -1386,6 +1415,7 @@ AddEventHandler('onResourceStop', function(resource)
     if activeSession then
         restoreHudForSession(activeSession)
         restoreRadarForSession(activeSession)
+        stopRotate('close')
         Camera.stop()
         stopControlLock()
         SetNuiFocus(false, false)

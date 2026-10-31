@@ -42,6 +42,7 @@ server_scripts {
 client_scripts {
     '@kora_theme/client/bridge.lua',
     'client/camera.lua',
+    'client/rotate.lua',
     'client/client.lua',
 }
 

@@ -1,0 +1,180 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { RotateDrag, type DragOptions, type RotateMode } from "./rotateDrag.ts"
+
+const W = 1000
+const H = 600
+
+function setup(mode: RotateMode, extra: Partial<DragOptions> = {}, accept: boolean | "never" = true) {
+    const log = { rotated: [] as number[], ends: 0, recenters: 0, starts: [] as number[][] }
+    let resolveStart: (value: boolean) => void = () => {}
+    const drag = new RotateDrag({
+        rotate: (deg) => log.rotated.push(deg),
+        end: () => { log.ends++ },
+        recenter: () => { log.recenters++ },
+        start: (button, x, y) => {
+            log.starts.push([button, x, y])
+            if (accept === "never") return new Promise<boolean>((resolve) => { resolveStart = resolve })
+            return Promise.resolve(accept)
+        },
+    }, { mode, degPerPixel: 0.5, guard: true, rightButton: true, ...extra })
+    return { drag, log, answer: (value: boolean) => resolveStart(value) }
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+const sample = (clientX: number, movementX = 0, buttons = 1) => ({ clientX, clientY: 300, movementX, buttons, width: W, height: H })
+
+test("plain drag rotates by movementX and ends once on release", () => {
+    const { drag, log } = setup("plain")
+    assert.equal(drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H }), true)
+    drag.move(sample(510, 10))
+    drag.move(sample(490, -20))
+    assert.deepEqual(log.rotated, [-5, 10])
+    drag.up()
+    drag.up()
+    assert.equal(log.ends, 1)
+    assert.equal(drag.dragging, false)
+})
+
+test("only the left button, and the right one when enabled, start a drag", () => {
+    const a = setup("plain")
+    assert.equal(a.drag.down({ button: 1, clientX: 1, clientY: 1, width: W, height: H }), false)
+    assert.equal(a.drag.down({ button: 2, clientX: 1, clientY: 1, width: W, height: H }), true)
+    const b = setup("plain", { rightButton: false })
+    assert.equal(b.drag.down({ button: 2, clientX: 1, clientY: 1, width: W, height: H }), false)
+})
+
+test("a right-button drag ends when the right button is no longer held", () => {
+    const { drag, log } = setup("plain")
+    drag.down({ button: 2, clientX: 500, clientY: 300, width: W, height: H })
+    drag.move(sample(510, 10, 2))
+    assert.equal(log.rotated.length, 1)
+    drag.move(sample(520, 10, 0))
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 1)
+    drag.move(sample(530, 10, 2))
+    assert.equal(log.rotated.length, 1)
+})
+
+test("lost() ends a cursor drag only when the guard is on", () => {
+    const on = setup("plain")
+    on.drag.down({ button: 0, clientX: 5, clientY: 5, width: W, height: H })
+    on.drag.lost()
+    assert.equal(on.log.ends, 1)
+    const off = setup("plain", { guard: false })
+    off.drag.down({ button: 0, clientX: 5, clientY: 5, width: W, height: H })
+    off.drag.lost()
+    assert.equal(off.drag.dragging, true)
+    off.drag.cancel()
+    assert.equal(off.drag.dragging, false)
+    assert.equal(off.log.ends, 0)
+})
+
+test("recenter: asks near an edge once and ignores the jump to the centre", () => {
+    const { drag, log } = setup("recenter")
+    drag.down({ button: 0, clientX: 300, clientY: 300, width: W, height: H })
+    drag.move(sample(200)) // -100px -> +50deg
+    drag.move(sample(100)) // -100px -> +50deg
+    drag.move(sample(80))  // inside the edge margin: asks to recentre
+    assert.equal(log.recenters, 1)
+    drag.move(sample(60))  // still waiting for the jump: no second request
+    assert.equal(log.recenters, 1)
+    const before = log.rotated.length
+    drag.move(sample(500)) // the synthetic jump to the centre
+    assert.equal(log.rotated.length, before, "jump adds no rotation")
+    drag.move(sample(520)) // real movement continues from the new centre
+    assert.equal(log.rotated[log.rotated.length - 1], -10)
+    assert.deepEqual(log.rotated.slice(0, 4), [50, 50, 10, 10])
+})
+
+test("recenter: asks again if the jump never arrives", () => {
+    const { drag, log } = setup("recenter")
+    drag.down({ button: 0, clientX: 100, clientY: 300, width: W, height: H })
+    drag.move(sample(90))
+    assert.equal(log.recenters, 1)
+    for (let i = 0; i < 40; i++) drag.move(sample(80 - (i % 2)))
+    assert.ok(log.recenters >= 2)
+})
+
+test("recenter: a big real move that does not land at the centre is not swallowed", () => {
+    const { drag, log } = setup("recenter")
+    drag.down({ button: 0, clientX: 100, clientY: 300, width: W, height: H })
+    drag.move(sample(90))
+    assert.equal(log.recenters, 1)
+    drag.move(sample(700)) // large, but not near the centre
+    assert.equal(log.rotated[log.rotated.length - 1], -305)
+})
+
+test("controls: hands the drag to Lua and ignores blur and pointer events afterwards", async () => {
+    const { drag, log } = setup("controls")
+    drag.down({ button: 0, clientX: 250, clientY: 150, width: W, height: H })
+    assert.deepEqual(log.starts, [[0, 0.25, 0.25]])
+    await tick()
+    assert.equal(drag.handedToLua, true)
+    drag.lost() // the cursorless focus switch blurs the page
+    drag.move(sample(10, 5, 0))
+    assert.equal(drag.dragging, true)
+    assert.deepEqual(log.rotated, [])
+    assert.equal(log.ends, 0)
+    drag.luaStopped()
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 0, "Lua ended it, so no rotateEnd is sent back")
+})
+
+test("controls: Escape, close or release while Lua owns the drag tell Lua to stop", async () => {
+    const { drag, log } = setup("controls")
+    drag.down({ button: 0, clientX: 1, clientY: 1, width: W, height: H })
+    await tick()
+    drag.cancel()
+    assert.equal(log.ends, 1)
+    assert.equal(drag.dragging, false)
+})
+
+test("controls: declined by Lua falls back to a plain drag", async () => {
+    const { drag, log } = setup("controls", {}, false)
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    await tick()
+    assert.equal(drag.handedToLua, false)
+    drag.move(sample(510, 10))
+    assert.deepEqual(log.rotated, [-5])
+    drag.up()
+    assert.equal(log.ends, 1)
+})
+
+test("controls: releasing before Lua answers stops the drag Lua then starts", async () => {
+    const { drag, log, answer } = setup("controls", {}, "never")
+    drag.down({ button: 0, clientX: 1, clientY: 1, width: W, height: H })
+    drag.up()
+    assert.equal(log.ends, 1)
+    answer(true)
+    await tick()
+    assert.equal(log.ends, 2, "late accept is followed by an end")
+    assert.equal(drag.dragging, false)
+})
+
+test("controls: a blur while waiting does not end a drag Lua then accepts, but ends a declined one", async () => {
+    const a = setup("controls", {}, "never")
+    a.drag.down({ button: 0, clientX: 1, clientY: 1, width: W, height: H })
+    a.drag.lost()
+    assert.equal(a.drag.dragging, true)
+    a.answer(true)
+    await tick()
+    assert.equal(a.drag.handedToLua, true)
+    const b = setup("controls", {}, "never")
+    b.drag.down({ button: 0, clientX: 1, clientY: 1, width: W, height: H })
+    b.drag.lost()
+    b.answer(false)
+    await tick()
+    assert.equal(b.drag.dragging, false)
+})
+
+test("controls: a rejected start request falls back to the plain drag", async () => {
+    const log = { rotated: [] as number[] }
+    const drag = new RotateDrag({
+        rotate: (deg) => log.rotated.push(deg), end: () => {}, recenter: () => {},
+        start: () => Promise.reject(new Error("no")),
+    }, { mode: "controls", degPerPixel: 1, guard: true, rightButton: true })
+    drag.down({ button: 0, clientX: 1, clientY: 1, width: W, height: H })
+    await tick()
+    drag.move(sample(2, 3))
+    assert.deepEqual(log.rotated, [-3])
+})

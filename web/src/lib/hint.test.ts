@@ -39,5 +39,6 @@ test("the viewport reports the first rotate drag and wheel to the hint", () => {
     const app = readFileSync(new URL("../App.tsx", import.meta.url), "utf8")
     const viewport = app.slice(app.indexOf("function Viewport"), app.indexOf("function ZoneToolbar"))
     assert.match(viewport, /onWheel=\{[^}]*onInteract\(\)/)
-    assert.match(viewport, /onRotate\([^)]*\)\s*\n?\s*onInteract\(\)|onInteract\(\)[^]*onRotate\(/)
+    // A move that actually turned the camera is the first rotate.
+    assert.match(viewport, /if \(drag\.move\([^\n]*onInteract\(\)/)
 })
