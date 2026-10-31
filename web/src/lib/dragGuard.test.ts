@@ -27,3 +27,17 @@ test("blur, mouseleave and a hidden document end the drag; cleanup detaches", ()
     doc.dispatchEvent(new Event("mouseleave"))
     assert.equal(ends, 3)
 })
+
+test("mouseleave is ignored while the pointer is locked", () => {
+    const win = new EventTarget()
+    const doc = Object.assign(new EventTarget(), { visibilityState: "visible", pointerLockElement: {} as unknown })
+    let ends = 0
+    listenForDragEnd(win, doc, () => { ends++ })
+    doc.dispatchEvent(new Event("mouseleave"))
+    assert.equal(ends, 0)
+    win.dispatchEvent(new Event("blur"))
+    assert.equal(ends, 1)
+    doc.pointerLockElement = null
+    doc.dispatchEvent(new Event("mouseleave"))
+    assert.equal(ends, 2)
+})

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
-import { listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
+import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import type {
     CameraPayload,
     CategoryCameraPayload,
@@ -144,7 +144,9 @@ function Viewport({ onRotate, onRotateEnd, onZoom, pointerLock, dragGuard }: {
     useEffect(() => {
         const stop = listenForLockRelease(window, release)
         const stopGuard = dragGuard ? listenForDragEnd(window, document, release) : () => {}
-        return () => { stop(); stopGuard(); release() }
+        // Lock lost mid-drag ends the drag; a refused lock keeps the plain drag.
+        const stopLock = listenForLockChange(document, () => { if (locked.current) release() }, () => { locked.current = false })
+        return () => { stop(); stopGuard(); stopLock(); release() }
     }, [release, dragGuard])
     return <div
         className="clothing-viewport"

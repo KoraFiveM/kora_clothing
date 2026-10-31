@@ -9,14 +9,16 @@ export function primaryReleased(event: { buttons: number }): boolean {
 }
 
 /** Calls onEnd when the window blurs, the document is left or hidden. Returns the cleanup function. */
-export function listenForDragEnd(win: EventTarget, doc: EventTarget & { visibilityState?: string }, onEnd: () => void): () => void {
+export function listenForDragEnd(win: EventTarget, doc: EventTarget & { visibilityState?: string; pointerLockElement?: unknown }, onEnd: () => void): () => void {
     const onVisibility = () => { if (doc.visibilityState === "hidden") onEnd() }
     win.addEventListener("blur", onEnd)
-    doc.addEventListener("mouseleave", onEnd)
+    // A locked pointer never leaves the window; some browsers still report a leave.
+    const onLeave = () => { if (!doc.pointerLockElement) onEnd() }
+    doc.addEventListener("mouseleave", onLeave)
     doc.addEventListener("visibilitychange", onVisibility)
     return () => {
         win.removeEventListener("blur", onEnd)
-        doc.removeEventListener("mouseleave", onEnd)
+        doc.removeEventListener("mouseleave", onLeave)
         doc.removeEventListener("visibilitychange", onVisibility)
     }
 }

@@ -37,3 +37,23 @@ export function listenForLockRelease(target: EventTarget, onRelease: () => void)
         target.removeEventListener("keydown", onKey)
     }
 }
+
+interface LockEvents extends EventTarget {
+    pointerLockElement?: unknown
+}
+
+/**
+ * Watches the lock itself. onLost runs when the lock is gone (pointerlockchange
+ * with nothing locked: Escape, alt-tab, the game took the mouse back); onError
+ * runs when the request was refused, so the caller keeps the plain drag.
+ * Returns the cleanup function.
+ */
+export function listenForLockChange(doc: LockEvents, onLost: () => void, onError: () => void): () => void {
+    const onChange = () => { if (!doc.pointerLockElement) onLost() }
+    doc.addEventListener("pointerlockchange", onChange)
+    doc.addEventListener("pointerlockerror", onError)
+    return () => {
+        doc.removeEventListener("pointerlockchange", onChange)
+        doc.removeEventListener("pointerlockerror", onError)
+    }
+}

@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no extra dependency).
 import assert from "node:assert/strict"
 import test from "node:test"
-import { listenForLockRelease, releaseRotateLock, requestRotateLock } from "./pointerLock.ts"
+import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "./pointerLock.ts"
 
 test("requests the lock only when enabled", () => {
     let calls = 0
@@ -43,4 +43,23 @@ test("blur and Escape release, other keys do not, cleanup detaches", () => {
     stop()
     target.dispatchEvent(new Event("blur"))
     assert.equal(releases, 2)
+})
+
+test("lock loss reports only when nothing is locked; a refusal reports an error", () => {
+    const doc = Object.assign(new EventTarget(), { pointerLockElement: {} as unknown })
+    let lost = 0
+    let errors = 0
+    const stop = listenForLockChange(doc, () => { lost++ }, () => { errors++ })
+    doc.dispatchEvent(new Event("pointerlockchange"))
+    assert.equal(lost, 0)
+    doc.pointerLockElement = null
+    doc.dispatchEvent(new Event("pointerlockchange"))
+    assert.equal(lost, 1)
+    doc.dispatchEvent(new Event("pointerlockerror"))
+    assert.equal(errors, 1)
+    stop()
+    doc.dispatchEvent(new Event("pointerlockchange"))
+    doc.dispatchEvent(new Event("pointerlockerror"))
+    assert.equal(lost, 1)
+    assert.equal(errors, 1)
 })
