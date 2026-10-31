@@ -31,3 +31,19 @@ test("the wheel zoom handler lives on the viewport, not on the rail panels", () 
     assert.equal(app.match(/onWheel=/g)?.length, 1)
     assert.match(css, /\.rail \{[^}]*pointer-events: none/)
 })
+
+test("UI text is not selectable but inputs stay editable", () => {
+    assert.match(css, /#root \*[^}]*user-select: none/)
+    assert.match(css, /-webkit-user-select: none/)
+    // Same or higher specificity than the blanket rule, or inputs would lose selection.
+    assert.match(css, /#root input[^{]*\{[^}]*user-select: text/)
+    assert.match(css, /#root textarea/)
+    assert.match(css, /\[contenteditable\]/)
+})
+
+test("docked rails share one edge inset", () => {
+    assert.match(rule(".rail-left"), /left: var\(--edge-inset\)/)
+    assert.match(rule(".rail-right"), /right: var\(--edge-inset\)/)
+    const inset = /--edge-inset: (\d+)px/g
+    for (const [, px] of css.matchAll(inset)) assert.ok(Number(px) >= 16 && Number(px) <= 24, `inset ${px}px`)
+})

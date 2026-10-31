@@ -1,3 +1,13 @@
+/* Nothing in the menu is meant to be selected: the UI is buttons and labels over
+   the game view, and a stray drag would highlight text. Inputs stay selectable
+   and editable. */
+html, body, #root, #root * { user-select: none; -webkit-user-select: none; }
+#root input, #root textarea, #root [contenteditable], #root [contenteditable] * { user-select: text; -webkit-user-select: text; }
+img { -webkit-user-drag: none; user-drag: none; }
+
+/* Gap between the viewport edge and anything docked to it (rails, icon buttons). */
+:root { --edge-inset: 20px; }
+
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
 
 .ease-out { transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
@@ -45,8 +55,8 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 /* --- rails --- */
 
 .rail { position: absolute; top: 84px; bottom: 108px; z-index: 2; width: 268px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-.rail-left { left: 20px; }
-.rail-right { right: 20px; }
+.rail-left { left: var(--edge-inset); }
+.rail-right { right: var(--edge-inset); }
 /* The rail is a fixed-height column. Without these two rules its flex children
    shrink below their content (squashing the Hair Color panel) and the overflow
    of the rest (eyebrows palette) is clipped. Panels keep their natural height
@@ -147,8 +157,7 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
   .headline { top: 74px; width: min(420px, calc(100vw - 32px)); }
   .zone-toolbar { top: 14px; max-width: calc(100vw - 24px); overflow-x: auto; }
   .rail { top: 140px; bottom: 94px; width: min(236px, calc(50vw - 20px)); }
-  .rail-left { left: 12px; }
-  .rail-right { right: 12px; }
+  :root { --edge-inset: 16px; }
   .bottom-bar { bottom: 12px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); }
   .error-banner { top: 156px; max-width: calc(100vw - 40px); }
 }
@@ -157,8 +166,6 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
   .zone-toolbar { left: 50%; right: auto; max-width: calc(100% - 24px); transform: translateX(-50%); }
   .zone-toolbar button { width: 32px; height: 32px; }
   .rail { top: 66px; bottom: 108px; width: calc(50vw - 18px); gap: 6px; }
-  .rail-left { left: 8px; }
-  .rail-right { right: 8px; }
   .panel-pad { padding: 8px; }
   .tab { gap: 7px; padding: 8px; font-size: 11px; }
   .tab svg { width: 15px; height: 15px; }
