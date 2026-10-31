@@ -776,13 +776,23 @@ Config.quickToggle = {
             if not config then return list end
             return config.list(list, config.string('x'))
         end
+        local function comps(list)
+            if not config then return list end
+            return config.list(list, config.object({
+                id = config.integer(0, { min = 0 }),
+                d = config.integer(0, { min = 0 }),
+                t = config.integer(0, { min = 0 }),
+            }))
+        end
         local head = { animDict = 'clothingtie', animClip = 'try_tie_neutral_a', animMs = 1200 }
         local body = { animDict = 'clothingshirt', animClip = 'try_shirt_positive_a', animMs = 1500 }
         local function part(def, anim)
             def.aliases = words(def.aliases or {})
             def.props = ids(def.props or {})
-            def.male = def.male or {}
-            def.female = def.female or {}
+            -- Typed lists: the config adopter drops empty untyped tables, which would
+            -- leave prop-only parts (hat, glasses, ...) without their male/female list.
+            def.male = comps(def.male or {})
+            def.female = comps(def.female or {})
             def.visor = def.visor == true
             def.animDict, def.animClip, def.animMs = anim.animDict, anim.animClip, anim.animMs
             return def
