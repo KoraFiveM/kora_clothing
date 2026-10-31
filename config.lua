@@ -348,11 +348,39 @@ Config.tattooStrip = {
 -- original clothing is put back exactly when the menu closes (confirm, cancel,
 -- Esc, death or a resource stop).
 --
+-- `allowStacking`, `maxStack`, `stackPriceMultiplier` : a tattoo can be applied
+-- more than once to darken it. The skin keeps the same tattoo id repeated, one
+-- entry per instance. The server validates every instance, caps each tattoo at
+-- `maxStack` and prices each added instance itself.
+--
 -- `peds`    : an optional tattoo artist standing in each tattoo shop. Targeting
 -- the artist ("Get tattooed") opens the same studio as the shop's zone, which
 -- keeps working. While the studio is open the artist is faded out locally so
 -- they do not block the view.
 Config.tattoo = {
+    -- Duplicate button in the studio list. Off keeps one instance per tattoo
+    -- (extra instances are dropped server-side). Read each time a skin is
+    -- sanitised or the studio opens.
+    allowStacking = config and config.boolean(true, {
+        label = 'Allow stacking tattoos',
+        description = 'Lets players apply the same tattoo more than once (a copy button appears on applied tattoos) so it renders darker. Turn off to allow one instance of each tattoo; extra instances in saved skins are dropped.',
+        live = true,
+    }) or true,
+    -- Most instances of ONE tattoo on a player. Three is visibly darker without
+    -- turning the body solid black; clamped to 1-10.
+    maxStack = config and config.integer(3, {
+        min = 1, max = 10,
+        label = 'Maximum tattoo stack',
+        description = 'Most times the same tattoo can be applied to one character. The server enforces it, so extra copies in a saved or submitted skin are dropped.',
+        live = true,
+    }) or 3,
+    -- 1.0 = every added instance costs the tattoo price, like a new tattoo.
+    stackPriceMultiplier = config and config.number(1.0, {
+        min = 0.0, max = 10.0,
+        label = 'Stacked tattoo price multiplier',
+        description = 'Multiplies the tattoo price for each extra copy of a tattoo beyond the first. 1.0 charges the full price again, 0.5 half price, 0 makes extra copies free. Existing copies are never charged again.',
+        live = true,
+    }) or 1.0,
     undress = {
         -- Off falls back to the old behaviour: the studio always strips to
         -- Config.tattooStrip on open and offers no buttons. Read each time the

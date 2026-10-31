@@ -1,10 +1,11 @@
-import { ChevronDown, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
+import { ChevronDown, Copy, Minus, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd, primaryReleased } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
 import { resolveStepEdit } from "@/lib/stepper"
+import { countOf, duplicateTattoo, instanceLabel, instancePrice, removeTattooInstance, stackLimit, tattooTotal, toggleTattoo as toggleTattooId } from "@/lib/tattoos"
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, listenForLockRelease, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
@@ -36,6 +37,7 @@ import type {
     SetVariationResponse,
     SetTattoosResponse,
     TattooItem,
+    TattooStacking,
     ZoomPayload,
 } from "@/lib/types"
 import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, mergeHeadValues, showFaceSkinPanel } from "@/lib/panels"
@@ -483,17 +485,28 @@ function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
     </div>
 }
 
-function TattooPanel({ tattoos, selected, onToggle }: { tattoos: TattooItem[]; selected: string[]; onToggle: (id: string) => void }) {
+function TattooPanel({ tattoos, selected, stacking, onToggle, onDuplicate, onRemoveOne }: {
+    tattoos: TattooItem[]; selected: string[]; stacking?: TattooStacking
+    onToggle: (id: string) => void; onDuplicate: (id: string) => void; onRemoveOne: (id: string) => void
+}) {
     if (tattoos.length === 0) return null
-    const selectedSet = new Set(selected)
+    const limit = stackLimit(stacking)
     return <div className="panel panel-pad tattoo-panel">
         <p className="section-title">Tattoos</p>
         <div className="tattoo-list">
-            {tattoos.map((tattoo) => <label key={tattoo.id} className="tattoo-row">
-                <input type="checkbox" checked={selectedSet.has(tattoo.id)} onChange={() => onToggle(tattoo.id)} />
-                <span className="tattoo-copy"><strong>{tattoo.label}</strong><small>{tattoo.group}</small></span>
-                <span className="tattoo-price">${tattoo.price}</span>
-            </label>)}
+            {tattoos.map((tattoo) => {
+                const count = countOf(selected, tattoo.id)
+                const canStack = limit > 1 && count > 0
+                return <div key={tattoo.id} className="tattoo-row">
+                    <input type="checkbox" checked={count > 0} onChange={() => onToggle(tattoo.id)} aria-label={tattoo.label} />
+                    <span className="tattoo-copy"><strong>{instanceLabel(tattoo.label, count)}</strong><small>{tattoo.group}</small></span>
+                    {canStack && count > 1 && <button type="button" className="tattoo-btn" title="Remove one instance" aria-label={`Remove one ${tattoo.label}`} onClick={() => onRemoveOne(tattoo.id)}><Minus size={12} /></button>}
+                    {canStack && <button type="button" className="tattoo-btn" disabled={count >= limit}
+                        title={count >= limit ? `Maximum ${limit} instances` : `Add another (+$${instancePrice(tattoo.price, count + 1, stacking)})`}
+                        aria-label={`Duplicate ${tattoo.label}`} onClick={() => onDuplicate(tattoo.id)}><Copy size={12} /></button>}
+                    <span className="tattoo-price">${tattoo.price}</span>
+                </div>
+            })}
         </div>
     </div>
 }
@@ -598,10 +611,7 @@ export default function App() {
         }
         let total = 0
         for (const group of changedGroups) total += priceOf(open.prices, group)
-        const baselineTattooSet = new Set(baselineTattoos)
-        for (const id of selectedTattoos) {
-            if (!baselineTattooSet.has(id)) total += open.tattoos.find((tattoo) => tattoo.id === id)?.price ?? 0
-        }
+        total += tattooTotal(selectedTattoos, baselineTattoos, open.tattoos, open.tattooStacking)
         return total
     }, [baseline, baselineHair, baselineHead, baselineTattoos, categories, hair, head, open, ownedSnapshot, selectedTattoos])
 
@@ -689,14 +699,15 @@ export default function App() {
         }
     }, [activeGroup])
 
-    const toggleTattoo = useCallback(async (id: string) => {
+    const changeTattoos = useCallback(async (id: string, change: (selected: string[]) => string[]) => {
         // Frame wherever this tattoo actually sits -- the toolbar's zoom
         // otherwise stays wherever it was last left, so a Torso/Arms tattoo
         // could be toggled without ever being in frame to see the result.
         const group = open?.tattoos.find((tattoo) => tattoo.id === id)?.group
         if (group) void frameCategory(group)
 
-        const next = selectedTattoos.includes(id) ? selectedTattoos.filter((value) => value !== id) : [...selectedTattoos, id]
+        const next = change(selectedTattoos)
+        if (next === selectedTattoos) return
         const response = await sendIntent<{ tattoos: string[] }, SetTattoosResponse>("qbclothing:nui:setTattoos", { tattoos: next })
         if (response.ok && response.tattoos) {
             setOwnedSnapshot(false)
@@ -771,7 +782,10 @@ export default function App() {
                 <p className="section-title">Categories</p>
                 <CategoryTabs active={activeGroup} groups={groupsPresent} onSelect={selectGroup} />
             </div>}
-            <TattooPanel tattoos={open.tattoos} selected={selectedTattoos} onToggle={(id) => void toggleTattoo(id)} />
+            <TattooPanel tattoos={open.tattoos} selected={selectedTattoos} stacking={open.tattooStacking}
+                onToggle={(id) => void changeTattoos(id, (list) => toggleTattooId(list, id))}
+                onDuplicate={(id) => void changeTattoos(id, (list) => duplicateTattoo(list, id, open.tattooStacking))}
+                onRemoveOne={(id) => void changeTattoos(id, (list) => removeTattooInstance(list, id))} />
             <OutfitsPanel
                 outfits={outfits}
                 expanded={outfitsExpanded}

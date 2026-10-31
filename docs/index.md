@@ -253,6 +253,9 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.shopPedScopeRadius` (75.0m) — the radius that creates a decorative clerk for the local player; independent of the interaction range
 - `Config.shopZoneDefault` — fallback box for a shop entry added without its own `zone`
 - `Config.tattoos` — the base-game overlay catalogue with per-tattoo pricing
+- `Config.tattoo.allowStacking` (default `true`) — a copy button on applied tattoos adds another instance of the same tattoo so it renders darker; the skin keeps the tattoo id repeated once per instance. `false` allows one instance per tattoo (extras are dropped server-side)
+- `Config.tattoo.maxStack` (default `3`, 1–10) — most instances of one tattoo; enforced server-side
+- `Config.tattoo.stackPriceMultiplier` (default `1.0`) — each added instance is priced like a new tattoo; instances beyond the first of a tattoo are scaled by this (`0.5` half price, `0` free). Existing instances are never charged again
 - `Config.tattoo.undress.enabled` (default `true`) — clothing buttons in the tattoo studio (see [Tattoo studio](#tattoo-studio)); `false` returns to the fixed `Config.tattooStrip` with no buttons
 - `Config.tattoo.undress.autoUndressOnOpen` (default `{ 'top', 'legs', 'headwear' }`) — part ids bared when the studio opens; `{}` opens fully dressed
 - `Config.tattoo.undress.parts` — one button per part: the bare component drawables per freemode model (`male` / `female`) and the prop slots cleared

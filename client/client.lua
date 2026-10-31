@@ -117,14 +117,7 @@ end
 -- --- ped appearance helpers ---
 
 local function sanitiseTattoos(model, tattoos)
-    local selected, seen = {}, {}
-    for _, id in ipairs(type(tattoos) == 'table' and tattoos or {}) do
-        if not seen[id] and Shared.tattooById(model, id) then
-            seen[id] = true
-            selected[#selected + 1] = id
-        end
-    end
-    return selected
+    return Shared.sanitiseTattoos(model, tattoos)
 end
 
 local function applyTattoos(ped, model, tattoos)
@@ -631,6 +624,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             undress = undressPayload(activeSession.service),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
+            tattooStacking = Shared.tattooStacking(),
             outfits = payload.outfits or {},
             money = payload.money,
             prices = payload.prices,

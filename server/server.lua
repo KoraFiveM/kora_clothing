@@ -212,13 +212,8 @@ local function sanitiseSkin(rawSkin, model)
         end
     end
 
-    local seen = {}
-    for _, id in ipairs(type(rawSkin.tattoos) == 'table' and rawSkin.tattoos or {}) do
-        if not seen[id] and Shared.tattooById(model, id) then
-            seen[id] = true
-            skin.tattoos[#skin.tattoos + 1] = id
-        end
-    end
+    -- Duplicates are stacked instances, kept up to Config.tattoo.maxStack each.
+    skin.tattoos = Shared.sanitiseTattoos(model, rawSkin.tattoos)
 
     return skin
 end
@@ -316,18 +311,12 @@ local function priceDiff(previousSkin, newSkin, prices)
 end
 
 -- Additions/replacements cost their individual configured price; removal and
--- existing tattoos are free. The server resolves every id against the current
--- model's catalogue before this runs, so client prices are never trusted.
+-- existing tattoos are free. Stacked instances (the same id repeated) are each
+-- priced as an addition, scaled by Config.tattoo.stackPriceMultiplier after
+-- the first. The server resolves every id against the current model's
+-- catalogue before this runs, so client prices are never trusted.
 local function tattooPriceDiff(previousSkin, newSkin, model)
-    local owned, total = {}, 0
-    for _, id in ipairs(previousSkin.tattoos or {}) do owned[id] = true end
-    for _, id in ipairs(newSkin.tattoos or {}) do
-        if not owned[id] then
-            local tattoo = Shared.tattooById(model, id)
-            total = total + (tattoo and tattoo.price or 0)
-        end
-    end
-    return total
+    return Shared.tattooPriceDiff(model, previousSkin.tattoos, newSkin.tattoos)
 end
 
 -- Exact content equality between two already-sanitised skins (both always
@@ -345,10 +334,9 @@ local function skinsMatch(a, b)
     end
 
     local function tattoosMatch(tattoosA, tattoosB)
-        local entriesA, entriesB = {}, {}
-        for _, id in ipairs(tattoosA or {}) do entriesA[id] = true end
-        for _, id in ipairs(tattoosB or {}) do entriesB[id] = true end
-        for id in pairs(entriesA) do if not entriesB[id] then return false end end
+        -- Counts, not presence: a stacked tattoo is a different look.
+        local entriesA, entriesB = Shared.tattooCounts(tattoosA), Shared.tattooCounts(tattoosB)
+        for id, count in pairs(entriesA) do if entriesB[id] ~= count then return false end end
         for id in pairs(entriesB) do if not entriesA[id] then return false end end
         return true
     end

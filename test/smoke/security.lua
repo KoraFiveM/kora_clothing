@@ -114,7 +114,7 @@ H.ok(server:find("if (service == 'barber' or service == 'hairdresser') and model
 H.ok(server:find("service = modelGender == 'female' and 'hairdresser' or 'barber'", 1, true),
     'female and male models resolve to their matching hair policy before validation')
 H.ok(server:find('local function tattooPriceDiff(previousSkin, newSkin, model)', 1, true), 'new tattoos are individually priced server-side')
-H.ok(server:find('Shared.tattooById(model, id)', 1, true), 'tattoos are validated against the configured model catalogue')
+H.ok(server:find('Shared.sanitiseTattoos(model, rawSkin.tattoos)', 1, true), 'tattoos are validated against the configured model catalogue')
 H.ok(client:find("RegisterNUICallback('qbclothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')
 H.ok(client:find('ClearPedDecorations(ped)', 1, true) and client:find('AddPedDecorationFromHashes', 1, true), 'tattoo decorations are reapplied to live peds')
 

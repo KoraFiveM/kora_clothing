@@ -69,6 +69,56 @@ function Shared.tattooById(model, id)
     return nil
 end
 
+-- Tattoo stacking (Config.tattoo.allowStacking/maxStack/stackPriceMultiplier).
+-- A skin's `tattoos` is an ordered list of tattoo ids; stacking simply repeats
+-- an id, one entry per instance, and each entry is a separate
+-- AddPedDecorationFromHashes call so the overlay renders darker. Read at use
+-- time so a live config change applies to the next session.
+function Shared.tattooStacking()
+    local cfg = type(Config.tattoo) == 'table' and Config.tattoo or {}
+    local enabled = cfg.allowStacking ~= false
+    local max = math.max(1, math.min(10, math.floor(tonumber(cfg.maxStack) or 3)))
+    local multiplier = math.max(0, tonumber(cfg.stackPriceMultiplier) or 1.0)
+    return { enabled = enabled, max = enabled and max or 1, priceMultiplier = multiplier }
+end
+
+-- Keeps only ids in the model's catalogue and at most `max` instances of each
+-- (extra instances are dropped, never trusted). Order is preserved.
+function Shared.sanitiseTattoos(model, tattoos)
+    local out, counts = {}, {}
+    local max = Shared.tattooStacking().max
+    for _, id in ipairs(type(tattoos) == 'table' and tattoos or {}) do
+        if Shared.tattooById(model, id) and (counts[id] or 0) < max then
+            counts[id] = (counts[id] or 0) + 1
+            out[#out + 1] = id
+        end
+    end
+    return out
+end
+
+function Shared.tattooCounts(tattoos)
+    local counts = {}
+    for _, id in ipairs(tattoos or {}) do counts[id] = (counts[id] or 0) + 1 end
+    return counts
+end
+
+-- Price of going from `previous` to `new` (both sanitised). Existing instances
+-- and removals are free; every added instance costs the tattoo's price, with
+-- instances beyond the first of an id scaled by the stack price multiplier.
+function Shared.tattooPriceDiff(model, previous, new)
+    local before, after, total = Shared.tattooCounts(previous), Shared.tattooCounts(new), 0
+    local multiplier = Shared.tattooStacking().priceMultiplier
+    for id, count in pairs(after) do
+        local tattoo = Shared.tattooById(model, id)
+        for instance = (before[id] or 0) + 1, count do
+            local price = tattoo and tattoo.price or 0
+            if instance > 1 then price = math.floor(price * multiplier + 0.5) end
+            total = total + price
+        end
+    end
+    return total
+end
+
 -- GTA's hair colouring is INDEXED, never RGB: SetPedHairColor takes two
 -- entries from the model's own fixed hair palette and accepts nothing else, so
 -- a hair colour is stored as a pair of palette indices (see buildHairPalette

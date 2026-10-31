@@ -37,6 +37,13 @@ export interface MoneyInfo {
 
 export type PriceTable = Partial<Record<CategoryGroup, number>>
 
+/** Config.tattoo stacking options, sent by the game when the studio opens. */
+export interface TattooStacking {
+    enabled: boolean
+    max: number
+    priceMultiplier: number
+}
+
 export interface TattooItem {
     id: string
     label: string
@@ -99,6 +106,7 @@ export interface OpenPayload {
     undress?: UndressPayload | null
     tattoos: TattooItem[]
     selectedTattoos: string[]
+    tattooStacking?: TattooStacking
     outfits: OutfitSummary[]
     money?: MoneyInfo
     prices: PriceTable
