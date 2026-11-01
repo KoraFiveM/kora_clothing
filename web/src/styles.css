@@ -240,6 +240,8 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    its swatches and the rail (one scroll column) scrolls the whole menu. A
    nested scroller would trap the wheel and clip the sections below it. */
 .swatch-block + .swatch-block { margin-top: 12px; }
+.match-hair { margin: 0 0 6px; border: 1px solid hsl(var(--foreground) / .14); border-radius: 6px; padding: 3px 8px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; cursor: pointer; }
+.match-hair[aria-pressed="true"] { border-color: hsl(var(--primary)); color: hsl(var(--foreground)); }
 .swatch-label { margin: 0 0 6px; padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(22px, 1fr)); gap: 4px; }
 /* No background/border of its own: the inline style IS the swatch (the colour

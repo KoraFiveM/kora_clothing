@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no extra dependency).
 import assert from "node:assert/strict"
 import test from "node:test"
-import { enabledOverlays, initialSelection, showFaceSkinPanel } from "./panels.ts"
+import { enabledOverlays, initialSelection, overlayColorEditable, showFaceSkinPanel } from "./panels.ts"
 import type { HeadPayload } from "./types.ts"
 
 const head: HeadPayload = {
@@ -48,4 +48,11 @@ test("the creator opens on Hair so hair, colour, facial hair and eyebrows show",
     assert.deepEqual(initialSelection(cats, order, true, undefined), { group: "body", item: cats[2] })
     assert.deepEqual(initialSelection(cats, order, true, false), { group: "tops", item: cats[0] })
     assert.deepEqual(initialSelection(cats, order, false, true), { group: "tops", item: cats[0] })
+})
+
+test("an eyebrow palette is offered unless the server locks eyebrows to the hair colour", () => {
+    assert.equal(overlayColorEditable(head, "eyebrows"), true)
+    assert.equal(overlayColorEditable({ ...head, overlayColors: { facialHair: true, eyebrows: true } }, "eyebrows"), true)
+    assert.equal(overlayColorEditable({ ...head, overlayColors: { facialHair: true, eyebrows: false } }, "eyebrows"), false)
+    assert.equal(overlayColorEditable({ ...head, overlayColors: { facialHair: true, eyebrows: false } }, "facialHair"), true)
 })

@@ -113,4 +113,31 @@ H.equal(runtime.headPayload('barber'), nil, 'nothing editable means no payload')
 H.equal(runtime.headPayload('creation').skinToneEditable, true)
 Config.headOverlays.eyebrows.barber, Config.headOverlays.facialHair.barber = true, true
 
+-- Eyebrow colour is independent of hair colour by default (male and female
+-- freemode peds take the same path), and Config can lock it back to the hair.
+H.equal(Config.headOverlays.eyebrows.followHairColor, false, "eyebrow colour is independent by default")
+H.equal(Shared.overlayFollowsHair('eyebrows'), false)
+H.equal(Shared.overlayFollowsHair('facialHair'), false)
+for _, model in ipairs({ 'mp_m_freemode_01', 'mp_f_freemode_01' }) do
+    overlays, colors = {}, {}
+    runtime.applySkin(1, { hairColor = 5, hairHighlight = 6, head = { eyebrows = 4, eyebrowsColor = 17 } }, model)
+    H.equal(colors[2], 17, model .. ": picked eyebrow colour is not the hair colour")
+    local snap = Shared.sanitiseHead(runtime.currentSkinSnapshot(1).head)
+    H.equal(snap.eyebrowsColor, 17, model .. ": eyebrow colour is saved")
+    overlays, colors = {}, {}
+    runtime.applySkin(1, { hairColor = 5, hairHighlight = 6, head = snap }, model)
+    H.equal(colors[2], 17, model .. ": eyebrow colour is loaded back")
+end
+H.equal(runtime.headPayload('barber').overlayColors.eyebrows, true, "NUI gets the eyebrow palette")
+H.equal(Shared.mergeHead(Config.services.barber, { eyebrows = 1 }, { eyebrows = 2, eyebrowsColor = 30 }).eyebrowsColor, 30)
+
+Config.headOverlays.eyebrows.followHairColor = true
+overlays, colors = {}, {}
+runtime.applySkin(1, { hairColor = 5, hairHighlight = 6, head = { eyebrows = 4, eyebrowsColor = 17, beard = 2, beardColor = 9 } }, 'mp_f_freemode_01')
+H.equal(colors[2], 5, "followHairColor puts eyebrows on the primary hair colour")
+H.equal(colors[1], 9, "facial hair keeps its own colour")
+H.equal(runtime.headPayload('creation').overlayColors.eyebrows, false, "NUI hides the eyebrow palette")
+H.equal(Shared.mergeHead(Config.services.creation, {}, { eyebrows = 2, eyebrowsColor = 30 }).eyebrowsColor, -1, "no stale colour is stored")
+Config.headOverlays.eyebrows.followHairColor = false
+
 H.finish()

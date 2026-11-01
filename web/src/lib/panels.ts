@@ -36,6 +36,11 @@ export function enabledOverlays(selected: Selected, head: HeadPayload | null) {
     return HEAD_OVERLAYS.filter((overlay) => head.overlays?.[overlay.key] === true)
 }
 
+/** Whether the overlay has its own colour palette; false when the server locks it to the hair colour. */
+export function overlayColorEditable(head: HeadPayload, key: OverlayKey) {
+    return head.overlayColors?.[key] !== false
+}
+
 /** First tab/item of a session. Character creation (skin tone editable) opens
  * on Style with Hair selected, so hair, hair colour, facial hair and eyebrows
  * are visible straight away; Config.ui.creatorOpensOnHair = false opts out. */

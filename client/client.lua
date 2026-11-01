@@ -68,14 +68,16 @@ local previewHead = Shared.sanitiseHead()
 
 -- Style, opacity and colour for each Shared.headOverlays entry (facial hair,
 -- eyebrows). Colour -1 follows the hair colour, as facial hair always has, so
--- this also runs after a hair recolour.
+-- this also runs after a hair recolour. A picked colour is its own palette index
+-- (SetPedHeadOverlayColor colorType 1), independent of SetPedHairColor, except
+-- eyebrows under Config.headOverlays.eyebrows.followHairColor.
 local function applyHeadOverlays(ped)
     for _, overlay in ipairs(Shared.headOverlays) do
         local style = previewHead[overlay.style]
         SetPedHeadOverlay(ped, overlay.overlay, style, previewHead[overlay.opacity])
         if style >= 0 and type(SetPedHeadOverlayColor) == 'function' then
             local color = previewHead[overlay.color]
-            color = color >= 0 and color or previewHair.color
+            color = (color >= 0 and not Shared.overlayFollowsHair(overlay.key)) and color or previewHair.color
             SetPedHeadOverlayColor(ped, overlay.overlay, 1, color, color)
         end
     end
@@ -300,8 +302,10 @@ local function headPayload(service)
     local payload = Shared.sanitiseHead(previewHead)
     payload.skinToneEditable = policy.all == true
     payload.overlays = {}
+    payload.overlayColors = {}
     for _, overlay in ipairs(Shared.headOverlays) do
         payload.overlays[overlay.key] = Shared.headOverlayEnabled(policy, overlay.key)
+        payload.overlayColors[overlay.key] = not Shared.overlayFollowsHair(overlay.key)
     end
     return payload
 end

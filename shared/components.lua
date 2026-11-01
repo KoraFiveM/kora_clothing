@@ -173,6 +173,17 @@ function Shared.sanitiseHead(raw)
     return head
 end
 
+---Whether an overlay is locked to the primary hair colour. Only eyebrows can
+---be, via Config.headOverlays.eyebrows.followHairColor (default false: their
+---colour is independent). Facial hair has its own palette, which falls back to
+---the hair colour only while unset (-1).
+---@param key string facialHair | eyebrows
+---@return boolean
+function Shared.overlayFollowsHair(key)
+    local entry = (Config.headOverlays or {})[key]
+    return key == 'eyebrows' and type(entry) == 'table' and entry.followHairColor == true
+end
+
 ---Whether a service may edit one head overlay, read live from
 ---Config.headOverlays. Creation/admin sessions use `creator`; sessions that
 ---can edit the hair component (barber, hairdresser) use `barber`. A config
@@ -208,6 +219,9 @@ function Shared.mergeHead(policy, current, requested)
     for _, overlay in ipairs(Shared.headOverlays) do
         local source = Shared.headOverlayEnabled(policy, overlay.key) and requested or current
         merged[overlay.style], merged[overlay.opacity], merged[overlay.color] = source[overlay.style], source[overlay.opacity], source[overlay.color]
+        -- A hair-locked overlay stores no colour of its own, so toggling the
+        -- option later never resurrects a stale independent colour.
+        if Shared.overlayFollowsHair(overlay.key) then merged[overlay.color] = -1 end
     end
     return merged
 end

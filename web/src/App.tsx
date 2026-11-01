@@ -4,6 +4,7 @@ import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
+import { scrollRailWithWheel } from "@/lib/railWheel"
 import { resolveStepEdit } from "@/lib/stepper"
 import { countOf, duplicateTattoo, instanceLabel, instancePrice, removeTattooInstance, stackLimit, tattooTotal, toggleTattoo as toggleTattooId } from "@/lib/tattoos"
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
@@ -42,7 +43,7 @@ import type {
     TattooStacking,
     ZoomPayload,
 } from "@/lib/types"
-import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, initialSelection, mergeHeadValues, showFaceSkinPanel } from "@/lib/panels"
+import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, initialSelection, mergeHeadValues, overlayColorEditable, showFaceSkinPanel } from "@/lib/panels"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
@@ -224,7 +225,11 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             if (mode === "pointer") locked.current = requestRotateLock(event.currentTarget, pointerLock)
         }}
         onLostPointerCapture={() => { if (dragGuard) { drag.lost(); unlock() } }}
-        onWheel={(event) => { onZoom(Math.sign(event.deltaY)); onInteract() }}
+        onWheel={(event) => {
+            // Over the right rail (its gaps are click-through) the wheel scrolls the menu.
+            if (scrollRailWithWheel(document.querySelector<HTMLElement>(".rail-right"), event)) return
+            onZoom(Math.sign(event.deltaY)); onInteract()
+        }}
         aria-hidden="true"
     />
 }
@@ -347,14 +352,17 @@ function VariationDetail({ item, onChange, onClear }: {
  * that gives the look of a picker while every value posted back stays a legal
  * index. The colours come from the game at runtime, which is why these are
  * inline styles rather than classes. */
-function HairColorGrid({ label, palette, value, onSelect }: {
+function HairColorGrid({ label, palette, value, onSelect, onMatchHair }: {
     label: string
     palette: HairSwatch[]
     value: number
     onSelect: (index: number) => void
+    /** Offered by overlays that can fall back to the hair colour (value -1). */
+    onMatchHair?: () => void
 }) {
     return <div className="swatch-block">
         <p className="swatch-label">{label}</p>
+        {onMatchHair && <button type="button" className="match-hair" aria-pressed={value < 0} onClick={onMatchHair}>Match hair colour</button>}
         <div className="swatch-grid" role="radiogroup" aria-label={label}>
             {palette.map((swatch) => (
                 <button
@@ -466,8 +474,10 @@ function FaceSkinPanel({ head, onChange }: { head: HeadPayload; onChange: (next:
 const OPACITY_STEP = 0.1
 
 /** Style, opacity and colour for each overlay the server allows here, shown
- * with the Hair item beside the hair colour. Colour reuses the hair palette;
- * with none selected the overlay follows the hair colour. */
+ * with the Hair item beside the hair colour. Colour reuses the hair palette but
+ * is its own choice per overlay; with none selected (or Match hair colour) the
+ * overlay follows the hair colour. Eyebrows hide the palette when the server
+ * locks them to the hair (Config.headOverlays.eyebrows.followHairColor). */
 function HeadOverlayPanel({ head, overlays, palette, onChange }: {
     head: HeadPayload
     overlays: ReturnType<typeof enabledOverlays>
@@ -492,9 +502,10 @@ function HeadOverlayPanel({ head, overlays, palette, onChange }: {
                     onPrev={() => onChange({ ...head, [overlay.opacity]: Math.max(0, Math.round((opacity - OPACITY_STEP) * 100) / 100) })}
                     onNext={() => onChange({ ...head, [overlay.opacity]: Math.min(1, Math.round((opacity + OPACITY_STEP) * 100) / 100) })}
                 />
-                {style >= 0 && palette.length > 0 && <HairColorGrid
+                {style >= 0 && palette.length > 0 && overlayColorEditable(head, overlay.key) && <HairColorGrid
                     label={`${overlay.label} colour`} palette={palette} value={head[overlay.color]}
                     onSelect={(index) => onChange({ ...head, [overlay.color]: index })}
+                    onMatchHair={() => onChange({ ...head, [overlay.color]: -1 })}
                 />}
             </div>
         })}

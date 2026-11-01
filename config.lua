@@ -73,6 +73,16 @@ Config.headOverlays = {
             description = 'Lets players change eyebrow style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide eyebrow options there.',
             live = true,
         }) or true,
+        -- Off (default): eyebrows have their own colour palette, independent of the
+        -- hair colour. Characters saved before that palette existed have no eyebrow
+        -- colour of their own and keep matching their hair until a colour is picked
+        -- (or Match hair colour is chosen). On: the eyebrow palette is hidden and
+        -- eyebrows always take the primary hair colour, the old behaviour.
+        followHairColor = config and config.boolean(false, {
+            label = 'Eyebrows follow hair colour',
+            description = 'Off (default): players pick an eyebrow colour of their own, separate from hair colour. On: no eyebrow colour palette is shown and eyebrows always use the primary hair colour. Applies to character creation and barbers.',
+            live = true,
+        }) or false,
     },
     facialHair = {
         creator = config and config.boolean(true, {

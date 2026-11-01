@@ -86,6 +86,8 @@ export interface HeadPayload extends HeadValues {
     skinToneEditable?: boolean
     /** Which overlays this service may edit (Config.headOverlays). */
     overlays?: { facialHair: boolean; eyebrows: boolean }
+    /** Whether each overlay has a colour palette of its own (false: locked to the hair colour). */
+    overlayColors?: { facialHair: boolean; eyebrows: boolean }
 }
 
 export interface OpenPayload {
