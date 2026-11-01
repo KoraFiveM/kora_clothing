@@ -862,8 +862,7 @@ end)
 -- is intentional, so it should not emit kora_lib's cross-resource collision
 -- warning intended for accidental namespace reuse. Powers kora_multichar's
 -- character-select preview camera.
-Kora.callback.register('qb-multicharacter:server:getSkin', function(_src, citizenid)
-    local src = _src
+Kora.callback.register('qb-multicharacter:server:getSkin', function(src, citizenid)
     if type(citizenid) ~= 'string' then return nil end
     local ok, owned = pcall(function() return exports.kora_core:ownsCharacter(src, citizenid) end)
     if not ok or owned ~= true then return nil end
