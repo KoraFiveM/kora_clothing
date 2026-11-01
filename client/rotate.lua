@@ -1,7 +1,7 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
 -- Config.rotateMode:
---   'controls' (default) the NUI hands the drag to this file. NUI focus drops
+--   'controls'  the NUI hands the drag to this file. NUI focus drops
 --              its cursor and passes input to the game (SetNuiFocusKeepInput +
 --              SetNuiFocus(true, false)); without the keep-input flag the game
 --              gets no mouse at all and every read would be zero. Mouse movement
@@ -13,7 +13,9 @@
 --              NUI focus + the cursor position are put back.
 --   'recenter' the NUI keeps the normal cursor drag and asks for the cursor to
 --              be put back at the screen centre when it nears an edge.
---   'pointer'  the browser Pointer Lock request (Config.rotatePointerLock).
+--   'pointer'  (default) the browser Pointer Lock request (Config.rotatePointerLock);
+--              the NUI turns the camera from movementX and never toggles NUI focus.
+--              If the lock is refused it falls back to recenter.
 --   'plain'    a normal press/move/release drag, no capture.
 
 RotateControl = {}
@@ -35,7 +37,7 @@ local active -- the running drag: { control, startedAt, seen, movedAt, x, y }
 ---@return string
 function RotateControl.mode()
     local mode = Config.rotateMode
-    if not MODES[mode] then mode = 'controls' end
+    if not MODES[mode] then mode = 'pointer' end
     if mode == 'pointer' and Config.rotatePointerLock == false then return 'plain' end
     return mode
 end
@@ -166,7 +168,8 @@ local lastRecenter = -RECENTER_MIN_INTERVAL_MS
 ---Puts the cursor at the screen centre ('recenter' mode), throttled.
 ---@return boolean moved
 function RotateControl.recenter()
-    if RotateControl.mode() ~= 'recenter' then return false end
+    local mode = RotateControl.mode()
+    if mode ~= 'recenter' and mode ~= 'pointer' then return false end
     local now = GetGameTimer()
     if now - lastRecenter < RECENTER_MIN_INTERVAL_MS then return false end
     lastRecenter = now

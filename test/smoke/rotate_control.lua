@@ -107,11 +107,12 @@ local function lastFocus() local f = focus[#focus]; return f and f[1], f and f[2
 local function runThread() local fn = table.remove(threads, 1); fn() end
 local function lastMessage() return messages[#messages] end
 
-H.equal(Config.rotateMode, 'controls', 'controls is the default mode')
+H.equal(Config.rotateMode, 'pointer', 'pointer lock is the default mode')
+H.equal(Config.rotateSensitivity, 1.0, 'rotate sensitivity defaults to 1')
 H.equal(Config.rotateRightButton, true, 'right button rotates by default')
-H.equal(RotateControl.mode(), 'controls', 'mode resolves to controls')
+H.equal(RotateControl.mode(), 'pointer', 'mode resolves to pointer')
 Config.rotateMode = 'nonsense'
-H.equal(RotateControl.mode(), 'controls', 'unknown mode falls back to controls')
+H.equal(RotateControl.mode(), 'pointer', 'unknown mode falls back to pointer')
 Config.rotateMode = 'pointer'
 H.equal(RotateControl.mode(), 'pointer', 'pointer mode')
 Config.rotatePointerLock = false
@@ -120,6 +121,7 @@ Config.rotatePointerLock = true
 Config.rotateMode = 'controls'
 
 H.equal(open().rotateMode, 'controls', 'payload carries the mode')
+H.equal(sent.rotateSensitivity, 1.0, 'payload carries the rotate sensitivity')
 H.equal(sent.rotateInvert, false, 'payload carries the invert option')
 H.ok(sent.rotateRecenterEdge < 0.1, 'payload carries a small recenter edge')
 H.equal(sent.rotateRightButton, true, 'payload carries the right-button option')

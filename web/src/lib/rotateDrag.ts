@@ -8,7 +8,8 @@
 //   recenter  a normal cursor drag; near a screen edge Lua is asked to move the
 //             cursor back to the centre, and that synthetic jump is ignored.
 //   pointer / plain  a normal cursor drag using movementX (pointer lock itself is
-//             requested by the caller).
+//             requested by the caller). When the lock is refused the caller calls
+//             useRecenter() and the drag carries on as recenter.
 
 export type RotateMode = "controls" | "recenter" | "pointer" | "plain"
 
@@ -61,6 +62,8 @@ export class RotateDrag {
     private lastY = 0
     private awaitingCenter = false
     private waited = 0
+    private recenterFallback = false
+    private resync = false
 
     private readonly io: DragIO
     private opts: DragOptions
@@ -86,6 +89,8 @@ export class RotateDrag {
         this.lostWhilePending = false
         this.awaitingCenter = false
         this.waited = 0
+        this.recenterFallback = false
+        this.resync = false
         this.lastX = sample.clientX
         this.lastY = sample.clientY
         const token = ++this.token
@@ -111,6 +116,15 @@ export class RotateDrag {
         if (this.lostWhilePending) this.finish()
     }
 
+    /** The pointer lock was refused or lost to the game: finish this drag by moving
+     * the cursor back to the centre near an edge instead of using movementX. */
+    useRecenter() {
+        if (!this.active || this.luaOwned || this.opts.mode === "recenter") return
+        this.recenterFallback = true
+        this.resync = true
+        this.awaitingCenter = false
+    }
+
     /** Returns true when the sample turned the camera. */
     move(sample: PointerSample): boolean {
         if (!this.active || this.luaOwned) return false
@@ -119,7 +133,7 @@ export class RotateDrag {
             this.finish()
             return false
         }
-        if (this.opts.mode !== "recenter") {
+        if (this.opts.mode !== "recenter" && !this.recenterFallback) {
             const delta = sample.movementX ?? 0
             if (delta === 0) return false
             this.io.rotate(-delta * this.opts.degPerPixel)
@@ -130,6 +144,7 @@ export class RotateDrag {
 
     private moveRecenter(sample: PointerSample): boolean {
         const { clientX: x, clientY: y, width, height } = sample
+        if (this.resync) { this.lastX = x; this.lastY = y; this.resync = false }
         if (this.awaitingCenter) {
             const nearCenter = Math.abs(x - width / 2) <= width * 0.1 && Math.abs(y - height / 2) <= height * 0.1
             const jumped = Math.abs(x - this.lastX) > width * 0.2 || Math.abs(y - this.lastY) > height * 0.2

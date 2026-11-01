@@ -194,3 +194,26 @@ test("controls: a rejected start request falls back to the plain drag", async ()
     drag.move(sample(2, 3))
     assert.deepEqual(log.rotated, [-3])
 })
+
+test("a refused pointer lock falls back to recentring near the edge and ignores the jump", () => {
+    const { drag, log } = setup("pointer")
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    drag.useRecenter()
+    drag.move(sample(480, -20)) // first move after the switch only sets the baseline
+    drag.move(sample(470, -10))
+    assert.deepEqual(log.rotated, [5])
+    drag.move(sample(10, -460))
+    assert.equal(log.recenters, 1)
+    drag.move(sample(500, 490))
+    assert.equal(log.rotated.length, 2)
+    drag.up()
+    assert.equal(log.ends, 1)
+})
+
+test("useRecenter does nothing without a running drag", () => {
+    const { drag, log } = setup("pointer")
+    drag.useRecenter()
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    drag.move(sample(510, 10))
+    assert.deepEqual(log.rotated, [-5])
+})

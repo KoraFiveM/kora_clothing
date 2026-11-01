@@ -103,6 +103,8 @@ export interface OpenPayload {
     rotateRightButton?: boolean
     /** Config.rotateInvert; absent means not inverted. */
     rotateInvert?: boolean
+    /** Config.rotateSensitivity (pointer, recenter, plain); absent means 1. */
+    rotateSensitivity?: number
     /** Config.rotateRecenterEdge (recenter mode); absent means the built-in default. */
     rotateRecenterEdge?: number
     /** Config.ui.showControlsHint; absent means on. */

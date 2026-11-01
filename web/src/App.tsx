@@ -135,7 +135,12 @@ function useZoom() {
     }, [flush])
 }
 
-function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, edgeMargin }: {
+/** Config.rotateSensitivity from the open payload; anything unusable means 1. */
+function rotateSensitivity(value: number | undefined) {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1
+}
+
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin }: {
     io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
@@ -146,9 +151,11 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     dragGuard: boolean
     rightButton: boolean
     invert: boolean
+    /** Config.rotateSensitivity: multiplier on the degrees turned per pixel. */
+    sensitivity: number
     edgeMargin?: number
 }) {
-    const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
+    const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * sensitivity * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
     const dragRef = useRef<RotateDrag | null>(null)
     if (!dragRef.current) dragRef.current = new RotateDrag(io, options)
     const drag = dragRef.current
@@ -170,7 +177,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         window.addEventListener("blur", onBlur)
         const stopGuard = dragGuard ? listenForDragEnd(window, document, () => { drag.lost(); unlock() }) : () => {}
         // Lock lost mid-drag ends the drag; a refused lock keeps the plain drag.
-        const stopLock = listenForLockChange(document, () => { if (locked.current) { drag.cancel(); unlock() } }, () => { locked.current = false })
+        const stopLock = listenForLockChange(document, () => { if (locked.current) { drag.cancel(); unlock() } }, () => { locked.current = false; drag.useRecenter() })
         return () => {
             window.removeEventListener("keydown", onKey)
             window.removeEventListener("blur", onBlur)
@@ -221,7 +228,10 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
             event.currentTarget.setPointerCapture(event.pointerId)
-            if (mode === "pointer") locked.current = requestRotateLock(event.currentTarget, pointerLock)
+            if (mode === "pointer") {
+                locked.current = requestRotateLock(event.currentTarget, pointerLock)
+                if (!locked.current) drag.useRecenter()
+            }
         }}
         onLostPointerCapture={() => { if (dragGuard) { drag.lost(); unlock() } }}
         onWheel={(event) => {
@@ -799,7 +809,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} edgeMargin={open.rotateRecenterEdge} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

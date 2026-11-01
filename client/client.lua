@@ -619,6 +619,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateMode = RotateControl and RotateControl.mode() or 'pointer',
             rotateRightButton = Config.rotateRightButton ~= false,
             rotateInvert = Config.rotateInvert == true,
+            rotateSensitivity = tonumber(Config.rotateSensitivity),
             rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
             creatorOpensOnHair = (Config.ui or {}).creatorOpensOnHair ~= false,

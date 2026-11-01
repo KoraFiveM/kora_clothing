@@ -594,17 +594,28 @@ Config.rotateDragGuard = config and config.boolean(true, {
 }) or true
 
 -- How drag-to-rotate keeps working when the cursor reaches the screen edge.
--- 'controls' hides the cursor for the drag and reads the mouse as a game control
--- (works even where browser pointer lock is ignored); 'recenter' moves the cursor
--- back to the screen centre near an edge; 'pointer' asks the browser for pointer
--- lock (see rotatePointerLock; unreliable in FiveM NUI); 'plain' captures nothing.
--- Read each time the menu opens.
-Config.rotateMode = config and config.enum('controls', {
-    options = { 'controls', 'recenter', 'pointer', 'plain' },
+-- 'pointer' (default) asks the browser for pointer lock on mouse down and turns the
+-- character by the mouse movement deltas, so the cursor never reaches the edge and
+-- NUI focus is never toggled (no cursor blink); if the lock is refused the drag
+-- falls back to 'recenter'. 'controls' hides the cursor for the drag and reads
+-- the mouse as a game control (it toggles NUI focus, which can flash the cursor);
+-- 'recenter' moves the cursor back to the screen centre near an edge; 'plain'
+-- captures nothing. Read each time the menu opens.
+Config.rotateMode = config and config.enum('pointer', {
+    options = { 'pointer', 'controls', 'recenter', 'plain' },
     label = 'Rotate drag mode',
-    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. controls: the cursor is hidden while you hold the button and mouse movement turns the character (most reliable). recenter: the cursor is moved back to the centre near the edge. pointer: browser pointer lock, which FiveM may ignore. plain: no capture.",
+    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. pointer: the mouse is locked while you hold the button so rotation never stops at the screen edge (falls back to recentre if the lock is refused). controls: the cursor is hidden and the game reads the mouse (switches NUI focus, which can flash the cursor). recenter: the cursor is moved back to the centre near the edge. plain: no capture.",
     live = true,
-}) or 'controls'
+}) or 'pointer'
+
+-- Rotation speed for the pointer, recenter and plain modes (controls mode has its
+-- own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
+Config.rotateSensitivity = config and config.number(1.0, {
+    min = 0.1, max = 10.0,
+    label = 'Rotate sensitivity',
+    description = 'How fast the character turns per pixel of mouse movement while dragging to rotate (pointer, recenter and plain modes). 1.0 is the default; raise it to turn faster, lower it for finer control.',
+    live = true,
+}) or 1.0
 
 -- Also lets the right mouse button rotate the character, in every rotateMode.
 Config.rotateRightButton = config and config.boolean(true, {

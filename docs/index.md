@@ -150,11 +150,17 @@ the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
 `Config.camera.categoryZones` on every category change.
 
 **Rotating.** Hold the left mouse button (or the right, unless
-`Config.rotateRightButton = false`) over the character and drag. Browser pointer
-lock is not reliably honoured by FiveM NUI, so `Config.rotateMode` picks how the
-drag survives the cursor reaching the screen edge (read each time a menu opens):
+`Config.rotateRightButton = false`) over the character and drag. `Config.rotateMode` picks how the
+drag survives the cursor reaching the screen edge (read each time a menu opens).
+`Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
+the pointer, recenter and plain modes:
 
-- `'controls'` (default) — the NUI hands the drag to Lua. While the button is
+- `'pointer'` (default) — the browser Pointer Lock request on mouse down
+  (`Config.rotatePointerLock`, `false` = plain drag). The character turns by the
+  `movementX` deltas, so the cursor never reaches the edge and NUI focus is never
+  toggled (no cursor blink). If the lock is refused the drag falls back to
+  `'recenter'`.
+- `'controls'` — the NUI hands the drag to Lua. While the button is
   held the cursor is hidden (`SetNuiFocus(true, false)`), the mouse reaches the
   game as `INPUT_LOOK_LR`, and `client/rotate.lua` turns the camera from that
   each frame. The drag ends on button release, Backspace/Esc, after
@@ -168,8 +174,6 @@ drag survives the cursor reaching the screen edge (read each time a menu opens):
 - `'recenter'` — the cursor drag stays in the NUI; near a screen edge the NUI
   asks Lua (`qbclothing:nui:recenter`, throttled) to `SetCursorLocation(0.5, 0.5)`
   and ignores the resulting jump.
-- `'pointer'` — the browser Pointer Lock request (`Config.rotatePointerLock`,
-  `false` = plain drag).
 - `'plain'` — a normal press/move/release drag.
 
 Every mode ends the drag on mouse release, window blur, Escape and menu close
