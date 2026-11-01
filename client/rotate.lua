@@ -28,7 +28,7 @@ local RECENTER_MIN_INTERVAL_MS = 40
 
 local MODES = { controls = true, recenter = true, pointer = true, plain = true }
 
-local active -- the running drag: { control, startedAt, seen, x, y }
+local active -- the running drag: { control, startedAt, seen, movedAt, x, y }
 
 ---The mode in effect. An unknown value falls back to the default; the older
 ---Config.rotatePointerLock = false still turns plain 'pointer' capture off.
@@ -60,8 +60,13 @@ local function lookDelta()
     return value
 end
 
+-- The held button can be reported on any input group once NUI focus drops its cursor,
+-- and as either a pressed flag or a non-zero normal; accept all of them.
 local function buttonHeld(control)
-    return IsDisabledControlPressed(0, control) or IsControlPressed(0, control)
+    for group = 0, 2 do
+        if IsDisabledControlPressed(group, control) or IsControlPressed(group, control) then return true end
+    end
+    return GetDisabledControlNormal(0, control) > 0.5 or GetControlNormal(0, control) > 0.5
 end
 
 local function cancelPressed()
@@ -109,6 +114,7 @@ function RotateControl.start(button, x, y)
         control = control,
         startedAt = GetGameTimer(),
         seen = false,
+        movedAt = nil,
         x = math.max(0.0, math.min(1.0, x)),
         y = math.max(0.0, math.min(1.0, y)),
     }
@@ -121,6 +127,7 @@ function RotateControl.start(button, x, y)
         while active == drag do
             local now = GetGameTimer()
             local delta = lookDelta()
+            if delta ~= 0 then drag.movedAt = now end
             if delta ~= 0 and Camera then
                 -- Same direction as the cursor drag: moving right turns the view clockwise.
                 local direction = Config.rotateInvert == true and -1.0 or 1.0
@@ -129,7 +136,14 @@ function RotateControl.start(button, x, y)
 
             if buttonHeld(drag.control) then
                 drag.seen = true
-            elseif drag.seen or now - drag.startedAt > PRESS_GRACE_MS then
+            elseif drag.seen then
+                RotateControl.stop('released')
+                break
+            elseif now - drag.startedAt > PRESS_GRACE_MS
+                and now - (drag.movedAt or drag.startedAt) > number('rotateControlsIdleSeconds', 0.4) * 1000.0 then
+                -- The game never reported the button (it was pressed before NUI handed
+                -- the mouse over). While the mouse keeps moving the drag is assumed to
+                -- be held, so it no longer dies after the first fraction of a second.
                 RotateControl.stop('released')
                 break
             end

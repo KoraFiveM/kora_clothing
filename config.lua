@@ -639,6 +639,16 @@ Config.rotateControlsSensitivity = config and config.number(8.0, {
     live = true,
 }) or 8.0
 
+-- rotateMode = 'controls' only. Used when the game never reports the held mouse
+-- button: the drag then lasts while the mouse keeps moving and ends this long
+-- after it stops. If the button is reported, release ends the drag immediately.
+Config.rotateControlsIdleSeconds = config and config.number(0.4, {
+    min = 0.1, max = 5.0,
+    label = 'Rotate idle end (controls mode)',
+    description = 'If the game cannot see the held mouse button, a controls-mode rotate drag ends this many seconds after the mouse stops moving. Raise it if the drag ends while you hold still.',
+    live = true,
+}) or 0.4
+
 -- rotateMode = 'controls' only. Hard stop for one drag, so a missed button
 -- release can never leave the menu stuck without a cursor.
 Config.rotateControlsMaxSeconds = config and config.number(30.0, {

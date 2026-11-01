@@ -6,7 +6,7 @@ html, body, #root, #root * { user-select: none; -webkit-user-select: none; }
 img { -webkit-user-drag: none; user-drag: none; }
 
 /* Gap between the viewport edge and anything docked to it (rails, icon buttons). */
-:root { --edge-inset: 20px; }
+:root { --edge-inset: 20px; --panel-shadow-y: 14px; --panel-shadow-blur: 40px; }
 
 html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
 
@@ -89,12 +89,14 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    gaps stay click-through because the rail itself has pointer-events: none. */
 /* A scroll container clips everything outside its padding box, panel box-shadows
    included. The rail therefore carries a shadow gutter as padding, cancelled by an equal
-   negative margin so the panels stay exactly where they were. The side gutter is the
-   edge inset, which keeps the right rail's scrollbar on screen. */
-.rail { --shadow-gutter-x: var(--edge-inset); --shadow-gutter-top: 28px; --shadow-gutter-bottom: 56px; box-sizing: content-box; padding: var(--shadow-gutter-top) var(--shadow-gutter-x) var(--shadow-gutter-bottom); margin: calc(-1 * var(--shadow-gutter-top)) calc(-1 * var(--shadow-gutter-x)) calc(-1 * var(--shadow-gutter-bottom)); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+   negative margin so the panels stay exactly where they were. Each gutter must be at
+   least offset + blur of --panel-shadow-* on that side (layout.test.ts checks it). */
+.rail { --shadow-gutter-in: 44px; --shadow-gutter-top: 28px; --shadow-gutter-bottom: 56px; --shadow-gutter-l: var(--shadow-gutter-in); --shadow-gutter-r: var(--edge-inset); box-sizing: content-box; padding: var(--shadow-gutter-top) var(--shadow-gutter-r) var(--shadow-gutter-bottom) var(--shadow-gutter-l); margin: calc(-1 * var(--shadow-gutter-top)) calc(-1 * var(--shadow-gutter-r)) calc(-1 * var(--shadow-gutter-bottom)) calc(-1 * var(--shadow-gutter-l)); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* Inner side of each rail (towards the screen centre) gets the full shadow room; the outer side is the edge inset, which keeps the right rail's scrollbar on screen. */
+.rail-left { --shadow-gutter-l: var(--edge-inset); --shadow-gutter-r: var(--shadow-gutter-in); }
 .rail > * { flex-shrink: 0; }
 
-.panel { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); box-shadow: 0 14px 40px rgb(0 0 0 / .4); }
+.panel { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); box-shadow: 0 var(--panel-shadow-y) var(--panel-shadow-blur) rgb(0 0 0 / .4); }
 .panel-pad { padding: 12px; }
 
 .tab-list { display: flex; flex-direction: column; gap: 3px; }

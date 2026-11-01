@@ -161,7 +161,9 @@ drag survives the cursor reaching the screen edge (read each time a menu opens):
   `Config.rotateControlsMaxSeconds` (30s, a hard stop), or when the menu
   closes; NUI focus and the cursor position are then restored.
   `Config.rotateControlsSensitivity` (default `8.0`) sets degrees per unit of
-  movement. If Lua declines (`qbclothing:nui:rotateStart` replies
+  movement. If the game never reports the held button, the drag lasts while
+  the mouse moves and ends `Config.rotateControlsIdleSeconds` (0.4s) after it
+  stops. If Lua declines (`qbclothing:nui:rotateStart` replies
   `active = false`) the NUI falls back to a plain drag.
 - `'recenter'` — the cursor drag stays in the NUI; near a screen edge the NUI
   asks Lua (`qbclothing:nui:recenter`, throttled) to `SetCursorLocation(0.5, 0.5)`

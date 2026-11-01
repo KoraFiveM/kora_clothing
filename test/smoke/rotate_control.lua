@@ -77,7 +77,7 @@ _G.SetNuiFocus = function(a, b) focus[#focus + 1] = { a, b } end
 local keepInput = false
 _G.SetNuiFocusKeepInput = function(v) keepInput = v end
 _G.SetCursorLocation = function(x, y) cursor = { x, y } end
-_G.GetDisabledControlNormal = function() return look end
+_G.GetDisabledControlNormal = function(_, control) if control == 1 then return look end return 0.0 end
 _G.GetControlNormal = function() return 0.0 end
 _G.IsDisabledControlPressed = function() return held end
 _G.IsControlPressed = function() return false end
@@ -183,6 +183,16 @@ runThread()
 H.ok(clock >= 400 and clock < 600, 'unseen button ends after the grace period')
 H.equal(lastFocus(), true, 'focus restored after the grace stop')
 H.equal(select(2, lastFocus()), true, 'cursor restored after the grace stop')
+
+-- button never reported by the game: a moving mouse keeps the drag alive, an idle one ends it
+reset()
+RotateControl.start(0, 0.5, 0.5)
+held, look = false, 0.5
+onFrame = function(n) if n == 80 then look = 0.0 end end
+runThread()
+H.ok(#rotated >= 79, 'drag outlives the press grace while the mouse keeps moving')
+H.ok(clock > 1600 and clock < 1800, 'ends shortly after the mouse stops')
+H.equal(lastMessage().data.reason, 'released', 'idle end reports released')
 
 reset()
 RotateControl.start(0, 0.5, 0.5)

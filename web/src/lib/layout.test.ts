@@ -64,3 +64,24 @@ test("docked rails share one edge inset", () => {
     const inset = /--edge-inset: (\d+)px/g
     for (const [, px] of css.matchAll(inset)) assert.ok(Number(px) >= 16 && Number(px) <= 24, `inset ${px}px`)
 })
+
+test("rail shadow gutters hold the full panel shadow on every clipped side", () => {
+    const px = (name: string) => Number(new RegExp(`${name}: (\\d+)px`).exec(css)?.[1])
+    const y = px("--panel-shadow-y")
+    const blur = px("--panel-shadow-blur")
+    assert.ok(blur > 0 && y >= 0)
+    const inner = px("--shadow-gutter-in")
+    const top = px("--shadow-gutter-top")
+    const bottom = px("--shadow-gutter-bottom")
+    assert.ok(inner >= blur, `side gutter ${inner}px < blur ${blur}px`)
+    assert.ok(top >= blur - y, `top gutter ${top}px < ${blur - y}px`)
+    assert.ok(bottom >= blur + y, `bottom gutter ${bottom}px < ${blur + y}px`)
+    assert.match(rule(".panel"), /box-shadow: 0 var\(--panel-shadow-y\) var\(--panel-shadow-blur\)/)
+    // padding and negative margin cancel on all four sides so layout does not move
+    const rail = rule(".rail")
+    assert.match(rail, /padding: var\(--shadow-gutter-top\) var\(--shadow-gutter-r\) var\(--shadow-gutter-bottom\) var\(--shadow-gutter-l\)/)
+    assert.match(rail, /margin: calc\(-1 \* var\(--shadow-gutter-top\)\) calc\(-1 \* var\(--shadow-gutter-r\)\) calc\(-1 \* var\(--shadow-gutter-bottom\)\) calc\(-1 \* var\(--shadow-gutter-l\)\)/)
+    // the inner side of the left rail is its right; the right rail's inner side is its left
+    assert.match(rule(".rail-left"), /--shadow-gutter-r: var\(--shadow-gutter-in\)/)
+    assert.doesNotMatch(rule(".rail-right"), /--shadow-gutter-l/)
+})
