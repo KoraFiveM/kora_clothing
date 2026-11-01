@@ -260,8 +260,6 @@ function QuickToggle.run(word)
     if not ok then print(('[kora_clothing] quick toggle failed: %s'):format(tostring(err))) end
 end
 
--- --- registration ---
-
 local registeredCommand
 
 local function suggestion()

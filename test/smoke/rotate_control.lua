@@ -64,7 +64,6 @@ local function open()
     return sent
 end
 
--- ---- fake game state ----
 local clock, frame = 0, 0
 local focus = {}          -- every SetNuiFocus call, in order
 local cursor              -- last SetCursorLocation
@@ -108,7 +107,6 @@ local function lastFocus() local f = focus[#focus]; return f and f[1], f and f[2
 local function runThread() local fn = table.remove(threads, 1); fn() end
 local function lastMessage() return messages[#messages] end
 
--- ---- modes ----
 H.equal(Config.rotateMode, 'controls', 'controls is the default mode')
 H.equal(Config.rotateRightButton, true, 'right button rotates by default')
 H.equal(RotateControl.mode(), 'controls', 'mode resolves to controls')
@@ -121,7 +119,6 @@ H.equal(RotateControl.mode(), 'plain', 'rotatePointerLock = false still turns po
 Config.rotatePointerLock = true
 Config.rotateMode = 'controls'
 
--- ---- payload ----
 H.equal(open().rotateMode, 'controls', 'payload carries the mode')
 H.equal(sent.rotateInvert, false, 'payload carries the invert option')
 H.ok(sent.rotateRecenterEdge < 0.1, 'payload carries a small recenter edge')
@@ -131,7 +128,6 @@ H.equal(open().rotateMode, 'recenter', 'mode is read live on the next open')
 Config.rotateMode = 'controls'
 handlers['qbclothing:client:closeSession']({ ok = true })
 
--- ---- refusals ----
 reset()
 Config.rotateMode = 'plain'
 H.equal(RotateControl.start(0, 0.4, 0.6), false, 'not started outside controls mode')
@@ -142,7 +138,6 @@ Config.rotateRightButton = true
 H.equal(RotateControl.start(1, 0.4, 0.6), false, 'unknown button refused')
 H.equal(#focus, 0, 'a refused start never touches NUI focus')
 
--- ---- a normal drag: rotates from the look control, ends on release, restores focus ----
 reset()
 H.equal(RotateControl.start(0, 0.25, 0.75), true, 'drag starts')
 H.equal(RotateControl.start(0, 0.5, 0.5), false, 'a second start while running is refused')
@@ -163,7 +158,6 @@ H.ok(rotateEnds >= 1, 'camera settled')
 H.equal(lastMessage().action, 'qbclothing:nui:rotateStopped', 'NUI told the drag ended')
 H.equal(lastMessage().data.reason, 'released', 'reason is release')
 
--- ---- invert flips the direction ----
 reset()
 Config.rotateInvert = true
 RotateControl.start(0, 0.5, 0.5)
@@ -173,7 +167,6 @@ runThread()
 H.equal(rotated[1], 4.0, 'rotateInvert reverses the direction')
 Config.rotateInvert = false
 
--- ---- sensitivity is live ----
 reset()
 Config.rotateControlsSensitivity = 2.0
 RotateControl.start(0, 0.5, 0.5)
@@ -183,7 +176,6 @@ runThread()
 H.equal(rotated[1], -2.0, 'sensitivity read live')
 Config.rotateControlsSensitivity = 8.0
 
--- ---- a button the game never reports ends after the grace period ----
 reset()
 RotateControl.start(0, 0.5, 0.5)
 held = false
@@ -192,7 +184,6 @@ H.ok(clock >= 400 and clock < 600, 'unseen button ends after the grace period')
 H.equal(lastFocus(), true, 'focus restored after the grace stop')
 H.equal(select(2, lastFocus()), true, 'cursor restored after the grace stop')
 
--- ---- cancel key ----
 reset()
 RotateControl.start(0, 0.5, 0.5)
 held = true
@@ -202,7 +193,6 @@ H.equal(RotateControl.isActive(), false, 'cancel key ends the drag')
 H.equal(lastMessage().data.reason, 'cancelled', 'reason is cancelled')
 H.equal(select(2, lastFocus()), true, 'focus restored after cancel')
 
--- ---- hard safety stop ----
 reset()
 Config.rotateControlsMaxSeconds = 1.0
 RotateControl.start(0, 0.5, 0.5)
@@ -215,12 +205,10 @@ H.equal(select(2, lastFocus()), true, 'focus restored after the safety stop')
 H.equal(keepInput, false, 'keep-input cleared after the safety stop')
 Config.rotateControlsMaxSeconds = 30.0
 
--- ---- right button uses INPUT_AIM ----
 reset()
 H.equal(RotateControl.start(2, 0.5, 0.5), true, 'right button starts a drag')
 RotateControl.stop('nui')
 
--- ---- NUI callbacks ----
 reset()
 local reply
 callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
