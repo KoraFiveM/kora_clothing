@@ -1341,7 +1341,14 @@ local function spawnTattooPed(index, model, coords, scenario)
     while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(25) end
     if not HasModelLoaded(hash) then return end
 
-    local ped = CreatePed(4, hash, coords.x, coords.y, coords.z, coords.w or 0.0, false, false)
+    -- Shop coords are floor level but a ped is placed by its middle, so find the
+    -- ground and stand the artist on it instead of sinking them to the knees.
+    RequestCollisionAtCoord(coords.x, coords.y, coords.z)
+    local z = coords.z + 1.0
+    local found, groundZ = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z + 2.0, false)
+    if found then z = groundZ + 1.0 end
+
+    local ped = CreatePed(4, hash, coords.x, coords.y, z, coords.w or 0.0, false, false)
     SetModelAsNoLongerNeeded(hash)
     if ped == 0 or not DoesEntityExist(ped) then return end
 
@@ -1353,6 +1360,9 @@ local function spawnTattooPed(index, model, coords, scenario)
     local entry = { ped = ped }
     tattooPeds[index] = entry
     if tattooPedsFaded then applyTattooPedAlpha(ped, true) end
+
+    -- Text prompt servers open the shop from the zone prompt only.
+    if Config.interactionMode == 'textui' then return end
 
     local ok, targetId = pcall(function()
         return exports.kora_target:addEntity(ped, {

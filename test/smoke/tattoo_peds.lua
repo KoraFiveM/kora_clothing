@@ -31,6 +31,9 @@ _G.IsModelInCdimage = function() return true end
 _G.RequestModel = function() end
 _G.HasModelLoaded = function() return true end
 _G.SetModelAsNoLongerNeeded = function() end
+_G.RequestCollisionAtCoord = function() end
+-- Ground is probed from 2.0 above the shop coords; here it is 0.5 below them.
+_G.GetGroundZFor_3dCoord = function(x, y, z) return true, z - 2.5 end
 _G.CreatePed = function(pedType, model, x, y, z, heading)
     nextHandle = nextHandle + 1
     world[nextHandle] = { model = model, x = x, y = y, z = z, heading = heading }
@@ -126,6 +129,7 @@ H.equal(artist.model, first.ped, 'uses the shop ped model (u_m_y_tattoo_01 by de
 H.equal(artist.model, 'u_m_y_tattoo_01')
 H.equal(artist.x, first.coords.x)
 H.equal(artist.heading, first.coords.w)
+H.equal(artist.z, first.coords.z + 0.5, 'stands on the probed ground, middle 1.0 above it')
 H.equal(artist.frozen, true)
 H.equal(artist.invincible, true)
 H.equal(artist.blockEvents, true)
