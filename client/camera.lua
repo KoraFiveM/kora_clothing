@@ -70,31 +70,107 @@ local function cameraAnchor(ped)
     return GetEntityCoords(ped)
 end
 
--- Vertical limits of the ped relative to the camera anchor, measured from the
--- model's own bounding box when the camera starts. Presets are authored for an
--- average freemode ped, so without this a tall preset (the face zone) can aim
--- above the head. The defaults only apply where the native is unavailable.
-local pedBounds = { low = -1.3, high = 0.65 }
+-- Vertical limits of the ped relative to the camera anchor. With
+-- Config.camera.frameToBones (default) they come from the ped's own head and
+-- foot bones, so they are right for any model or height; the model bounding box
+-- is only the fallback (it is unreliable for freemode peds and used to cap the
+-- face view at the shoulders and drop the shoes view below the floor).
+--   low/high : bottom/top of the ped         head/feet : bone heights (bone mode)
+--   ground   : the floor under the feet      margin    : look-at headroom below `high`
+-- All are metres relative to the anchor. The defaults only apply where no
+-- measurement is possible.
+local HEAD_BONE = 31086      -- SKEL_Head
+local L_FOOT_BONE = 14201    -- SKEL_L_Foot
+local R_FOOT_BONE = 52301    -- SKEL_R_Foot
+local HEAD_TOP = 0.12        -- skull top above the head bone
+local FOOT_SOLE = 0.1        -- floor below the foot bones
 
--- The face centre sits about this far below the top of the head.
+-- The face centre sits about this far below the top of the head (box fallback).
 local HEAD_MARGIN = 0.15
 
+local pedBounds = { low = -1.3, high = 0.65, ground = -1.3, margin = HEAD_MARGIN }
+
+local function validBone(c)
+    return c and c.x and c.y and c.z
+end
+
+-- Bone-derived bounds, or nil when the skeleton readings are not plausible (a
+-- ped that has not finished streaming reports zero vectors).
+local function boneBounds(anchorZ, headZ, leftFootZ, rightFootZ)
+    if not (headZ and leftFootZ and rightFootZ) then return nil end
+    local footZ = math.min(leftFootZ, rightFootZ)
+    if headZ - footZ < 0.5 then return nil end
+    return {
+        low = footZ - FOOT_SOLE - anchorZ,
+        ground = footZ - FOOT_SOLE - anchorZ,
+        high = headZ + HEAD_TOP - anchorZ,
+        head = headZ - anchorZ,
+        feet = footZ - anchorZ,
+        margin = 0.0,
+    }
+end
+
+local function applyBounds(bounds)
+    pedBounds.low, pedBounds.high, pedBounds.ground = bounds.low, bounds.high, bounds.ground
+    pedBounds.head, pedBounds.feet, pedBounds.margin = bounds.head, bounds.feet, bounds.margin
+end
+
 local function measurePedBounds(ped)
+    local anchor = cameraAnchor(ped)
+
+    if Config.camera.frameToBones ~= false and type(GetPedBoneCoords) == 'function' then
+        local head = GetPedBoneCoords(ped, HEAD_BONE, 0.0, 0.0, 0.0)
+        local left = GetPedBoneCoords(ped, L_FOOT_BONE, 0.0, 0.0, 0.0)
+        local right = GetPedBoneCoords(ped, R_FOOT_BONE, 0.0, 0.0, 0.0)
+        if validBone(head) and validBone(left) and validBone(right) then
+            local bounds = boneBounds(anchor.z, head.z, left.z, right.z)
+            if bounds then return applyBounds(bounds) end
+        end
+    end
+
+    pedBounds.head, pedBounds.feet, pedBounds.margin = nil, nil, HEAD_MARGIN
     if type(GetModelDimensions) ~= 'function' then return end
     local minimum, maximum = GetModelDimensions(GetEntityModel(ped))
     if not minimum or not maximum then return end
 
-    local anchor, root = cameraAnchor(ped), GetEntityCoords(ped)
+    local root = GetEntityCoords(ped)
     pedBounds.low = root.z + minimum.z - anchor.z
     pedBounds.high = root.z + maximum.z - anchor.z
+    pedBounds.ground = pedBounds.low
+end
+
+-- Keeps a camera height at least `minAbove` metres above the floor
+-- (Config.camera.minHeightAboveGround).
+local function clampAboveGround(z, groundZ, minAbove)
+    return math.max(z, groundZ + (tonumber(minAbove) or 0.0))
 end
 
 -- Look-at and camera heights for a zone, relative to the anchor, kept inside
--- the ped. The camera keeps the preset's height above its look-at point.
+-- the ped. A zone with `track` ("head" or "feet") is centred on that bone plus
+-- `trackOffset` instead of on the spine, so it follows the model's real height.
+-- The camera keeps the preset's height above its look-at point but never goes
+-- below the floor.
 local function zoneHeights(zoneCfg)
-    local target = clamp(zoneCfg.boneOffset.z, pedBounds.low, pedBounds.high - HEAD_MARGIN)
-    local height = clamp(target + zoneCfg.camOffset.z, pedBounds.low, pedBounds.high)
+    local base = zoneCfg.boneOffset.z
+    local tracked = zoneCfg.track == 'head' and pedBounds.head or zoneCfg.track == 'feet' and pedBounds.feet
+    if tracked then base = tracked + (zoneCfg.trackOffset or 0.0) end
+
+    local target = clamp(base, pedBounds.low, pedBounds.high - pedBounds.margin)
+    local lowest = math.min(pedBounds.high, math.max(pedBounds.low, pedBounds.ground + (Config.camera.minHeightAboveGround or 0.0)))
+    local height = clamp(target + zoneCfg.camOffset.z, lowest, pedBounds.high)
     return target, height
+end
+
+-- Floor height under the ped for the live camera clamp: the foot-bone floor,
+-- raised to the real ground under the camera when the engine finds one close to
+-- the ped (so a slope or step cannot put the camera under it either).
+local function floorZ(anchor, camX, camY)
+    local floor = anchor.z + pedBounds.ground
+    if type(GetGroundZFor_3dCoord) == 'function' then
+        local found, groundZ = GetGroundZFor_3dCoord(camX, camY, anchor.z, false)
+        if found and groundZ and math.abs(groundZ - floor) < 1.0 then floor = math.max(floor, groundZ) end
+    end
+    return floor
 end
 
 local function traceCameraPath(subject, candidate)
@@ -248,6 +324,9 @@ function Camera.start(ped)
             state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))
 
             if pedRef and DoesEntityExist(pedRef) then
+                -- Every frame: the model (and so its height) can change while the
+                -- camera runs, for instance when the creator swaps gender.
+                measurePedBounds(pedRef)
                 local pedCoords = cameraAnchor(pedRef)
                 local heading = GetEntityHeading(pedRef)
                 local targetHeight = pedCoords.z + targetOffset
@@ -257,7 +336,12 @@ function Camera.start(ped)
                     state.angle + occlusion.angle, occlusion.lift
                 )
 
-                SetCamCoord(cam, camPoint.x, camPoint.y, camPoint.z)
+                local camZ = camPoint.z
+                if (Config.camera.minHeightAboveGround or 0.0) > 0.0 then
+                    camZ = clampAboveGround(camZ, floorZ(pedCoords, camPoint.x, camPoint.y), Config.camera.minHeightAboveGround)
+                end
+
+                SetCamCoord(cam, camPoint.x, camPoint.y, camZ)
                 PointCamAtCoord(cam, pedCoords.x, pedCoords.y, targetHeight)
                 SetCamFov(cam, state.fov)
             end
@@ -353,7 +437,17 @@ if Config.testMode then
         zoomOffset = function() return target.zoomOffset end,
         zone = function() return target.zone end,
         zoneHeights = zoneHeights,
-        setPedBounds = function(low, high) pedBounds.low, pedBounds.high = low, high end,
+        setPedBounds = function(low, high)
+            pedBounds.low, pedBounds.high, pedBounds.ground = low, high, low
+            pedBounds.head, pedBounds.feet, pedBounds.margin = nil, nil, HEAD_MARGIN
+        end,
+        boneBounds = boneBounds,
+        setBoneBounds = function(anchorZ, headZ, leftZ, rightZ)
+            local bounds = boneBounds(anchorZ, headZ, leftZ, rightZ)
+            if bounds then applyBounds(bounds) end
+            return bounds ~= nil
+        end,
+        clampAboveGround = clampAboveGround,
         setZoomOffset = function(value) target.zoomOffset = value end,
         targetAngle = function() return target.angle end,
         frontAngle = frontAngle,

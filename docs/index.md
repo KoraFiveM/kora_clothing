@@ -137,6 +137,13 @@ old angle-0 start, which is often side-on) and `Config.camera.initialPreset`
 (a key of `Config.camera.zones`, default `'full'`) control this; both are read
 each time a menu opens.
 
+**Head and feet framing.** The face and shoes presets are centred on the
+ped's `SKEL_Head` and foot bones (`track` / `trackOffset` on the zone), so they
+fit any ped model or height, and the camera is never lower than
+`Config.camera.minHeightAboveGround` (default `0.15` m, `0` disables) above the
+floor, so the shoes view cannot go under the map. `Config.camera.frameToBones =
+false` returns to the fixed spine offsets.
+
 **Categories.** Choosing a category does not move the camera by default, so the
 player's own rotation and zoom survive tab changes and the preset buttons stay
 the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to

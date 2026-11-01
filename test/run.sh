@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/session_open.lua
 "${LUA:-lua}" test/smoke/head_overlays.lua
 "${LUA:-lua}" test/smoke/camera_category.lua
+"${LUA:-lua}" test/smoke/camera_bones.lua
 "${LUA:-lua}" test/smoke/shop_interaction.lua
 "${LUA:-lua}" test/smoke/radar_hide.lua
 "${LUA:-lua}" test/smoke/rotate_end.lua

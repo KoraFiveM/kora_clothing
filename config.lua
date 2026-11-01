@@ -671,13 +671,37 @@ Config.ui = {
 --   camOffset.y  : distance from the ped; camOffset.z: camera height above the
 --                  look-at point.
 -- Tune boneOffset.z if a custom ped/scale frames a region too high or low.
+--   track        : optional "head" or "feet". With Config.camera.frameToBones on, the
+--                  look-at point is that bone (SKEL_Head / lowest of the SKEL_L/R_Foot
+--                  bones) plus trackOffset (metres, up) instead of boneOffset.z, so
+--                  the framing follows the real height of any ped model.
+--   trackOffset  : metres above the tracked bone to look at.
 Config.camera = {
+    -- Frame the face and shoes zones on the ped's head and foot bones, and size
+    -- the camera limits from them, instead of from the model bounding box. Fixes
+    -- the face view stopping at the shoulders and the shoes view dropping under
+    -- the map on female / differently sized peds. Turn off for the old
+    -- spine-offset framing. Read while the camera runs.
+    frameToBones = config and config.boolean(true, {
+        label = 'Frame head and feet on their bones',
+        description = "Centres the face and shoes camera views on the character's head and foot bones so they work for every ped model and height. Turn off to use the fixed offsets from the spine instead.",
+        live = true,
+    }) or true,
+    -- The fitting-room camera is never lower than this many metres above the
+    -- floor under the ped's feet, so the shoes view cannot go under the map.
+    -- 0 turns the floor clamp off.
+    minHeightAboveGround = config and config.number(0.15, {
+        min = 0.0, max = 1.0,
+        label = 'Minimum camera height above ground',
+        description = 'Lowest the fitting-room camera may go above the floor, in metres, so the shoes view never ends up underneath the map. 0 disables the limit.',
+        live = true,
+    }) or 0.15,
     zones = {
         full  = { boneOffset = vector3(0.0, 0.0, 0.0),   camOffset = vector3(0.0, 2.2, 0.3),  fov = 45.0 },
-        face  = { boneOffset = vector3(0.0, 0.0, 0.5),   camOffset = vector3(0.0, 0.65, 0.0), fov = 30.0 },
+        face  = { boneOffset = vector3(0.0, 0.0, 0.5),   camOffset = vector3(0.0, 0.65, 0.0), fov = 30.0, track = 'head', trackOffset = 0.04 },
         torso = { boneOffset = vector3(0.0, 0.0, 0.1),   camOffset = vector3(0.0, 1.3, 0.05), fov = 35.0 },
         legs  = { boneOffset = vector3(0.0, 0.0, -0.55), camOffset = vector3(0.0, 1.4, 0.05), fov = 35.0 },
-        shoes = { boneOffset = vector3(0.0, 0.0, -1.05), camOffset = vector3(0.0, 1.0, 0.1),  fov = 35.0 },
+        shoes = { boneOffset = vector3(0.0, 0.0, -1.05), camOffset = vector3(0.0, 1.0, 0.1),  fov = 35.0, track = 'feet', trackOffset = 0.12 },
     },
     -- Free mouse-wheel zoom, applied as an OFFSET on top of whichever zone
     -- preset is selected (the presets stay jump-to shortcuts). `step` is
