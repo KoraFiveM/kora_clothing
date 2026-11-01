@@ -241,7 +241,23 @@ local function applySkin(ped, skin, model)
     end
     applyHairColor(ped, skin.hairColor, skin.hairHighlight)
     applyHead(ped, skin.head)
+    -- SetPedHeadBlendData (inside applyHead) re-initialises the freemode head
+    -- and drops a tint set before it, so the hair tint is asserted again once
+    -- the blend data is in place, then the overlays that follow it are
+    -- recoloured. The menu path gets this order for free: its colour is set on
+    -- an already-blended ped.
+    applyHairColor(ped, skin.hairColor, skin.hairHighlight)
+    if type(SetPedHeadOverlay) == 'function' then applyHeadOverlays(ped) end
     applyTattoos(ped, model, skin.tattoos)
+end
+
+-- Re-asserts only the colour fields (hair tint, overlay colours) of an already
+-- applied skin. Used after login, when the spawn flow (resurrect/teleport/fade)
+-- can still reset the ped's tints after the skin has been applied.
+local function reapplyColours(ped, skin)
+    refreshHairVariation(ped)
+    applyHairColor(ped, skin.hairColor, skin.hairHighlight)
+    if type(SetPedHeadOverlay) == 'function' then applyHeadOverlays(ped) end
 end
 
 local function currentSkinSnapshot(ped)
@@ -1015,7 +1031,20 @@ local function applySavedSkin()
         -- login). Applying a late-arriving saved skin at that point would
         -- silently clobber whatever the player is currently trying on.
         if not model or activeSession then return end
-        applyModel(model, skin)
+        if not applyModel(model, skin) then return end
+
+        local retry = Config.loginColourReapply
+        if type(retry) ~= 'table' or retry.enabled ~= true then return end
+        local previous = 0
+        for _, delay in ipairs(retry.delays or {}) do
+            Wait(math.max(0, delay - previous))
+            previous = delay
+            -- A newer login apply, or a fitting-room session, owns the ped now.
+            if generation ~= skinApplyGeneration or activeSession then return end
+            local ped = PlayerPedId()
+            if currentModelName(ped) ~= model then return end
+            reapplyColours(ped, skin or {})
+        end
     end)
 end
 
@@ -1648,7 +1677,7 @@ if QuickToggle then QuickToggle.sessionActive = function() return activeSession 
 if Config.testMode then
     QBClothing = QBClothing or {}
     QBClothing._testRuntime = {
-        applySkin = applySkin, refreshHairVariation = refreshHairVariation,
+        applySkin = applySkin, reapplyColours = reapplyColours, refreshHairVariation = refreshHairVariation,
         currentSkinSnapshot = currentSkinSnapshot, headPayload = headPayload,
         syncTattooPeds = syncTattooPeds, tattooPeds = tattooPeds,
     }

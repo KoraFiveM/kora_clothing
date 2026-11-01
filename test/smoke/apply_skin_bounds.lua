@@ -197,7 +197,7 @@ H.equal(Shared.clampHairColor(0 / 0), 0, 'NaN survives math.floor, so it is reje
 
 hairCalls = {}
 runtime.applySkin(1, { hairColor = 3, hairHighlight = 5 }, 'mp_m_freemode_01')
-H.equal(#hairCalls, 1, 'applySkin always sets a hair colour, so a saved look cannot inherit the previous ped\'s')
+H.equal(#hairCalls, 2, "applySkin sets hair colour before and again after the head blend, so a saved look cannot inherit the previous ped's")
 H.equal(hairCalls[1].color, 3, 'an in-palette primary hair colour is applied unchanged')
 H.equal(hairCalls[1].highlight, 5, 'an in-palette highlight is applied unchanged')
 

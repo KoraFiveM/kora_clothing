@@ -98,6 +98,23 @@ Config.headOverlays = {
     },
 }
 
+-- Login colour re-assert. The saved skin is applied as soon as the character
+-- loads, but kora_multichar's spawn (resurrect, teleport, fade-in) can run
+-- afterwards and reset the ped's hair tint and overlay colours to defaults;
+-- opening any menu fixed it because that re-applies the colours. When enabled,
+-- the saved hair colour, highlight and overlay colours (eyebrows, facial hair)
+-- are applied again at each delay (milliseconds after the first apply). Ignored
+-- if the player opens a fitting room or the model changes. Turn off to apply
+-- the skin once only.
+Config.loginColourReapply = {
+    enabled = config and config.boolean(true, {
+        label = 'Re-apply hair colour after login',
+        description = 'Re-applies the saved hair colour, highlight and eyebrow/facial hair colours shortly after login, because the spawn sequence can reset them to default. Turn off to apply the saved look only once.',
+        live = true,
+    }) or true,
+    delays = { 750, 3000 },
+}
+
 Config.wardrobe = {
     maxOutfits = 20,
 }
