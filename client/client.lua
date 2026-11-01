@@ -92,8 +92,6 @@ local function faceShapeFromDrawable(ped)
 end
 
 local function applyHead(ped, head)
-    -- Plain print + json so this is visible regardless of how Kora.print.debug
-    -- formats a leading entity handle.
     -- Test harnesses and old FiveM artifacts may not expose the head natives;
     -- the rest of an appearance must still be applicable in that environment.
     if type(SetPedHeadBlendData) ~= 'function' or type(SetPedHeadOverlay) ~= 'function' then return end
@@ -388,7 +386,6 @@ local function applyModel(model, skin)
     return true
 end
 
---
 -- Built on `temporaryOverride`: that table already records the original
 -- component/prop of everything a session bared, and every close path already
 -- puts it back (confirm -> restoreTemporaryOverride, cancel/ESC/death ->
@@ -624,9 +621,6 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     end
 
     local head = headPayload(activeSession.service)
-    -- If this prints null, the service's policy can't edit the head at all, so
-    -- the NUI is never given head controls (check Config.services[...] and
-    -- Shared.headEditable). skinTone additionally needs policy.all == true.
 
     QBTheme.refresh()
     SendNUIMessage({
@@ -859,8 +853,6 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
 end)
 
 RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
-    -- Printed before any guard so you can tell "the NUI never called this"
-    -- apart from "this ran and a guard below refused it".
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local policy = servicePolicy(activeSession.service)
     if not Shared.headEditable(policy) then
@@ -1477,7 +1469,6 @@ local function registerTargetShop(index, shop, zone)
     })
 end
 
---
 -- A client-local, frozen artist per tattoo shop, only while the player is near.
 -- It carries a kora_target "Get tattooed" option that opens the same session as
 -- the shop's storefront zone (which stays registered, so both work). While the
