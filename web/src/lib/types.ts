@@ -105,6 +105,8 @@ export interface OpenPayload {
     rotateRecenterEdge?: number
     /** Config.ui.showControlsHint; absent means on. */
     showControlsHint?: boolean
+    /** Config.ui.creatorOpensOnHair; absent means on. */
+    creatorOpensOnHair?: boolean
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]

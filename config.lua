@@ -626,6 +626,15 @@ Config.ui = {
         description = 'Shows a short Drag to rotate / Scroll to zoom reminder when a clothing, barber, tattoo or creator menu opens. It fades after the first rotate or zoom, or after about 8 seconds. Turn off to never show it.',
         live = true,
     }) or true,
+    -- Character creation (and admin sessions) open on the Style tab with Hair
+    -- selected, so hair, hair colour, facial hair and eyebrows are visible at
+    -- once instead of behind Style > Hair. Which of those parts are offered is
+    -- still decided by Config.headOverlays. Off keeps the old start on Tops.
+    creatorOpensOnHair = config and config.boolean(true, {
+        label = 'Creator opens on hair and grooming',
+        description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
+        live = true,
+    }) or true,
 }
 
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`

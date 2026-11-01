@@ -626,6 +626,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateInvert = Config.rotateInvert == true,
             rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
+            creatorOpensOnHair = (Config.ui or {}).creatorOpensOnHair ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
             -- if the requested model failed to stream in time, this must
