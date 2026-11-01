@@ -2,8 +2,12 @@
 --
 -- Config.rotateMode:
 --   'controls' (default) the NUI hands the drag to this file. NUI focus drops
---              its cursor (SetNuiFocus(true, false)), so mouse movement reaches
---              the game as INPUT_LOOK_LR and is read here every frame. The drag
+--              its cursor and passes input to the game (SetNuiFocusKeepInput +
+--              SetNuiFocus(true, false)); without the keep-input flag the game
+--              gets no mouse at all and every read would be zero. Mouse movement
+--              reaches the game as INPUT_LOOK_LR and is read here every frame.
+--              The cursor is hidden and never moves, so it cannot leave the
+--              window and nothing is ever recentred. The drag
 --              ends when the mouse button is released, on a cancel key, after
 --              Config.rotateControlsMaxSeconds, or when the session closes, and
 --              NUI focus + the cursor position are put back.
@@ -77,6 +81,9 @@ function RotateControl.stop(reason)
     if not drag then return false end
     active = nil
     if Camera and Camera.rotateEnd then Camera.rotateEnd() end
+    -- Input goes back to the NUI whatever the reason, so a closing menu never
+    -- leaves the game receiving the mouse through a dead focus.
+    SetNuiFocusKeepInput(false)
     if reason ~= 'close' then
         SetNuiFocus(true, true)
         SetCursorLocation(drag.x, drag.y)
@@ -106,6 +113,7 @@ function RotateControl.start(button, x, y)
         y = math.max(0.0, math.min(1.0, y)),
     }
     active = drag
+    SetNuiFocusKeepInput(true)
     SetNuiFocus(true, false)
 
     CreateThread(function()
@@ -115,7 +123,8 @@ function RotateControl.start(button, x, y)
             local delta = lookDelta()
             if delta ~= 0 and Camera then
                 -- Same direction as the cursor drag: moving right turns the view clockwise.
-                Camera.rotate(-delta * number('rotateControlsSensitivity', 8.0))
+                local direction = Config.rotateInvert == true and -1.0 or 1.0
+                Camera.rotate(-delta * number('rotateControlsSensitivity', 8.0) * direction)
             end
 
             if buttonHeld(drag.control) then

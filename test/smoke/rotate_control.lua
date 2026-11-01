@@ -75,6 +75,8 @@ local threads = {}
 
 _G.GetGameTimer = function() return clock end
 _G.SetNuiFocus = function(a, b) focus[#focus + 1] = { a, b } end
+local keepInput = false
+_G.SetNuiFocusKeepInput = function(v) keepInput = v end
 _G.SetCursorLocation = function(x, y) cursor = { x, y } end
 _G.GetDisabledControlNormal = function() return look end
 _G.GetControlNormal = function() return 0.0 end
@@ -121,6 +123,8 @@ Config.rotateMode = 'controls'
 
 -- ---- payload ----
 H.equal(open().rotateMode, 'controls', 'payload carries the mode')
+H.equal(sent.rotateInvert, false, 'payload carries the invert option')
+H.ok(sent.rotateRecenterEdge < 0.1, 'payload carries a small recenter edge')
 H.equal(sent.rotateRightButton, true, 'payload carries the right-button option')
 Config.rotateMode = 'recenter'
 H.equal(open().rotateMode, 'recenter', 'mode is read live on the next open')
@@ -144,6 +148,7 @@ H.equal(RotateControl.start(0, 0.25, 0.75), true, 'drag starts')
 H.equal(RotateControl.start(0, 0.5, 0.5), false, 'a second start while running is refused')
 local a, b = lastFocus()
 H.equal(a, true, 'focus kept'); H.equal(b, false, 'cursor hidden for the drag')
+H.equal(keepInput, true, 'game receives the mouse during the drag')
 held, look = true, 0.5
 onFrame = function(n) if n == 5 then held, look = false, 0.0 end end
 runThread()
@@ -152,10 +157,21 @@ H.equal(rotated[1], -4.0, 'moving right turns by -delta * sensitivity (8 deg/uni
 H.equal(RotateControl.isActive(), false, 'drag over after release')
 a, b = lastFocus()
 H.equal(a, true, 'focus restored'); H.equal(b, true, 'cursor restored')
+H.equal(keepInput, false, 'input handed back to the NUI')
 H.equal(cursor[1], 0.25, 'cursor put back where it was (x)'); H.equal(cursor[2], 0.75, 'cursor put back where it was (y)')
 H.ok(rotateEnds >= 1, 'camera settled')
 H.equal(lastMessage().action, 'qbclothing:nui:rotateStopped', 'NUI told the drag ended')
 H.equal(lastMessage().data.reason, 'released', 'reason is release')
+
+-- ---- invert flips the direction ----
+reset()
+Config.rotateInvert = true
+RotateControl.start(0, 0.5, 0.5)
+held, look = true, 0.5
+onFrame = function(n) if n == 2 then held = false end end
+runThread()
+H.equal(rotated[1], 4.0, 'rotateInvert reverses the direction')
+Config.rotateInvert = false
 
 -- ---- sensitivity is live ----
 reset()
@@ -196,6 +212,7 @@ H.equal(RotateControl.isActive(), false, 'safety stop ends a drag whose release 
 H.equal(lastMessage().data.reason, 'timeout', 'reason is timeout')
 H.ok(clock >= 1000 and clock < 1100, 'stopped at the limit')
 H.equal(select(2, lastFocus()), true, 'focus restored after the safety stop')
+H.equal(keepInput, false, 'keep-input cleared after the safety stop')
 Config.rotateControlsMaxSeconds = 30.0
 
 -- ---- right button uses INPUT_AIM ----
@@ -223,6 +240,7 @@ handlers['qbclothing:client:closeSession']({ ok = true })
 H.equal(RotateControl.isActive(), false, 'closing the menu ends the drag')
 local a2, b2 = lastFocus()
 H.equal(a2, false, 'focus dropped on close'); H.equal(b2, false, 'cursor dropped on close')
+H.equal(keepInput, false, 'keep-input cleared on close')
 
 -- recenter callback: only in recenter mode, with a session, throttled
 reset()

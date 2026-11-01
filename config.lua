@@ -580,6 +580,23 @@ Config.rotateRightButton = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- Reverses the drag direction in every rotateMode (default: dragging right turns
+-- the character clockwise, like grabbing its front).
+Config.rotateInvert = config and config.boolean(false, {
+    label = 'Invert rotate direction',
+    description = 'Reverses which way the character turns when you drag the mouse left or right.',
+    live = true,
+}) or false
+
+-- rotateMode = 'recenter' only. How close to a screen edge (fraction of the
+-- screen) the cursor must get before it is moved back to the centre.
+Config.rotateRecenterEdge = config and config.number(0.04, {
+    min = 0.01, max = 0.3,
+    label = 'Recentre distance from edge (recenter mode)',
+    description = 'In recenter mode the cursor is only moved back to the screen centre once it is this close to an edge (0.04 = 4% of the screen).',
+    live = true,
+}) or 0.04
+
 -- rotateMode = 'controls' only. Degrees turned per unit of mouse movement as the
 -- game reports it (INPUT_LOOK_LR, -1..1 per frame). Raise it if turning feels slow.
 Config.rotateControlsSensitivity = config and config.number(8.0, {

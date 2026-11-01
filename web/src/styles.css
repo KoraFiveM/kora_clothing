@@ -22,7 +22,7 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    only exists to capture the drag-to-rotate gesture -- it must never paint a
    background of its own. */
 .clothing-viewport { position: absolute; inset: 0; z-index: 0; pointer-events: auto; cursor: grab; touch-action: none; }
-.clothing-viewport:active { cursor: grabbing; }
+.clothing-viewport:active { cursor: none; } /* hidden while dragging: no blink when Lua takes over, nothing to watch recentre */
 
 .headline { position: absolute; top: 82px; left: 50%; z-index: 1; transform: translateX(-50%); text-align: center; pointer-events: none; }
 .headline h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 12px rgb(0 0 0 / .6); }

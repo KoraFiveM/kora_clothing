@@ -623,6 +623,8 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateDragGuard = Config.rotateDragGuard ~= false,
             rotateMode = RotateControl and RotateControl.mode() or 'pointer',
             rotateRightButton = Config.rotateRightButton ~= false,
+            rotateInvert = Config.rotateInvert == true,
+            rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --

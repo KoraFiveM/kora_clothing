@@ -74,34 +74,50 @@ test("recenter: asks near an edge once and ignores the jump to the centre", () =
     drag.down({ button: 0, clientX: 300, clientY: 300, width: W, height: H })
     drag.move(sample(200)) // -100px -> +50deg
     drag.move(sample(100)) // -100px -> +50deg
-    drag.move(sample(80))  // inside the edge margin: asks to recentre
+    drag.move(sample(30))  // inside the edge margin: asks to recentre
     assert.equal(log.recenters, 1)
-    drag.move(sample(60))  // still waiting for the jump: no second request
+    drag.move(sample(20))  // still waiting for the jump: no second request
     assert.equal(log.recenters, 1)
     const before = log.rotated.length
     drag.move(sample(500)) // the synthetic jump to the centre
     assert.equal(log.rotated.length, before, "jump adds no rotation")
     drag.move(sample(520)) // real movement continues from the new centre
     assert.equal(log.rotated[log.rotated.length - 1], -10)
-    assert.deepEqual(log.rotated.slice(0, 4), [50, 50, 10, 10])
+    assert.deepEqual(log.rotated.slice(0, 4), [50, 50, 35, 5])
+})
+
+test("recenter: nothing happens until the cursor is really at the edge", () => {
+    const { drag, log } = setup("recenter")
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    for (const x of [400, 300, 200, 100, 70]) drag.move(sample(x)) // 7% from the edge: still fine
+    assert.equal(log.recenters, 0)
+    drag.move(sample(30))
+    assert.equal(log.recenters, 1)
+})
+
+test("recenter: edgeMargin option is honoured", () => {
+    const { drag, log } = setup("recenter", { edgeMargin: 0.2 })
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    drag.move(sample(150))
+    assert.equal(log.recenters, 1)
 })
 
 test("recenter: asks again if the jump never arrives", () => {
     const { drag, log } = setup("recenter")
     drag.down({ button: 0, clientX: 100, clientY: 300, width: W, height: H })
-    drag.move(sample(90))
+    drag.move(sample(30))
     assert.equal(log.recenters, 1)
-    for (let i = 0; i < 40; i++) drag.move(sample(80 - (i % 2)))
+    for (let i = 0; i < 40; i++) drag.move(sample(30 - (i % 2)))
     assert.ok(log.recenters >= 2)
 })
 
 test("recenter: a big real move that does not land at the centre is not swallowed", () => {
     const { drag, log } = setup("recenter")
     drag.down({ button: 0, clientX: 100, clientY: 300, width: W, height: H })
-    drag.move(sample(90))
+    drag.move(sample(30))
     assert.equal(log.recenters, 1)
     drag.move(sample(700)) // large, but not near the centre
-    assert.equal(log.rotated[log.rotated.length - 1], -305)
+    assert.equal(log.rotated[log.rotated.length - 1], -335)
 })
 
 test("controls: hands the drag to Lua and ignores blur and pointer events afterwards", async () => {
