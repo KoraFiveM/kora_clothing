@@ -41,3 +41,14 @@ test("mouseleave is ignored while the pointer is locked", () => {
     doc.dispatchEvent(new Event("mouseleave"))
     assert.equal(ends, 2)
 })
+
+test("mouseleave with a button still held does not end the drag", () => {
+    const win = new EventTarget()
+    const doc = new EventTarget()
+    let ends = 0
+    listenForDragEnd(win, doc, () => { ends++ })
+    doc.dispatchEvent(Object.assign(new Event("mouseleave"), { buttons: 1 }))
+    assert.equal(ends, 0)
+    doc.dispatchEvent(Object.assign(new Event("mouseleave"), { buttons: 0 }))
+    assert.equal(ends, 1)
+})

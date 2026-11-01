@@ -184,7 +184,36 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         button: event.button, buttons: event.buttons, movementX: event.movementX,
         clientX: event.clientX, clientY: event.clientY, width: window.innerWidth, height: window.innerHeight,
     })
+    // Moves and the release are listened to on the window, not the viewport, so a drag
+    // keeps turning the character over panels and rails, and outside the page, until the
+    // button comes up. Pointer capture on the viewport (set on press) keeps events
+    // coming when the cursor leaves the window.
+    const viewport = useRef<HTMLDivElement | null>(null)
+    useEffect(() => {
+        const onMove = (event: PointerEvent) => {
+            if (drag.move(sample(event))) onInteract()
+            if (!drag.dragging) unlock()
+        }
+        const release = (event: MouseEvent | PointerEvent) => {
+            drag.up()
+            unlock()
+            const element = viewport.current
+            if (element && "pointerId" in event && element.hasPointerCapture?.(event.pointerId)) element.releasePointerCapture(event.pointerId)
+        }
+        const onCancel = () => { drag.lost(); unlock() }
+        window.addEventListener("pointermove", onMove)
+        window.addEventListener("pointerup", release)
+        window.addEventListener("mouseup", release)
+        window.addEventListener("pointercancel", onCancel)
+        return () => {
+            window.removeEventListener("pointermove", onMove)
+            window.removeEventListener("pointerup", release)
+            window.removeEventListener("mouseup", release)
+            window.removeEventListener("pointercancel", onCancel)
+        }
+    }, [drag, unlock, onInteract])
     return <div
+        ref={viewport}
         className="clothing-viewport"
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
@@ -192,17 +221,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             event.currentTarget.setPointerCapture(event.pointerId)
             if (mode === "pointer") locked.current = requestRotateLock(event.currentTarget, pointerLock)
         }}
-        onPointerUp={(event) => {
-            drag.up()
-            unlock()
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-        }}
-        onPointerCancel={() => { drag.lost(); unlock() }}
         onLostPointerCapture={() => { if (dragGuard) { drag.lost(); unlock() } }}
-        onPointerMove={(event) => {
-            if (drag.move(sample(event.nativeEvent))) onInteract()
-            if (!drag.dragging) unlock()
-        }}
         onWheel={(event) => { onZoom(Math.sign(event.deltaY)); onInteract() }}
         aria-hidden="true"
     />

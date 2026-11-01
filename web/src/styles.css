@@ -78,13 +78,17 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    space between the top and bottom bars, so it only covers the 3D view where
    there are panels, and it takes pointer events itself so the wheel and the
    scrollbar work anywhere over it (the wheel zooms only over the 3D view). */
-.rail-right { bottom: auto; max-height: calc(100vh - var(--rail-top) - var(--rail-bottom)); padding-right: 2px; pointer-events: auto; }
+.rail-right { bottom: auto; max-height: calc(100vh - var(--rail-top) - var(--rail-bottom)); pointer-events: auto; }
 /* The rail is a fixed-height column. Without these two rules its flex children
    shrink below their content (squashing the Hair Color panel) and the overflow
    of the rest (eyebrows palette) is clipped. Panels keep their natural height
    and the rail scrolls instead; the wheel bubbles up from any panel, and the
    gaps stay click-through because the rail itself has pointer-events: none. */
-.rail { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* A scroll container clips everything outside its padding box, panel box-shadows
+   included. The rail therefore carries a shadow gutter as padding, cancelled by an equal
+   negative margin so the panels stay exactly where they were. The side gutter is the
+   edge inset, which keeps the right rail's scrollbar on screen. */
+.rail { --shadow-gutter-x: var(--edge-inset); --shadow-gutter-top: 28px; --shadow-gutter-bottom: 56px; box-sizing: content-box; padding: var(--shadow-gutter-top) var(--shadow-gutter-x) var(--shadow-gutter-bottom); margin: calc(-1 * var(--shadow-gutter-top)) calc(-1 * var(--shadow-gutter-x)) calc(-1 * var(--shadow-gutter-bottom)); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .rail > * { flex-shrink: 0; }
 
 .panel { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); box-shadow: 0 14px 40px rgb(0 0 0 / .4); }
