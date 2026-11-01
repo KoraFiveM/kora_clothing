@@ -75,10 +75,13 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .rail-right { right: var(--edge-inset); }
 /* The right rail is the one scroll container for the whole menu (style list,
    hair colour, eyebrows, facial hair). It takes its content height up to the
-   space between the top and bottom bars, so it only covers the 3D view where
-   there are panels, and it takes pointer events itself so the wheel and the
-   scrollbar work anywhere over it (the wheel zooms only over the 3D view). */
-.rail-right { bottom: auto; max-height: calc(100vh - var(--rail-top) - var(--rail-bottom)); pointer-events: auto; }
+   space between the top and bottom bars. It is click-through like the left rail:
+   only its panels take pointer events, so a rotate drag or wheel zoom that starts
+   in the shadow gutter or between panels reaches the 3D view. The wheel still
+   scrolls it from over a panel (scrolling follows the DOM ancestors, not
+   pointer-events) and the scrollbar stays draggable (Chromium does not apply
+   pointer-events: none to the scrollbar of a scroller). */
+.rail-right { bottom: auto; max-height: calc(100vh - var(--rail-top) - var(--rail-bottom)); }
 /* The rail is a fixed-height column. Without these two rules its flex children
    shrink below their content (squashing the Hair Color panel) and the overflow
    of the rest (eyebrows palette) is clipped. Panels keep their natural height

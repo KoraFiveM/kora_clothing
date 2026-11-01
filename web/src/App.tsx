@@ -210,6 +210,8 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             window.removeEventListener("pointerup", release)
             window.removeEventListener("mouseup", release)
             window.removeEventListener("pointercancel", onCancel)
+            drag.cancel()
+            unlock()
         }
     }, [drag, unlock, onInteract])
     return <div

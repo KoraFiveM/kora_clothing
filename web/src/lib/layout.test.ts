@@ -30,7 +30,13 @@ test("the right rail is the single scroll container, sized to its content", () =
     const right = rule(".rail-right")
     assert.match(right, /bottom: auto/)
     assert.match(right, /max-height: calc\(100vh - var\(--rail-top\) - var\(--rail-bottom\)\)/)
-    assert.match(right, /pointer-events: auto/)
+    assert.doesNotMatch(right, /pointer-events: auto/)
+})
+
+test("the rail gutter is click-through and only the panels take pointer events", () => {
+    assert.match(rule(".rail"), /pointer-events: none/)
+    assert.doesNotMatch(rule(".rail-right"), /pointer-events: auto/)
+    assert.match(rule(".panel"), /pointer-events: auto/)
 })
 
 test("colour swatches wrap into as many columns as fit", () => {
