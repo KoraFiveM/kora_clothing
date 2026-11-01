@@ -114,8 +114,6 @@ local function notify(message, kind)
     Kora.notify.send({ title = 'Clothing', message = message, type = kind or 'info' })
 end
 
--- --- ped appearance helpers ---
-
 local function sanitiseTattoos(model, tattoos)
     return Shared.sanitiseTattoos(model, tattoos)
 end
@@ -364,7 +362,6 @@ local function applyModel(model, skin)
     return true
 end
 
--- --- tattoo studio undress buttons (preview only) ---
 --
 -- Built on `temporaryOverride`: that table already records the original
 -- component/prop of everything a session bared, and every close path already
@@ -474,8 +471,6 @@ local function reapplyUndress(ped, model, active)
     end
 end
 
--- --- temporary strip for tattoo/barber/hairdresser sessions ---
-
 ---@return table|false  -- { d, t } if a hat was worn, else false (nothing to restore)
 local function stripHat(ped)
     local drawable = GetPedPropIndex(ped, 0)
@@ -539,8 +534,6 @@ local function restoreTemporaryOverride(ped)
     end
 end
 
--- --- movement lock while the fitting room is open ---
-
 local function startControlLock()
     disableControlsThread = true
     CreateThread(function()
@@ -564,8 +557,6 @@ local function stopRotate(reason)
     if RotateControl then return RotateControl.stop(reason) end
     return false
 end
-
--- --- session lifecycle ---
 
 RegisterNetEvent('qbclothing:client:openSession', function(payload)
     if type(payload) ~= 'table' then return end
@@ -705,8 +696,6 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     restoreRadarForSession(session)
     if refreshShopPrompt then refreshShopPrompt() end
 end)
-
--- --- NUI callbacks ---
 
 RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
@@ -979,8 +968,6 @@ startUndressDeathWatch = function(session)
     end)
 end
 
--- --- open triggers ---
-
 local function openSession(mode, extra)
     if activeSession then return end
     triggerOrError('qbclothing:server:requestSession', mode, extra)
@@ -1106,8 +1093,6 @@ AddEventHandler('qbmultichar:client:spawnComplete', function(isNew)
     TriggerEvent('qb-clothing:client:CreateFirstCharacter')
 end)
 
--- --- real qb-clothing client wire protocol (third-party compat) ---
-
 RegisterNetEvent('qb-clothing:client:CreateFirstCharacter', function()
     openSession('firstCharacter')
 end)
@@ -1184,8 +1169,6 @@ exports('ApplyAppearanceToPed', function(ped, model, skin)
     applySkin(ped, skin, model)
     return true
 end)
-
--- --- shop targets ---
 
 -- Config.interactionMode = 'textui' replaces the target option with kora_lib's
 -- "[E] Open <shop>" prompt while the player is inside the shop zone. It is read
@@ -1284,7 +1267,6 @@ local function registerTargetShop(index, shop, zone)
     })
 end
 
--- --- tattoo artist peds (Config.tattoo.peds) ---
 --
 -- A client-local, frozen artist per tattoo shop, only while the player is near.
 -- It carries a kora_target "Get tattooed" option that opens the same session as

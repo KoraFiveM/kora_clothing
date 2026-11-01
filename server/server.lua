@@ -36,8 +36,6 @@ local function defaultModelFor(src)
     return gender == 1 and Shared.models.female or Shared.models.male
 end
 
--- --- persistence-backed reads/writes ---
-
 local function dbGetSkin(citizenid, src, context)
     local row, err = Kora.sql.single('SELECT `model`, `skin` FROM `playerskins` WHERE `citizenid` = ?', { citizenid })
     if err then
@@ -169,8 +167,6 @@ local function nearShop(src, shop)
     local dx, dy, dz = pos.x - shop.coords.x, pos.y - shop.coords.y, pos.z - shop.coords.z
     return (dx * dx + dy * dy + dz * dz) <= (Config.interactDistance + 1.0) ^ 2
 end
-
--- --- sanitisation ---
 
 -- Clamps to a generous plausible range. The true per-model/per-slot cap can
 -- only be queried from a live ped (client-side natives), so this is a coarse
@@ -372,8 +368,6 @@ local function ownedOutfitMatch(citizenid, model, skin)
     return false
 end
 
--- --- bucket helpers ---
-
 -- kora_core updates legacy bucket tracking and notifies voice subscribers too.
 -- Keep the native fallback so a core outage cannot prevent fitting-room isolation.
 local function setBucket(src, bucket)
@@ -403,8 +397,6 @@ end
 local function leaveFittingRoom(src, previousBucket)
     setBucket(src, previousBucket or 0)
 end
-
--- --- clothing-as-item (optional, Config.clothingAsItem) ---
 
 -- Fires when a player uses a `qbclothing_outfit` item from their inventory.
 -- Equips it live and persists it as their current look, same as a direct
@@ -487,8 +479,6 @@ local function giveOutfitItem(src, model, skin, label)
     end)
     return ok and added == true
 end
-
--- --- session lifecycle ---
 
 -- Server-to-server entry point used by kora_admin after its own command has
 -- resolved a target and passed the admin gate. The short-lived grant is
@@ -786,8 +776,6 @@ Kora.events.register('qbclothing:server:cancelSession', function(src)
     TriggerClientEvent('qbclothing:client:closeSession', src, { ok = true, cancelled = true })
 end)
 
--- --- real qb-clothing / qb-multicharacter compat callbacks ---
-
 -- Real signature: cb(model, skin). kora_lib's Kora.callback is return-value based
 -- (see kora_core/compat/server/qb-multicharacter.lua's own getSkin stub), so a
 -- handler returning `model, skin` is what Kora.callback.trigger(...) surfaces
@@ -844,8 +832,6 @@ AddStateBagChangeHandler('qbmultichar:mode', nil, function(bagName, _, value)
     local src = tonumber(bagName:match('^player:(%d+)$'))
     if src then previewCache[src] = nil end
 end)
-
--- --- cleanup ---
 
 AddEventHandler('playerDropped', function()
     openingSessions[source] = nil
