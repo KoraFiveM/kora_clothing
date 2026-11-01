@@ -189,7 +189,9 @@ Barber and hairdresser are `service` values inside this same session, not
 separate UIs, so both get free zoom and the unobstructed camera with no
 per-service configuration. Every grooming target accepts either freemode
 gender: the server routes the session to the matching barber or hairdresser
-policy before validating and opening it.
+policy before validating and opening it. With `Config.genderLockedSalons`
+on, shop visits are instead gender-locked (barber male, hairdresser female)
+and the wrong gender gets a notice; admin sessions still follow the model.
 
 ### Hair colour
 
@@ -269,6 +271,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.bucket.base` (1,000,000) — fitting-room routing bucket offset, `base + source`
 - `Config.bucket.disablePopulation` (true) — switches ambient peds/vehicles off in the first-character fitting room bucket only; shops, barbers and wardrobes keep the world population
 - `Config.shop.currency` — account charged for purchases (default `cash`)
+- `Config.genderLockedSalons` (false, live in-game option) — when true, barbers serve only male and hairdressers only female freemode models at shops (no menu swap); admin sessions, creation and other services are unaffected
 - `Config.services` — per-service (`clothing`/`barber`/`hairdresser`/`tattoo`/`creation`) component/prop whitelists, prices and gender restrictions
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen
 - `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/kora_inventory/)) instead of equipping directly
