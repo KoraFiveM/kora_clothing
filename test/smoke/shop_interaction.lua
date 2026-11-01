@@ -45,6 +45,8 @@ dofile('shared/components.lua')
 local function load(settings)
     polyZones, boxZones, requests, textZones, keybinds, prompts, hidden = {}, {}, {}, {}, {}, {}, {}
     Config.showTargetHints, Config.interactionMode = settings.hints, settings.mode
+    _G.RegisterCommand = _G.RegisterCommand or function() end
+    _G.TriggerEvent = _G.TriggerEvent or function() end
     dofile('client/client.lua')
     startThread() -- the last CreateThread in client.lua registers the shops
 end

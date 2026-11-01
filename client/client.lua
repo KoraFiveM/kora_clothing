@@ -351,17 +351,23 @@ local function currentModelName(ped)
     return GetEntityModel(ped) == joaat(Shared.models.female) and Shared.models.female or Shared.models.male
 end
 
-local function applyModel(model, skin)
+local function switchModel(model)
     local ped = PlayerPedId()
     local hash = joaat(model)
     if GetEntityModel(ped) ~= hash then
         local loaded = Kora.stream.loadModel(hash, nil, { timeout = 5000 })
-        if not loaded then return false end
+        if not loaded then return nil end
         SetPlayerModel(PlayerId(), hash)
         SetModelAsNoLongerNeeded(hash)
         ped = PlayerPedId()
         SetPedDefaultComponentVariation(ped)
     end
+    return ped
+end
+
+local function applyModel(model, skin)
+    local ped = switchModel(model)
+    if not ped then return false end
     applySkin(ped, skin, model)
     return true
 end
@@ -700,6 +706,7 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     restoreHudForSession(session)
     restoreRadarForSession(session)
     if refreshShopPrompt then refreshShopPrompt() end
+    TriggerEvent('qb-clothing:client:onMenuClose')
 end)
 
 RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
@@ -1102,15 +1109,11 @@ RegisterNetEvent('qb-clothing:client:CreateFirstCharacter', function()
     openSession('firstCharacter')
 end)
 
-RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
-    openSession('shop', type(shopType) == 'table' and shopType or { shopId = tonumber(shopType) or 1 })
-end)
-
 -- Used by kora_admin's self-service clothing entry.  Keeping the nearest-shop
 -- selection inside kora_clothing means external callers never have to duplicate
 -- this resource's shop ordering; the server still performs the authoritative
 -- distance check when it receives requestSession('shop', index).
-RegisterNetEvent('qbclothing:client:openNearestShop', function(service)
+local function openNearestShop(service)
     service = service or 'clothing'
     local coords = GetEntityCoords(PlayerPedId())
     local nearestIndex, nearestDistance
@@ -1134,6 +1137,13 @@ RegisterNetEvent('qbclothing:client:openNearestShop', function(service)
         return
     end
     openSession('shop', { shopId = nearestIndex })
+end
+
+RegisterNetEvent('qbclothing:client:openNearestShop', openNearestShop)
+
+RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
+    if shopType == nil then return openNearestShop('clothing') end
+    openSession('shop', type(shopType) == 'table' and shopType or { shopId = tonumber(shopType) or 1 })
 end)
 
 RegisterNetEvent('qb-clothing:client:openOutfitMenu', function()
@@ -1148,9 +1158,170 @@ RegisterNetEvent('qbclothing:client:openAdminSession', function(service)
     openSession('admin', service and { service = service } or nil)
 end)
 
+local STOCK_COMPONENT_IDS = {
+    face = 0, mask = 1, hair = 2, arms = 3, pants = 4, bag = 5, shoes = 6,
+    accessory = 7, ['t-shirt'] = 8, vest = 9, decals = 10, torso2 = 11,
+}
+local STOCK_PROP_IDS = { hat = 0, glass = 1, ear = 2, watch = 6, bracelet = 7 }
+
+local function stockEntry(entry)
+    if type(entry) ~= 'table' then return nil end
+    local item, texture = tonumber(entry.item), tonumber(entry.texture) or 0
+    if not item or item ~= item then return nil end
+    return math.floor(item), math.max(0, math.floor(texture))
+end
+
+local function setOutfitComponent(ped, id, drawable, texture)
+    if drawable < 0 then drawable = 0 end
+    if drawable >= GetNumberOfPedDrawableVariations(ped, id) then return end
+    if texture >= GetNumberOfPedTextureVariations(ped, id, drawable) then texture = 0 end
+    SetPedComponentVariation(ped, id, drawable, texture, 0)
+end
+
+local function setOutfitProp(ped, id, drawable, texture)
+    if drawable <= 0 then ClearPedProp(ped, id); return end
+    if drawable >= GetNumberOfPedPropDrawableVariations(ped, id) then return end
+    if texture >= GetNumberOfPedPropTextureVariations(ped, id, drawable) then texture = 0 end
+    SetPedPropIndex(ped, id, drawable, texture, true)
+end
+
+---Overlays stock qb-clothing outfit keys on the current ped; never changes the model.
+local function overlayStockOutfit(ped, data)
+    for key, id in pairs(STOCK_COMPONENT_IDS) do
+        local drawable, texture = stockEntry(data[key])
+        if drawable and key ~= 'face' then
+            if key == 'hair' then
+                setOutfitComponent(ped, id, drawable, 0)
+                applyHairColor(ped, texture, texture)
+            else
+                setOutfitComponent(ped, id, drawable, texture)
+            end
+        end
+    end
+    for key, id in pairs(STOCK_PROP_IDS) do
+        local drawable, texture = stockEntry(data[key])
+        if drawable then setOutfitProp(ped, id, drawable, texture) end
+    end
+end
+
+local function decodeStockTable(value)
+    if type(value) == 'string' then
+        local ok, decoded = pcall(json.decode, value)
+        value = ok and decoded or nil
+    end
+    return type(value) == 'table' and value or nil
+end
+
 RegisterNetEvent('qb-clothing:client:loadOutfit', function(outfit)
     if type(outfit) ~= 'table' then return end
-    applyModel(outfit.model or Shared.models.male, outfit.skin)
+    local data = outfit.outfitData ~= nil and decodeStockTable(outfit.outfitData) or nil
+    if data then
+        overlayStockOutfit(PlayerPedId(), data)
+        if type(outfit.outfitName) == 'string' and outfit.outfitName ~= '' then
+            notify(('You have chosen %s! Press Confirm to confirm outfit.'):format(outfit.outfitName), 'info')
+        end
+        return
+    end
+    if outfit.outfitData ~= nil or not Shared.isFreemodeModel(outfit.model) then return end
+    applyModel(outfit.model, outfit.skin)
+end)
+
+local function stockSkinToKora(data)
+    local skin = { components = {}, props = {}, head = {} }
+    for _, id in pairs(STOCK_COMPONENT_IDS) do skin.components[tostring(id)] = { d = 0, t = 0 } end
+    for key, id in pairs(STOCK_COMPONENT_IDS) do
+        local drawable, texture = stockEntry(data[key])
+        if drawable and key ~= 'hair' then
+            skin.components[tostring(id)] = { d = math.max(0, drawable), t = key == 'face' and 0 or texture }
+        elseif drawable then
+            skin.components[tostring(id)] = { d = math.max(0, drawable), t = 0 }
+            skin.hairColor, skin.hairHighlight = texture, texture
+        end
+    end
+    for key, id in pairs(STOCK_PROP_IDS) do
+        local drawable, texture = stockEntry(data[key])
+        if drawable and drawable > 0 then skin.props[tostring(id)] = { d = drawable, t = texture } end
+    end
+    local _, skinTone = stockEntry(data.face)
+    skin.head.skinTone = skinTone
+    local beard, beardColor = stockEntry(data.beard)
+    skin.head.beard, skin.head.beardColor = beard, beardColor
+    local eyebrows, eyebrowsColor = stockEntry(data.eyebrows)
+    skin.head.eyebrows, skin.head.eyebrowsColor = eyebrows, eyebrowsColor
+    return skin
+end
+
+local function freemodeModelName(ped)
+    local hash = GetEntityModel(ped)
+    for _, name in pairs(Shared.models) do
+        if hash == joaat(name) then return name end
+    end
+    return nil
+end
+
+local function loadStockClothing(data, ped)
+    data = decodeStockTable(data)
+    if not data then return false end
+    if type(ped) ~= 'number' or ped == 0 then ped = PlayerPedId() end
+    if not DoesEntityExist(ped) then return false end
+    local model = freemodeModelName(ped)
+    if not model then return false end
+    local skin = stockSkinToKora(data)
+    if ped == PlayerPedId() then skin.tattoos = previewTattoos end
+    applySkin(ped, skin, model)
+    return true
+end
+
+RegisterNetEvent('qb-clothing:client:loadPlayerClothing', function(data, ped)
+    loadStockClothing(data, ped)
+end)
+
+local function freemodeNameFromAny(model)
+    if type(model) == 'string' and Shared.isFreemodeModel(model) then return model end
+    local hash = tonumber(model)
+    if not hash then return nil end
+    for _, name in pairs(Shared.models) do
+        if hash == joaat(name) then return name end
+    end
+    return nil
+end
+
+RegisterNetEvent('qb-clothes:loadSkin', function(isNew, model, data)
+    if activeSession or isNew == true then return end
+    local name = freemodeNameFromAny(model)
+    data = decodeStockTable(data)
+    if not name or not data then return end
+    if type(data.components) == 'table' or type(data.props) == 'table' then
+        applyModel(name, data)
+        return
+    end
+    local ped = switchModel(name)
+    if ped then loadStockClothing(data, ped) end
+end)
+
+local QUICK_PART_FOR = {
+    top = 'shirt', shirt = 'shirt', pants = 'pants', shoes = 'shoes', neck = 'chain', mask = 'mask',
+    vest = 'vest', bag = 'bag', bagoff = 'bag', hat = 'hat', glasses = 'glasses', visor = 'visor',
+    ear = 'ears', watch = 'watch', bracelet = 'bracelet',
+}
+
+local function toggleQuickPart(which)
+    if type(which) == 'table' then which = which.id end
+    local part = QUICK_PART_FOR[tostring(which or ''):lower()]
+    if part and QuickToggle and QuickToggle.run then QuickToggle.run(part) end
+end
+
+RegisterNetEvent('qb-radialmenu:ToggleClothing', toggleQuickPart)
+RegisterNetEvent('qb-radialmenu:ToggleProps', toggleQuickPart)
+RegisterNetEvent('qb-radialmenu:ResetClothing', function()
+    if QuickToggle and QuickToggle.run then QuickToggle.run('reset') end
+end)
+
+local ADJUST_FACEWEAR_PART = { [1] = 'hat', [2] = 'glasses', [3] = 'ears', [4] = 'mask', [5] = 'shirt' }
+
+RegisterNetEvent('qb-clothing:client:adjustfacewear', function(kind)
+    local part = ADJUST_FACEWEAR_PART[tonumber(kind) or 0]
+    if part and QuickToggle and QuickToggle.run then QuickToggle.run(part) end
 end)
 
 -- Public modern form: exports.kora_clothing:OpenClothingRoom({ shopId = 1 }).
@@ -1159,6 +1330,9 @@ exports('OpenClothingRoom', function(options)
     openSession('shop', type(options) == 'table' and options or { shopId = tonumber(options) or 1 })
 end)
 exports('OpenWardrobe', function() openSession('wardrobe') end)
+exports('reloadSkin', function() applySavedSkin() end)
+exports('IsCreatingCharacter', function() return activeSession ~= nil and activeSession.mode == 'firstCharacter' end)
+exports('getOutfits', function() openSession('wardrobe') end)
 exports('IsClothingMenuOpen', function() return activeSession ~= nil end)
 exports('GetPedModels', function() return Shared.models end)
 -- Applies this resource's canonical component/prop/tattoo schema to an
@@ -1174,6 +1348,8 @@ exports('ApplyAppearanceToPed', function(ped, model, skin)
     applySkin(ped, skin, model)
     return true
 end)
+
+RegisterCommand('refreshskin', function() applySavedSkin() end, false)
 
 -- Config.interactionMode = 'textui' replaces the target option with kora_lib's
 -- "[E] Open <shop>" prompt while the player is inside the shop zone. It is read

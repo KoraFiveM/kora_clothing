@@ -795,6 +795,66 @@ Kora.callback.register('qb-clothing:server:getSkin', function(src)
     return saved.model, sanitiseSkin(saved.skin, saved.model)
 end)
 
+local STOCK_COOLDOWN_MS = 2000
+local stockLastUse = {} -- [src][key] = GetGameTimer() of the last accepted call
+
+local function stockAllowed(src, key)
+    local now = GetGameTimer()
+    local byKey = stockLastUse[src]
+    if not byKey then byKey = {}; stockLastUse[src] = byKey end
+    if byKey[key] and now - byKey[key] < STOCK_COOLDOWN_MS then return false end
+    byKey[key] = now
+    return true
+end
+
+local function stockOutfitRows(citizenid)
+    local rows = Kora.sql.query(
+        'SELECT `id`, `outfitname`, `model`, `skin` FROM `playeroutfits` WHERE `citizenid` = ? ORDER BY `id` DESC',
+        { citizenid }
+    ) or {}
+    local out = {}
+    for _, row in ipairs(rows) do
+        out[#out + 1] = {
+            id = row.id, outfitId = tostring(row.id), citizenid = citizenid, outfitname = row.outfitname,
+            model = row.model, skin = sanitiseSkin(decode(row.skin), row.model),
+        }
+    end
+    return out
+end
+
+Kora.callback.register('qb-clothing:server:getOutfits', function(src)
+    local citizenid = citizenIdFor(src)
+    if not citizenid then return {} end
+    return stockOutfitRows(citizenid)
+end, { rateLimit = { max = 10, window = 10000 } })
+
+RegisterNetEvent('qb-clothing:server:removeOutfit', function(outfitName, outfitId)
+    local src = source
+    local citizenid = citizenIdFor(src)
+    local id = tonumber(outfitId)
+    if not citizenid or not id or type(outfitName) ~= 'string' then return end
+    if not stockAllowed(src, 'removeOutfit') then return end
+
+    local row = dbGetOutfit(citizenid, id)
+    if not row or row.outfitname ~= outfitName then return end
+    if not dbDeleteOutfit(citizenid, id) then return end
+    local rows = dbListOutfits(citizenid)
+    TriggerClientEvent('qbclothing:client:outfitsUpdated', src, rows)
+    TriggerClientEvent('qb-clothing:client:reloadOutfits', src, #rows > 0 and stockOutfitRows(citizenid) or nil)
+end)
+
+RegisterNetEvent('qb-clothes:loadPlayerSkin', function()
+    local src = source
+    local citizenid = citizenIdFor(src)
+    if not citizenid or not stockAllowed(src, 'loadPlayerSkin') then return end
+    local ok, saved = pcall(dbGetSkin, citizenid)
+    if not ok or not saved or not Shared.isFreemodeModel(saved.model) then
+        TriggerClientEvent('qb-clothes:loadSkin', src, true)
+        return
+    end
+    TriggerClientEvent('qb-clothes:loadSkin', src, false, saved.model, sanitiseSkin(saved.skin, saved.model))
+end)
+
 -- Overrides kora_core's own honest "no clothing module exists" stub
 -- (compat/server/qb-multicharacter.lua) now that one does. Kora.callback.register
 -- is a plain last-writer-wins overwrite (kora_lib/local/callback/server.lua).
@@ -837,6 +897,7 @@ AddEventHandler('playerDropped', function()
     openingSessions[source] = nil
     sessions[source] = nil
     previewCache[source] = nil
+    stockLastUse[source] = nil
 end)
 
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)

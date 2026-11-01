@@ -100,6 +100,8 @@ _G.Kora = _G.QB
 dofile('config.lua')
 dofile('shared/components.lua')
 Config.testMode = true
+_G.RegisterCommand = _G.RegisterCommand or function() end
+_G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
 local runtime = QBClothing._testRuntime
 local shopsThread = threads[#threads] -- the last CreateThread at load registers the shops

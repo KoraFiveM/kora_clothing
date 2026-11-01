@@ -94,6 +94,8 @@ Config.testMode = true
 -- worth mocking out.
 Config.shops = {}
 dofile('shared/components.lua')
+_G.RegisterCommand = _G.RegisterCommand or function() end
+_G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
 
 H.ok(registeredNetEvents['QBCore:Client:OnPlayerLoaded'] ~= nil,

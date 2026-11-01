@@ -108,10 +108,28 @@ exports.kora_clothing:ApplyAppearanceToPed(ped, model, skin) -- local preview pe
 ### Legacy qb-clothing / qb-multicharacter compat events (client)
 ```lua
 TriggerEvent('qb-clothing:client:CreateFirstCharacter')  -- one-time free mandatory fitting
-TriggerEvent('qb-clothing:client:openMenu', shopType)     -- numeric shop index or { shopId = n }
+TriggerEvent('qb-clothing:client:openMenu', shopType)     -- numeric shop index or { shopId = n }; no argument = nearest clothing shop
 TriggerEvent('qb-clothing:client:openOutfitMenu')         -- open the wardrobe
 TriggerEvent('qb-clothing:client:loadOutfit', outfit)     -- { model, skin } applied directly
+TriggerEvent('qb-clothing:client:loadOutfit', { outfitData = { bag = { item = 7, texture = 0 } }, outfitName = 'x' })
+                                                          -- stock keys overlaid on the current ped; the model is never changed
+TriggerEvent('qb-clothing:client:loadPlayerClothing', stockSkin, ped) -- stock skin table onto a freemode ped
+TriggerEvent('qb-clothing:client:adjustfacewear', 1)      -- 1 hat, 2 glasses, 3 ears, 4 mask, 5 top (quick toggle)
+TriggerEvent('qb-radialmenu:ToggleClothing' | 'qb-radialmenu:ToggleProps' | 'qb-radialmenu:ResetClothing')
+                                                          -- mapped onto the /c quick toggles (own ped only)
 ```
+
+Also emitted: `qb-clothing:client:onMenuClose` when the fitting room closes. Command `/refreshskin` re-applies the saved look.
+Exports `reloadSkin`, `IsCreatingCharacter` and `getOutfits` (opens the wardrobe; job room outfits are not supported) exist under `kora_clothing` and `qb-clothing`.
+Stock outfit keys: `arms t-shirt torso2 pants shoes bag accessory mask decals vest hair hat glass ear watch bracelet`.
+
+### Legacy server events (caller's own data only, rate limited)
+```lua
+Kora.callback.trigger('qb-clothing:server:getOutfits')   -- own outfits: { id, outfitId, outfitname, model, skin } (skin in Kora format)
+TriggerServerEvent('qb-clothing:server:removeOutfit', outfitName, outfitId) -- outfitId is the numeric id from getOutfits
+TriggerServerEvent('qb-clothes:loadPlayerSkin')          -- replies to the caller with qb-clothes:loadSkin
+```
+`qb-clothing:saveSkin` and `qb-clothes:saveOutfit` are intentionally not provided.
 
 ### Callbacks (`Kora.callback`, real qb-clothing/qb-multicharacter names)
 ```lua
