@@ -30,7 +30,6 @@ import type {
     LoadOutfitResponse,
     OpenPayload,
     OutfitSummary,
-    PriceTable,
     RotatePayload,
     SetHairColorPayload,
     SetHairColorResponse,
@@ -568,10 +567,6 @@ function TattooPanel({ tattoos, selected, stacking, onToggle, onDuplicate, onRem
     </div>
 }
 
-function priceOf(prices: PriceTable | undefined, group: CategoryGroup) {
-    return prices?.[group] ?? 0
-}
-
 export default function App() {
     const [open, setOpen] = useState<OpenPayload | null>(null)
     const [categories, setCategories] = useState<ClothingCategoryItem[]>([])
@@ -614,9 +609,6 @@ export default function App() {
     }, [])
 
     useNuiEvent<OpenPayload>("qbclothing:nui:open", (payload) => {
-        // Start from the same clean slate as a close, then layer the
-        // payload-derived fields on top -- keeps the "what does a fresh
-        // session look like" defaults defined in exactly one place.
         resetLocalState()
         setOpen(payload)
         setCategories(payload.categories)
@@ -665,7 +657,7 @@ export default function App() {
             changedGroups.add("body")
         }
         let total = 0
-        for (const group of changedGroups) total += priceOf(open.prices, group)
+        for (const group of changedGroups) total += open.prices?.[group] ?? 0
         total += tattooTotal(selectedTattoos, baselineTattoos, open.tattoos, open.tattooStacking)
         return total
     }, [baseline, baselineHair, baselineHead, baselineTattoos, categories, hair, head, open, ownedSnapshot, selectedTattoos])
