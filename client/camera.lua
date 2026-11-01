@@ -57,7 +57,7 @@ end
 local CAMERA_TRACE_FLAGS = 273 -- world geometry, objects, and vegetation
 local CAMERA_TRACE_RADIUS = 0.28
 local CAMERA_FAN_ANGLES = { 0.0, 28.0, -28.0, 55.0, -55.0, 82.0, -82.0, 180.0 }
-local MID_SPINE_BONE = 24816 -- SKEL_Spine2
+local MID_SPINE_BONE = 24816 -- SKEL_Spine1
 
 -- Camera-zone offsets are authored from the middle of the torso. Entity
 -- coordinates, however, are at the ped's model origin (near the feet), which

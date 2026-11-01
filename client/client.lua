@@ -736,6 +736,11 @@ RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
     elseif data.kind == 'component' and id and Shared.components[id] then
         local drawable = math.max(0, tonumber(data.drawable) or 0)
         SetPedComponentVariation(ped, id, drawable, math.max(0, tonumber(data.texture) or 0), 0)
+        -- The player chose this slot while a tattoo preview had it bared: their
+        -- choice is the outfit to keep, not the one remembered from before.
+        if temporaryOverride and activeSession.service ~= 'tattoo' and temporaryOverride.components[id] then
+            temporaryOverride.components[id] = { d = GetPedDrawableVariation(ped, id), t = GetPedTextureVariation(ped, id) }
+        end
         cb({
             ok = true,
             drawable = drawable,
@@ -750,6 +755,10 @@ RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
         else
             SetPedPropIndex(ped, id, drawable, math.max(0, tonumber(data.texture) or 0), true)
         end
+        if temporaryOverride and activeSession.service ~= 'tattoo' and temporaryOverride.props[id] ~= nil then
+            temporaryOverride.props[id] = GetPedPropIndex(ped, id) >= 0
+                and { d = GetPedPropIndex(ped, id), t = GetPedPropTextureIndex(ped, id) } or false
+        end
         cb({
             ok = true,
             drawable = drawable,
@@ -762,12 +771,39 @@ RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
     end
 end)
 
+-- Tattoo group -> Config.tattoo.undress.parts id that covers it.
+local TATTOO_GROUP_PARTS = { Head = 'headwear', Torso = 'top', Arms = 'top', Back = 'top', Legs = 'legs' }
+
+---Character creation (any non-tattoo session that offers tattoos): the studio
+---strips on open, but here the outfit stays on and hides the tattoo being
+---previewed. Bares the covering part (Config.tattoo.undress.previewInCreator).
+---The change goes through temporaryOverride, so it is never saved.
+local function previewTattooArea(ped, model, before, after)
+    if activeSession.service == 'tattoo' then return end
+    local cfg = Config.tattoo and Config.tattoo.undress
+    if type(cfg) ~= 'table' or cfg.previewInCreator == false then return end
+
+    local counts = Shared.tattooCounts(before)
+    for _, id in ipairs(after) do
+        if (counts[id] or 0) > 0 then
+            counts[id] = counts[id] - 1
+        else
+            local tattoo = Shared.tattooById(model, id)
+            local part = tattoo and undressPartById(cfg, TATTOO_GROUP_PARTS[tattoo.group])
+            if part then setPartUndressed(ped, model, part, true) end
+        end
+    end
+end
+
 RegisterNUICallback('qbclothing:nui:setTattoos', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local policy = Config.services[activeSession.service] or {}
     if not policy.tattoos then cb({ ok = false }); return end
     local ped = PlayerPedId()
-    applyTattoos(ped, currentModelName(ped), data.tattoos)
+    local model = currentModelName(ped)
+    local before = previewTattoos
+    applyTattoos(ped, model, data.tattoos)
+    previewTattooArea(ped, model, before, previewTattoos)
     cb({ ok = true, tattoos = previewTattoos })
 end)
 

@@ -94,14 +94,23 @@ for category, zone in pairs(Config.camera.categoryZones) do
 end
 
 -- The look-at point never rises above the head and the camera stays within the ped.
-runtime.setPedBounds(-1.0, 0.7)
+-- Each region is framed at its own height: head above chest above thighs above feet,
+-- all inside a standing freemode ped (about -1.3 .. +0.65m around the spine anchor).
+local zones = Config.camera.zones
+H.ok(zones.face.boneOffset.z > zones.torso.boneOffset.z, 'head is framed above the torso')
+H.ok(zones.torso.boneOffset.z > zones.legs.boneOffset.z, 'torso is framed above the legs')
+H.ok(zones.legs.boneOffset.z > zones.shoes.boneOffset.z, 'legs are framed above the shoes')
+H.ok(zones.face.boneOffset.z <= 0.65 - 0.15 + 1e-9, 'head look-at is not above the head')
+H.ok(zones.shoes.boneOffset.z >= -1.3, 'shoes look-at is not below the feet')
+
+runtime.setPedBounds(-1.3, 0.7)
 local face = Config.camera.zones.face
 local target, height = runtime.zoneHeights(face)
 H.ok(target <= 0.7 - 0.15 + 1e-9, 'face look-at is below the top of the head')
 H.ok(height <= 0.7 + 1e-9, 'face camera is not above the head')
 target = runtime.zoneHeights(Config.camera.zones.shoes)
 H.equal(target, Config.camera.zones.shoes.boneOffset.z, 'a zone inside the ped is untouched')
-runtime.setPedBounds(-1.0, 5.0)
+runtime.setPedBounds(-1.3, 5.0)
 target, height = runtime.zoneHeights(face)
 H.equal(target, face.boneOffset.z, 'a tall ped keeps the authored face framing')
 H.equal(height, face.boneOffset.z + face.camOffset.z)

@@ -390,6 +390,17 @@ Config.tattoo = {
             description = 'Shows clothing buttons (top, legs, shoes, headwear, undress all) in the tattoo studio so players can see tattoos under their clothes. Preview only: nothing is saved or charged and the original clothing is restored when the menu closes. Turn off to use the fixed strip in Config.tattooStrip with no buttons.',
             live = true,
         }) or true,
+        -- Character creation (and the admin session) also offers tattoos, but
+        -- clothing there hides them. When on, choosing a tattoo there bares the
+        -- clothing over its area for the preview (Head -> headwear, Torso/Arms/
+        -- Back -> top, Legs -> legs, using the `parts` below). Preview only: the
+        -- outfit that is saved is unchanged, and choosing an item in the menu for
+        -- a bared slot dresses it again. Read each time a tattoo is chosen.
+        previewInCreator = config and config.boolean(true, {
+            label = 'Show tattoos through clothing in character creation',
+            description = 'In character creation, picking a tattoo temporarily takes off the clothing covering that body area so the tattoo is visible. Preview only: the saved outfit is not changed. Turn off to leave clothing on.',
+            live = true,
+        }) or true,
         -- Parts (ids from `parts` below) already removed when the studio opens.
         -- The default matches what the studio always did before the buttons
         -- existed (top, legs and head cover off, shoes left on), so tattoos on
@@ -638,16 +649,23 @@ Config.ui = {
 }
 
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
--- callback. Offsets are relative to the ped's mid-spine bone in the ped's own
--- forward-facing frame; client/camera.lua turns these into world-space coords
--- every frame so they track ped rotation during the live orbit.
+-- callback. Offsets are relative to the ped's mid-spine bone (SKEL_Spine1,
+-- roughly the belly, about 1.2m above the feet on a standing freemode ped) in
+-- the ped's own forward-facing frame; client/camera.lua turns these into
+-- world-space coords every frame so they track ped rotation during the live
+-- orbit.
+--   boneOffset.z : height the camera LOOKS AT, in metres above that spine bone
+--                  (face ~ head centre, torso ~ chest, legs ~ thighs, shoes ~ feet).
+--   camOffset.y  : distance from the ped; camOffset.z: camera height above the
+--                  look-at point.
+-- Tune boneOffset.z if a custom ped/scale frames a region too high or low.
 Config.camera = {
     zones = {
-        full  = { boneOffset = vector3(0.0, 0.0, 0.0),  camOffset = vector3(0.0, 2.2, 0.3),  fov = 45.0 },
-        face  = { boneOffset = vector3(0.0, 0.0, 0.62), camOffset = vector3(0.0, 0.65, 0.05), fov = 30.0 },
-        torso = { boneOffset = vector3(0.0, 0.0, 0.42), camOffset = vector3(0.0, 1.1, 0.05),  fov = 35.0 },
-        legs  = { boneOffset = vector3(0.0, 0.0, -0.2), camOffset = vector3(0.0, 1.3, 0.05),  fov = 35.0 },
-        shoes = { boneOffset = vector3(0.0, 0.0, -0.85),camOffset = vector3(0.0, 1.1, -0.15), fov = 35.0 },
+        full  = { boneOffset = vector3(0.0, 0.0, 0.0),   camOffset = vector3(0.0, 2.2, 0.3),  fov = 45.0 },
+        face  = { boneOffset = vector3(0.0, 0.0, 0.5),   camOffset = vector3(0.0, 0.65, 0.0), fov = 30.0 },
+        torso = { boneOffset = vector3(0.0, 0.0, 0.1),   camOffset = vector3(0.0, 1.3, 0.05), fov = 35.0 },
+        legs  = { boneOffset = vector3(0.0, 0.0, -0.55), camOffset = vector3(0.0, 1.4, 0.05), fov = 35.0 },
+        shoes = { boneOffset = vector3(0.0, 0.0, -1.05), camOffset = vector3(0.0, 1.0, 0.1),  fov = 35.0 },
     },
     -- Free mouse-wheel zoom, applied as an OFFSET on top of whichever zone
     -- preset is selected (the presets stay jump-to shortcuts). `step` is
