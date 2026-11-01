@@ -79,15 +79,18 @@ export interface HeadValues {
     eyebrows: number
     eyebrowsOpacity: number
     eyebrowsColor: number
+    chestHair: number
+    chestHairOpacity: number
+    chestHairColor: number
 }
 
 export interface HeadPayload extends HeadValues {
     /** Skin tone is creation-only. */
     skinToneEditable?: boolean
     /** Which overlays this service may edit (Config.headOverlays). */
-    overlays?: { facialHair: boolean; eyebrows: boolean }
+    overlays?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean }
     /** Whether each overlay has a colour palette of its own (false: locked to the hair colour). */
-    overlayColors?: { facialHair: boolean; eyebrows: boolean }
+    overlayColors?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean }
 }
 
 export interface OpenPayload {

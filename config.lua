@@ -96,6 +96,18 @@ Config.headOverlays = {
             live = true,
         }) or true,
     },
+    chestHair = {
+        creator = config and config.boolean(true, {
+            label = 'Chest hair in character creation',
+            description = 'Lets players choose chest hair style, opacity and colour while creating a character. Turn off to hide chest hair options from creation.',
+            live = true,
+        }) or true,
+        barber = config and config.boolean(true, {
+            label = 'Chest hair at the barber',
+            description = 'Lets players change chest hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide chest hair options there.',
+            live = true,
+        }) or true,
+    },
 }
 
 -- Login colour re-assert. The saved skin is applied as soon as the character

@@ -7,19 +7,35 @@ export const HAIR_COMPONENT_ID = 2
 
 type Selected = { kind: string; id: number } | undefined
 
-export type OverlayKey = "facialHair" | "eyebrows"
+export type OverlayKey = "facialHair" | "eyebrows" | "chestHair"
 
 export const HEAD_OVERLAYS: {
     key: OverlayKey
     label: string
-    style: "beard" | "eyebrows"
-    opacity: "beardOpacity" | "eyebrowsOpacity"
-    color: "beardColor" | "eyebrowsColor"
+    style: "beard" | "eyebrows" | "chestHair"
+    opacity: "beardOpacity" | "eyebrowsOpacity" | "chestHairOpacity"
+    color: "beardColor" | "eyebrowsColor" | "chestHairColor"
     maxStyle: number
 }[] = [
-    { key: "facialHair", label: "Facial hair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28 },
+    { key: "facialHair", label: "Facial Hair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28 },
     { key: "eyebrows", label: "Eyebrows", style: "eyebrows", opacity: "eyebrowsOpacity", color: "eyebrowsColor", maxStyle: 33 },
+    { key: "chestHair", label: "Chest Hair", style: "chestHair", opacity: "chestHairOpacity", color: "chestHairColor", maxStyle: 15 },
 ]
+
+export type HairSection = "hair" | OverlayKey
+
+/** Sections of the Hair item: Hair itself plus every overlay the server allows.
+ * Empty when there is nothing to choose between (no overlays), so the menu
+ * keeps its single-section layout. */
+export function hairSections(overlays: { key: OverlayKey; label: string }[]): { key: HairSection; label: string }[] {
+    if (overlays.length === 0) return []
+    return [{ key: "hair", label: "Hair" }, ...overlays.map(({ key, label }) => ({ key, label }))]
+}
+
+/** The chosen section, falling back to Hair when it is not offered (a toggled-off overlay). */
+export function activeHairSection(sections: { key: HairSection }[], chosen: HairSection): HairSection {
+    return sections.some((section) => section.key === chosen) ? chosen : "hair"
+}
 
 function isComponent(selected: Selected, id: number) {
     return selected?.kind === "component" && selected.id === id

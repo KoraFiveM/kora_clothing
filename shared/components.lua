@@ -148,6 +148,7 @@ end
 Shared.headOverlays = {
     { key = 'facialHair', overlay = 1, style = 'beard', opacity = 'beardOpacity', color = 'beardColor', maxStyle = 28 },
     { key = 'eyebrows', overlay = 2, style = 'eyebrows', opacity = 'eyebrowsOpacity', color = 'eyebrowsColor', maxStyle = 33 },
+    { key = 'chestHair', overlay = 10, style = 'chestHair', opacity = 'chestHairOpacity', color = 'chestHairColor', maxStyle = 15 },
 }
 
 local function clampNumber(value, minimum, maximum, default)
@@ -177,7 +178,7 @@ end
 ---be, via Config.headOverlays.eyebrows.followHairColor (default false: their
 ---colour is independent). Facial hair has its own palette, which falls back to
 ---the hair colour only while unset (-1).
----@param key string facialHair | eyebrows
+---@param key string facialHair | eyebrows | chestHair
 ---@return boolean
 function Shared.overlayFollowsHair(key)
     local entry = (Config.headOverlays or {})[key]
@@ -189,7 +190,7 @@ end
 ---can edit the hair component (barber, hairdresser) use `barber`. A config
 ---without the table keeps the original behaviour: creator facial hair only.
 ---@param policy table Config.services entry
----@param key string 'facialHair' | 'eyebrows'
+---@param key string 'facialHair' | 'eyebrows' | 'chestHair'
 ---@return boolean
 function Shared.headOverlayEnabled(policy, key)
     local entry = (Config.headOverlays or {})[key]

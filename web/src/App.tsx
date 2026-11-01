@@ -42,7 +42,8 @@ import type {
     TattooStacking,
     ZoomPayload,
 } from "@/lib/types"
-import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, initialSelection, mergeHeadValues, overlayColorEditable, showFaceSkinPanel } from "@/lib/panels"
+import { activeHairSection, enabledOverlays, HAIR_COMPONENT_ID, hairSections, HEAD_OVERLAYS, initialSelection, mergeHeadValues, overlayColorEditable, showFaceSkinPanel } from "@/lib/panels"
+import type { HairSection } from "@/lib/panels"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
@@ -318,6 +319,7 @@ function VariationDetail({ item, onChange, onClear }: {
 }) {
     if (!item) return <div className="empty-panel"><User size={26} /><span>Pick an item from the list to adjust it.</span></div>
 
+    const isHair = item.kind === "component" && item.id === HAIR_COMPONENT_ID
     const removed = item.kind === "prop" && item.drawable < 0
     const clearable = item.kind === "prop" && item.clearable === true
     const canPrevDrawable = item.kind === "prop" && item.clearable ? item.drawable > -1 : item.drawable > 0
@@ -326,8 +328,12 @@ function VariationDetail({ item, onChange, onClear }: {
     const canNextTexture = !removed && item.texture < item.textureCount - 1
 
     return <div>
-        <h3 className="detail-title">{item.label}</h3>
-        <p className="detail-sub">{item.kind === "component" ? "Clothing item" : "Accessory"}</p>
+        {isHair
+            ? <p className="section-title section-head">{item.label}</p>
+            : <>
+                <h3 className="detail-title">{item.label}</h3>
+                {item.kind === "prop" ? <p className="detail-sub">Accessory</p> : <div className="detail-gap" />}
+            </>}
 
         <Stepper
             label="Style"
@@ -395,7 +401,7 @@ function HairColorPanel({ hair, onChange }: {
 }) {
     if (hair.palette.length === 0) return null
     return <div className="panel panel-pad hair-panel">
-        <p className="section-title">Hair Color</p>
+        <p className="section-title section-head">Hair Color</p>
         <HairColorGrid label="Primary (Base)" palette={hair.palette} value={hair.color} onSelect={(index) => onChange({ color: index, highlight: hair.highlight })} />
         <HairColorGrid label="Secondary (Highlights)" palette={hair.palette} value={hair.highlight} onSelect={(index) => onChange({ color: hair.color, highlight: index })} />
     </div>
@@ -498,7 +504,7 @@ function HeadOverlayPanel({ head, overlays, palette, onChange }: {
             const style = head[overlay.style]
             const opacity = head[overlay.opacity]
             return <div key={overlay.key} className="panel panel-pad head-panel">
-                <p className="section-title">{overlay.label}</p>
+                <p className="section-title section-head">{overlay.label}</p>
                 <Stepper
                     label={`${overlay.label} style`} text={style < 0 ? "None" : `${style + 1} / ${overlay.maxStyle + 1}`}
                     typed={{ value: style + 1, min: 0, max: overlay.maxStyle + 1, onCommit: (value) => onChange({ ...head, [overlay.style]: value - 1 }) }}
@@ -519,6 +525,25 @@ function HeadOverlayPanel({ head, overlays, palette, onChange }: {
             </div>
         })}
     </>
+}
+
+/** Hair, Facial Hair, Eyebrows and Chest Hair as selectable buttons; only the
+ * chosen section controls are shown below. */
+function HairSectionPanel({ sections, active, onSelect }: {
+    sections: { key: HairSection; label: string }[]
+    active: HairSection
+    onSelect: (key: HairSection) => void
+}) {
+    return <div className="panel panel-pad">
+        <p className="section-title">Style</p>
+        <div className="item-list">
+            {sections.map((section) => (
+                <button key={section.key} type="button" className="item-row" aria-pressed={active === section.key} onClick={() => onSelect(section.key)}>
+                    <span>{section.label}</span>
+                </button>
+            ))}
+        </div>
+    </div>
 }
 
 function OutfitsPanel({ outfits, expanded, onToggle, onWear, onDelete }: {
@@ -600,6 +625,7 @@ export default function App() {
     const [outfits, setOutfits] = useState<OutfitSummary[]>([])
     const [activeGroup, setActiveGroup] = useState<CategoryGroup>("tops")
     const [selectedKey, setSelectedKey] = useState<string>()
+    const [hairSection, setHairSection] = useState<HairSection>("hair")
     const [zone, setZone] = useState<Zone>("full")
     const [undressActive, setUndressActive] = useState<string[]>([])
     const [error, setError] = useState<string>()
@@ -643,7 +669,12 @@ export default function App() {
     const groupsPresent = useMemo(() => new Set(categories.map((item) => item.category)), [categories])
     const itemsInActiveGroup = useMemo(() => categories.filter((item) => item.category === activeGroup), [categories, activeGroup])
     const selectedItem = useMemo(() => categories.find((item) => itemKey(item) === selectedKey), [categories, selectedKey])
-    const overlays = enabledOverlays(selectedItem, head)
+    const allOverlays = enabledOverlays(selectedItem, head)
+    const sections = hairSections(allOverlays)
+    const activeSection = activeHairSection(sections, hairSection)
+    // With sections, only the chosen one shows its controls; without, as before.
+    const overlays = sections.length > 0 ? allOverlays.filter((overlay) => overlay.key === activeSection) : allOverlays
+    const showDetail = sections.length === 0 || activeSection === "hair"
 
     const changedTotal = useMemo(() => {
         if (!open || open.free || ownedSnapshot) return 0
@@ -857,22 +888,24 @@ export default function App() {
             activeGroup never moves off its "tops" default, which would
             otherwise show a "Tops" header over a permanently empty list. */}
         {groupsPresent.size > 0 && <div className="rail rail-right">
-            <div className="panel panel-pad">
+            {/* A group holding only the Hair item gets its section buttons instead of a one-button list. */}
+            {!(sections.length > 0 && itemsInActiveGroup.length <= 1) && <div className="panel panel-pad">
                 <p className="section-title">{GROUP_LABEL[activeGroup]}</p>
                 <ItemList items={itemsInActiveGroup} selectedKey={selectedKey} onSelect={(item) => setSelectedKey(itemKey(item))} />
-            </div>
-            <div className="panel panel-pad">
+            </div>}
+            {sections.length > 0 && <HairSectionPanel sections={sections} active={activeSection} onSelect={setHairSection} />}
+            {showDetail && <div className="panel panel-pad">
                 <VariationDetail
                     item={selectedItem}
                     onChange={(next) => selectedItem && void setVariation(selectedItem, next)}
                     onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
                 />
-            </div>
+            </div>}
             {/* Hair colour is a property of the hair component, so it appears
                 with that component and nowhere else. `hair` itself is already
                 null for any service that cannot edit component 2, so a
                 clothing shop never renders these at all. */}
-            {hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
+            {showDetail && hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
                 <HairColorPanel hair={hair} onChange={(next) => void setHairColor(next)} />
             )}
             {/* Each head panel belongs to one Style item (src/lib/panels.ts), not

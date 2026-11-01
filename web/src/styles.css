@@ -118,6 +118,8 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 /* --- variation detail (right rail) --- */
 
 .detail-title { margin: 0 0 2px; font-size: 16px; font-weight: 800; }
+.section-head { font-size: 12px; }
+.detail-gap { height: 12px; }
 .detail-sub { margin: 0 0 14px; color: hsl(var(--muted-foreground)); font-size: 11px; }
 .stepper { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin-bottom: 10px; }
 .stepper span { color: hsl(var(--foreground)); font-size: 12px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
@@ -212,6 +214,7 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
   .tab svg { width: 15px; height: 15px; }
   .item-row { padding: 7px; font-size: 11px; }
   .detail-sub, .section-title { font-size: 9px; }
+  .section-head { font-size: 11px; }
   .detail-title { font-size: 14px; }
   .bottom-bar { left: 8px; right: 8px; bottom: 8px; max-width: none; padding: 7px; transform: none; gap: 6px; }
   .save-field { flex: 1 1 100%; }

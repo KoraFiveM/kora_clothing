@@ -62,6 +62,17 @@ H.equal(clamped.eyebrowsColor, Shared.maxHairColorIndex)
 H.equal(clamped.beard, -1)
 H.equal(clamped.beardOpacity, 1.0, 'NaN opacity falls back to the default')
 
+-- Chest hair is head overlay 10 and is saved and re-applied like the others.
+H.ok(Shared.headOverlayEnabled(Config.services.barber, 'chestHair'), 'chest hair is on at the barber by default')
+H.ok(not Shared.headOverlayEnabled(Config.services.clothing, 'chestHair'), 'chest hair is never on in a clothing shop')
+H.equal(Shared.sanitiseHead({ chestHair = 99 }).chestHair, 15)
+H.equal(Shared.sanitiseHead({}).chestHair, -1, 'old saves have no chest hair')
+overlays, colors = {}, {}
+runtime.applySkin(1, { hairColor = 5, head = { chestHair = 3, chestHairOpacity = 0.6, chestHairColor = 12 } }, 'mp_m_freemode_01')
+H.equal(overlays[10].style, 3)
+H.equal(overlays[10].opacity, 0.6)
+H.equal(colors[10], 12)
+
 -- Save/load round trip through the client: apply, snapshot, sanitise, apply again.
 local head = { skinTone = 4, beard = 5, beardOpacity = 0.5, beardColor = 9, eyebrows = 12, eyebrowsOpacity = 0.8, eyebrowsColor = -1 }
 runtime.applySkin(1, { head = head }, 'mp_m_freemode_01')
@@ -111,9 +122,11 @@ H.equal(runtime.headPayload('clothing'), nil, 'clothing shops get no head contro
 Config.headOverlays.eyebrows.barber = false
 H.equal(runtime.headPayload('barber').overlays.eyebrows, false, 'false hides the category')
 Config.headOverlays.facialHair.barber = false
+Config.headOverlays.chestHair.barber = false
 H.equal(runtime.headPayload('barber'), nil, 'nothing editable means no payload')
 H.equal(runtime.headPayload('creation').skinToneEditable, true)
 Config.headOverlays.eyebrows.barber, Config.headOverlays.facialHair.barber = true, true
+Config.headOverlays.chestHair.barber = true
 
 -- Eyebrow colour is independent of hair colour by default (male and female
 -- freemode peds take the same path), and Config can lock it back to the hair.
