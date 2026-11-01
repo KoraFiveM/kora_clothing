@@ -574,7 +574,19 @@ local function requestSession(src, mode, extra, opening)
     -- Apply this to normal target interactions as well as admin sessions so a
     -- player is not rejected merely for using the other styling location.
     local modelGender = Shared.modelGender(model)
-    if (service == 'barber' or service == 'hairdresser') and modelGender then
+    -- Config.genderLockedSalons (read per request, so live edits apply) turns
+    -- the swap off for shop visits: each location then serves only its own
+    -- gender. Admin sessions keep the swap so staff can always open the
+    -- editor that matches the target's model.
+    local groomingService = service == 'barber' or service == 'hairdresser'
+    if groomingService and modelGender and Config.genderLockedSalons == true and mode == 'shop' then
+        if modelGender ~= serviceConfig(service).model then
+            TriggerClientEvent('qbclothing:client:sessionError', src, service == 'barber'
+                and 'This barber only serves male characters. Try a hairdresser.'
+                or 'This hairdresser only serves female characters. Try a barber.')
+            return
+        end
+    elseif groomingService and modelGender then
         service = modelGender == 'female' and 'hairdresser' or 'barber'
     end
     if not serviceAllowsModel(service, model) then

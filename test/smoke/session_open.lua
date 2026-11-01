@@ -244,6 +244,70 @@ local count = #opens
 start('admin', { service = 'tattoo' })
 H.equal(#opens, count, 'remote admin grant remains one-use')
 
+-- Config.genderLockedSalons: off keeps the model-based swap; on rejects the
+-- wrong gender at shops (with a message), but never affects admin sessions,
+-- creation or other services. Read live, so toggling needs no restart.
+do
+    local barberShop, hairShop
+    for index, shop in ipairs(Config.shops) do
+        if shop.service == 'barber' and not barberShop then barberShop = index end
+        if shop.service == 'hairdresser' and not hairShop then hairShop = index end
+    end
+    H.ok(barberShop and hairShop, 'config has a barber and a hairdresser')
+    local function visit(shopIndex, model, mode, extra)
+        saved = mode ~= 'firstCharacter' and { model = model, skin = {} } or nil
+        position = Config.shops[shopIndex or 2].coords
+        local count, errors = #opens, #sessionErrors
+        start(mode or 'shop', extra or { shopId = shopIndex })
+        local opened = #opens > count and opens[#opens].payload.service or nil
+        local err = #sessionErrors > errors and sessionErrors[#sessionErrors].payload or nil
+        if opened then cancel() end
+        return opened, err
+    end
+    local male, female = Shared.models.male, Shared.models.female
+    local maleMsg = 'This barber only serves male characters. Try a hairdresser.'
+    local femaleMsg = 'This hairdresser only serves female characters. Try a barber.'
+
+    H.equal(Config.genderLockedSalons, false, 'salons are open to everyone by default')
+    H.equal(visit(barberShop, female), 'hairdresser', 'off: a woman at the barber gets the hairdresser menu')
+    H.equal(visit(hairShop, male), 'barber', 'off: a man at the hairdresser gets the barber menu')
+    H.equal(visit(barberShop, male), 'barber', 'off: barber serves a man')
+    H.equal(visit(hairShop, female), 'hairdresser', 'off: hairdresser serves a woman')
+
+    Config.genderLockedSalons = true
+    local service, err = visit(barberShop, female)
+    H.equal(service, nil, 'on: a woman is not served at the barber')
+    H.equal(err, maleMsg, 'on: the barber explains who it serves')
+    service, err = visit(hairShop, male)
+    H.equal(service, nil, 'on: a man is not served at the hairdresser')
+    H.equal(err, femaleMsg, 'on: the hairdresser explains who it serves')
+    H.equal(visit(barberShop, male), 'barber', 'on: barber serves a man with no swap')
+    H.equal(visit(hairShop, female), 'hairdresser', 'on: hairdresser serves a woman with no swap')
+    service, err = visit(barberShop, 'a_c_dog')
+    H.equal(service, nil, 'on: a non-freemode ped is still rejected at the barber')
+    H.ok(err, 'on: non-freemode rejection still notifies')
+    service, err = visit(hairShop, 'a_c_dog')
+    H.equal(service, nil, 'on: a non-freemode ped is still rejected at the hairdresser')
+    H.ok(err, 'on: non-freemode rejection at the hairdresser notifies')
+
+    -- Unaffected flows while locked.
+    H.equal(visit(2, female, 'shop', { shopId = 2 }), 'clothing', 'on: clothing shops serve everyone')
+    H.equal(visit(nil, female, 'wardrobe'), 'clothing', 'on: wardrobes are unaffected')
+    admin = true
+    H.equal(visit(nil, female, 'admin', { service = 'barber' }), 'hairdresser', 'on: admin barber session still follows the target model')
+    H.equal(visit(nil, male, 'admin', { service = 'hairdresser' }), 'barber', 'on: admin hairdresser session still follows the target model')
+    H.equal(visit(nil, female, 'admin', { service = 'tattoo' }), 'tattoo', 'on: admin tattoo session is unaffected')
+    admin = false
+    H.equal(visit(nil, female, 'firstCharacter'), 'creation', 'on: character creation is unaffected')
+    -- A mandatory creation fitting cannot be cancelled; unload ends it.
+    emit('QBCore:Server:OnPlayerUnload', 7, 7)
+
+    Config.genderLockedSalons = false
+    H.equal(visit(barberShop, female), 'hairdresser', 'toggling off again restores the swap')
+    saved = { model = Shared.models.male, skin = {} }
+    position = Config.shops[2].coords
+end
+
 -- Compat-disabled installations use the raw native, with the same local notice.
 saved = { model = Shared.models.male, skin = {} }
 for _, available in ipairs({ true, false }) do

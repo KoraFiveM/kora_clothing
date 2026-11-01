@@ -532,6 +532,18 @@ Config.hideRadarInMenu = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- Off (default): barbers and hairdressers both serve everyone, and the server
+-- gives each player the menu matching their freemode model. On: a barber only
+-- serves male freemode models and a hairdresser only female ones; the wrong
+-- gender is told to try the other shop. Shop visits only -- admin sessions,
+-- character creation and other services are unaffected. Read on every shop
+-- visit, so changes apply to the next session without a restart.
+Config.genderLockedSalons = config and config.boolean(false, {
+    label = 'Gender-locked salons',
+    description = 'When enabled, barbers only serve male characters and hairdressers only female characters, and anyone else is told to try the other shop. When disabled, both shops serve everyone and show the menu matching the character. Admin sessions and character creation are not affected. Applies to the next shop visit.',
+    live = true,
+}) or false
+
 -- How players open a shop. 'target' uses a kora_target zone option; 'textui'
 -- shows "[E] Open <shop>" through kora_lib's TextUI while inside the shop zone
 -- and opens on E. Read when the resource starts.
