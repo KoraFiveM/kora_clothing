@@ -43,6 +43,7 @@ client_scripts {
     '@kora_theme/client/bridge.lua',
     'client/camera.lua',
     'client/rotate.lua',
+    'client/quicktoggle.lua',
     'client/client.lua',
 }
 

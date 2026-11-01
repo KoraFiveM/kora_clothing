@@ -589,6 +589,8 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
         previousAppearance = { model = payload.model, skin = payload.skin },
     }
     undressActive = {}
+    -- The ped was just dressed from the saved skin, so any /c toggle memory is moot.
+    if QuickToggle then QuickToggle.forget() end
     activeSession.hudHidden = hideHudForSession()
     activeSession.radarHidden = hideRadarForSession()
 
@@ -621,7 +623,10 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateDragGuard = Config.rotateDragGuard ~= false,
             rotateMode = RotateControl and RotateControl.mode() or 'pointer',
             rotateRightButton = Config.rotateRightButton ~= false,
+            rotateInvert = Config.rotateInvert == true,
+            rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
+            creatorOpensOnHair = (Config.ui or {}).creatorOpensOnHair ~= false,
             shopLabel = payload.shopLabel,
             -- Read back off the live ped, not echoed from the request --
             -- if the requested model failed to stream in time, this must
@@ -1424,6 +1429,9 @@ AddEventHandler('onResourceStop', function(resource)
         restoreTemporaryOverride(PlayerPedId())
     end
 end)
+
+-- Lets the /c quick toggles (client/quicktoggle.lua) stay out of the fitting room.
+if QuickToggle then QuickToggle.sessionActive = function() return activeSession ~= nil end end
 
 -- Deliberately absent in production. Same pattern as kora_target's
 -- Config.target.testMode -> Target._testRuntime: lets the standalone smoke

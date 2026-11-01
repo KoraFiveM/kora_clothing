@@ -147,7 +147,7 @@ export class RotateDrag {
         this.lastY = y
         let turned = false
         if (dx !== 0) { this.io.rotate(-dx * this.opts.degPerPixel); turned = true }
-        const margin = this.opts.edgeMargin ?? 0.12
+        const margin = this.opts.edgeMargin ?? 0.04
         const nearEdge = x < width * margin || x > width * (1 - margin) || y < height * margin || y > height * (1 - margin)
         if (nearEdge && !this.awaitingCenter) {
             this.awaitingCenter = true

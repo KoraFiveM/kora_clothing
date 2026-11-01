@@ -99,8 +99,14 @@ export interface OpenPayload {
     rotateMode?: "controls" | "recenter" | "pointer" | "plain"
     /** Config.rotateRightButton; absent means on. */
     rotateRightButton?: boolean
+    /** Config.rotateInvert; absent means not inverted. */
+    rotateInvert?: boolean
+    /** Config.rotateRecenterEdge (recenter mode); absent means the built-in default. */
+    rotateRecenterEdge?: number
     /** Config.ui.showControlsHint; absent means on. */
     showControlsHint?: boolean
+    /** Config.ui.creatorOpensOnHair; absent means on. */
+    creatorOpensOnHair?: boolean
     shopLabel?: string
     model: string
     categories: ClothingCategoryItem[]

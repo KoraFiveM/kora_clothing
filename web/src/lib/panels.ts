@@ -36,6 +36,20 @@ export function enabledOverlays(selected: Selected, head: HeadPayload | null) {
     return HEAD_OVERLAYS.filter((overlay) => head.overlays?.[overlay.key] === true)
 }
 
+/** First tab/item of a session. Character creation (skin tone editable) opens
+ * on Style with Hair selected, so hair, hair colour, facial hair and eyebrows
+ * are visible straight away; Config.ui.creatorOpensOnHair = false opts out. */
+export function initialSelection<T extends { kind: string; id: number; category: string }>(
+    categories: T[], groupOrder: string[], creator: boolean, opensOnHair: boolean | undefined,
+): { group: string | undefined; item: T | undefined } {
+    if (creator && opensOnHair !== false) {
+        const hair = categories.find((item) => item.kind === "component" && item.id === HAIR_COMPONENT_ID)
+        if (hair) return { group: hair.category, item: hair }
+    }
+    const group = groupOrder.find((candidate) => categories.some((item) => item.category === candidate))
+    return { group, item: categories.find((item) => item.category === group) }
+}
+
 /** Keeps the editor flags while taking the values the game confirmed. */
 export function mergeHeadValues(current: HeadPayload, values: HeadValues): HeadPayload {
     return { ...current, ...values }

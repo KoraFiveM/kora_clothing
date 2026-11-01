@@ -580,6 +580,23 @@ Config.rotateRightButton = config and config.boolean(true, {
     live = true,
 }) or true
 
+-- Reverses the drag direction in every rotateMode (default: dragging right turns
+-- the character clockwise, like grabbing its front).
+Config.rotateInvert = config and config.boolean(false, {
+    label = 'Invert rotate direction',
+    description = 'Reverses which way the character turns when you drag the mouse left or right.',
+    live = true,
+}) or false
+
+-- rotateMode = 'recenter' only. How close to a screen edge (fraction of the
+-- screen) the cursor must get before it is moved back to the centre.
+Config.rotateRecenterEdge = config and config.number(0.04, {
+    min = 0.01, max = 0.3,
+    label = 'Recentre distance from edge (recenter mode)',
+    description = 'In recenter mode the cursor is only moved back to the screen centre once it is this close to an edge (0.04 = 4% of the screen).',
+    live = true,
+}) or 0.04
+
 -- rotateMode = 'controls' only. Degrees turned per unit of mouse movement as the
 -- game reports it (INPUT_LOOK_LR, -1..1 per frame). Raise it if turning feels slow.
 Config.rotateControlsSensitivity = config and config.number(8.0, {
@@ -607,6 +624,15 @@ Config.ui = {
     showControlsHint = config and config.boolean(true, {
         label = 'Show camera controls hint',
         description = 'Shows a short Drag to rotate / Scroll to zoom reminder when a clothing, barber, tattoo or creator menu opens. It fades after the first rotate or zoom, or after about 8 seconds. Turn off to never show it.',
+        live = true,
+    }) or true,
+    -- Character creation (and admin sessions) open on the Style tab with Hair
+    -- selected, so hair, hair colour, facial hair and eyebrows are visible at
+    -- once instead of behind Style > Hair. Which of those parts are offered is
+    -- still decided by Config.headOverlays. Off keeps the old start on Tops.
+    creatorOpensOnHair = config and config.boolean(true, {
+        label = 'Creator opens on hair and grooming',
+        description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
         live = true,
     }) or true,
 }
@@ -683,6 +709,162 @@ Config.camera = {
     transitionMs = 350,
 }
 
+-- Quick clothing toggles: `/c vest`, `/c pants`, ... take ONE item off and
+-- a second use puts back exactly what was worn (drawable, texture, palette).
+-- Everything is local to the player's ped: nothing is sent to the server or
+-- saved, so the saved outfit stays the "put back" state. Opening a fitting-room
+-- menu puts everything back first. If the player changes an item themselves
+-- (menu, outfit, another script) after taking it off, the remembered value is
+-- stale and is dropped instead of being restored over their change.
+-- The command name is registered when the resource starts; the other options
+-- are read each time the command is used.
+--
+--   enabled      : master switch for the whole feature (no command, no suggestion).
+--   command      : chat command name.
+--   cooldownMs   : minimum time between two uses; 0 disables the cooldown.
+--   allowDead / allowCuffed / allowInVehicle : whether the command works in that state.
+--   animations   : short clothing animation per part (each part's animDict/animClip/animMs).
+--                  Never played in a vehicle (animationsInVehicle) or when a part has no animDict.
+--   chatSuggestion : register the /c chat suggestion listing the valid parts.
+--   visor        : { male = { [hatDrawable] = otherDrawable }, female = ... } pairs of
+--                  hat/helmet drawables that are the same helmet with the visor up/down.
+--                  `/c visor` swaps between the two (texture kept, either direction works).
+--                  GTA offers no way to detect visor variants, so empty by default: the player
+--                  then sees "no visor variant". Fill in for the helmets of your clothing pack.
+--   parts        : id (also the argument), aliases (other accepted arguments), label,
+--                  male/female = freemode components set to a "nothing" drawable
+--                  (id = GTA component, d = drawable, t = texture), props = prop slots cleared
+--                  (0 hat, 1 glasses, 2 ears, 6 watch, 7 bracelet). The defaults are the stock
+--                  freemode "bare" drawables, like Config.tattoo.undress.parts. `visor` marks the
+--                  part handled through Config.quickToggle.visor instead. `shirt` includes the
+--                  undershirt and arms so the torso looks right. Only valid ids; an
+--                  out-of-range drawable is skipped. `reset` / `all` (and `/c` with
+--                  `resetWords`) put everything back.
+Config.quickToggle = {
+    enabled = config and config.boolean(true, {
+        label = 'Quick clothing toggles (/c <part>)',
+        description = 'Adds a chat command (default /c) with a part argument (vest, shirt, pants, shoes, hat, mask, visor, glasses, ...) that takes that clothing item off and, on a second use, puts it back. Temporary: nothing is saved. Turn off to remove the command and its chat suggestion (applies on the next resource start).',
+    }) or true,
+    command = config and config.string('c', {
+        label = 'Quick toggle command name',
+        description = 'Chat command name without the slash. Change it if another resource already uses /c. Applies on the next resource start.',
+    }) or 'c',
+    chatSuggestion = config and config.boolean(true, {
+        label = 'Quick toggle chat suggestion',
+        description = 'Shows the command and its valid parts in the chat suggestions.',
+    }) or true,
+    cooldownMs = config and config.integer(1500, {
+        min = 0, max = 60000,
+        label = 'Quick toggle cooldown (ms)',
+        description = 'Minimum time between two uses of the command by one player. 0 disables the cooldown.',
+        live = true,
+    }) or 1500,
+    allowDead = config and config.boolean(false, {
+        label = 'Quick toggles while dead',
+        description = 'Allow the command while the player is dead or downed.',
+        live = true,
+    }) or false,
+    allowCuffed = config and config.boolean(false, {
+        label = 'Quick toggles while cuffed',
+        description = 'Allow the command while handcuffed (needs kora_police; ignored if it is not running).',
+        live = true,
+    }) or false,
+    allowInVehicle = config and config.boolean(true, {
+        label = 'Quick toggles in a vehicle',
+        description = 'Allow the command while sitting in a vehicle.',
+        live = true,
+    }) or true,
+    animations = config and config.boolean(true, {
+        label = 'Quick toggle animations',
+        description = 'Plays a short clothing animation when an item is taken off or put back. Turn off for instant changes.',
+        live = true,
+    }) or true,
+    animationsInVehicle = config and config.boolean(false, {
+        label = 'Quick toggle animations in a vehicle',
+        description = 'Also play the animation while in a vehicle. Off by default: the change is instant there.',
+        live = true,
+    }) or false,
+    resetWords = config and config.list({ 'reset', 'all' }, config.string('reset'), {
+        label = 'Quick toggle reset arguments',
+        description = 'Arguments that put every removed item back on.',
+        live = true,
+    }) or { 'reset', 'all' },
+    visor = {
+        male = {},
+        female = {},
+    },
+    parts = (function()
+        local function ids(list)
+            if not config then return list end
+            return config.list(list, config.integer(0, { min = 0 }))
+        end
+        local function words(list)
+            if not config then return list end
+            return config.list(list, config.string('x'))
+        end
+        local function comps(list)
+            if not config then return list end
+            return config.list(list, config.object({
+                id = config.integer(0, { min = 0 }),
+                d = config.integer(0, { min = 0 }),
+                t = config.integer(0, { min = 0 }),
+            }))
+        end
+        local head = { animDict = 'clothingtie', animClip = 'try_tie_neutral_a', animMs = 1200 }
+        local body = { animDict = 'clothingshirt', animClip = 'try_shirt_positive_a', animMs = 1500 }
+        local function part(def, anim)
+            def.aliases = words(def.aliases or {})
+            def.props = ids(def.props or {})
+            -- Typed lists: the config adopter drops empty untyped tables, which would
+            -- leave prop-only parts (hat, glasses, ...) without their male/female list.
+            def.male = comps(def.male or {})
+            def.female = comps(def.female or {})
+            def.visor = def.visor == true
+            def.animDict, def.animClip, def.animMs = anim.animDict, anim.animClip, anim.animMs
+            return def
+        end
+        local function shirtSet() return { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } } end
+        local parts = {
+            part({ id = 'vest', label = 'Vest', aliases = { 'kevlar', 'armor', 'armour' }, male = { { id = 9, d = 0, t = 0 } }, female = { { id = 9, d = 0, t = 0 } } }, body),
+            part({ id = 'shirt', label = 'Shirt', aliases = { 'top', 'jacket', 'torso' }, male = shirtSet(), female = shirtSet() }, body),
+            part({ id = 'pants', label = 'Pants', aliases = { 'legs', 'trousers' }, male = { { id = 4, d = 21, t = 0 } }, female = { { id = 4, d = 15, t = 0 } } }, body),
+            part({ id = 'shoes', label = 'Shoes', aliases = { 'feet', 'boots' }, male = { { id = 6, d = 34, t = 0 } }, female = { { id = 6, d = 35, t = 0 } } }, body),
+            part({ id = 'hat', label = 'Hat', aliases = { 'helmet', 'cap' }, props = { 0 } }, head),
+            part({ id = 'mask', label = 'Mask', male = { { id = 1, d = 0, t = 0 } }, female = { { id = 1, d = 0, t = 0 } } }, head),
+            part({ id = 'visor', label = 'Visor', visor = true, props = { 0 } }, head),
+            part({ id = 'glasses', label = 'Glasses', aliases = { 'glass', 'shades' }, props = { 1 } }, head),
+            part({ id = 'bag', label = 'Bag', aliases = { 'backpack' }, male = { { id = 5, d = 0, t = 0 } }, female = { { id = 5, d = 0, t = 0 } } }, body),
+            part({ id = 'chain', label = 'Neck item', aliases = { 'neck', 'necklace', 'tie' }, male = { { id = 7, d = 0, t = 0 } }, female = { { id = 7, d = 0, t = 0 } } }, head),
+            part({ id = 'ears', label = 'Earrings', aliases = { 'earrings', 'ear' }, props = { 2 } }, head),
+            part({ id = 'watch', label = 'Watch', props = { 6 } }, body),
+            part({ id = 'bracelet', label = 'Bracelet', props = { 7 } }, body),
+        }
+        if not config then return parts end
+        local component = config.object({
+            id = config.integer(0, { min = 0 }),
+            d = config.integer(0, { min = 0 }),
+            t = config.integer(0, { min = 0 }),
+        })
+        local schema = config.object({
+            id = config.string('shirt'),
+            label = config.string('Shirt'),
+            aliases = config.list({}, config.string('x')),
+            male = config.list({}, component),
+            female = config.list({}, component),
+            props = config.list({}, config.integer(0, { min = 0 })),
+            visor = config.boolean(false),
+            animDict = config.string(''),
+            animClip = config.string(''),
+            animMs = config.integer(1500, { min = 0, max = 10000 }),
+        })
+        return config.list(parts, schema, {
+            label = 'Quick toggle parts',
+            description = 'One entry per /c argument: id, aliases, and the freemode components (id/drawable/texture "nothing" values per gender) and prop slots it removes. animDict/animClip/animMs set the animation (leave animDict empty for none). Only valid non-negative ids; an out-of-range drawable is skipped. Never saved.',
+            live = true,
+        })
+    end)(),
+}
+
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if Kora and Kora.config and Kora.config.adopt then
     local tattooStripItem = Kora.config.object({
@@ -701,5 +883,14 @@ if Kora and Kora.config and Kora.config.adopt then
         label = 'Female tattoo preview clothing',
         description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a female freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
     })
+    local visorPair = Kora.config.integer(0, { min = 0 })
+    for _, gender in ipairs({ 'male', 'female' }) do
+        Config.quickToggle.visor[gender] = Kora.config.map(Config.quickToggle.visor[gender], visorPair, {
+            keyType = 'integer',
+            live = true,
+            label = ('Quick toggle visor pairs (%s)'):format(gender),
+            description = 'Maps a hat/helmet drawable to the drawable of the same helmet with the visor in the other position. /c visor swaps between the two (works in both directions if you list both). Empty means no helmet has a visor variant.',
+        })
+    end
     Config = Kora.config.adopt(Config)
 end

@@ -289,6 +289,44 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
 
+## Quick clothing toggles (`/c <part>`)
+
+Take one item off, or put it back, without opening the clothing menu:
+`/c vest`, `/c shirt`, `/c pants`, `/c shoes`, `/c hat`, `/c mask`, `/c visor`,
+`/c glasses`, plus `bag`, `chain`, `ears`, `watch` and `bracelet`. Aliases work
+too (`top` = shirt, `helmet` = hat, `legs` = pants, ...). `/c` on its own, or
+with an unknown part, shows the usage. `/c reset` (or `/c all`) puts everything
+back.
+
+- Each use **toggles**: the first removes the item, the second restores exactly
+  what was worn (drawable, texture, palette). `shirt` also removes the
+  undershirt and arms so the torso looks right.
+- **Temporary**: nothing is sent to the server or saved; the saved outfit is the
+  "put back" state. If the player changes an item meanwhile (clothing menu,
+  outfit, another script) the remembered value is dropped, never restored over
+  their change. The command is blocked while a fitting-room menu is open, and the menu starts from the saved outfit.
+- `visor` swaps a hat/helmet with its visor-up/visor-down drawable using
+  `Config.quickToggle.visor` (`{ male = { [hatDrawable] = otherDrawable } }`).
+  GTA cannot detect visor variants, so it ships empty and the player sees "no
+  visor to flip" until you list the helmets of your pack.
+- Gloves are not a separate argument: gloves are part of the arms (component 3),
+  which `shirt` already bares.
+- Client side only (`client/quicktoggle.lua`), chat suggestion included.
+
+| `Config.quickToggle` option | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | Turns the whole feature off (no command, no suggestion). |
+| `command` | `'c'` | Command name; change it if another resource uses `/c`. Read at start. |
+| `chatSuggestion` | `true` | Register the chat suggestion listing the parts. |
+| `cooldownMs` | `1500` | Minimum time between uses; `0` disables. |
+| `allowDead` / `allowCuffed` | `false` / `false` | Work while dead or handcuffed (cuffed needs kora_police). |
+| `allowInVehicle` | `true` | Work while seated in a vehicle. |
+| `animations` | `true` | Short clothing animation per part. |
+| `animationsInVehicle` | `false` | Play the animation in a vehicle too. |
+| `resetWords` | `{ 'reset', 'all' }` | Arguments that put everything back. |
+| `visor` | empty | Helmet visor drawable pairs per gender. |
+| `parts` | see `config.lua` | Per part: `id`, `aliases`, `label`, per-gender `male`/`female` "nothing" components, `props` slots, `visor`, `animDict`/`animClip`/`animMs`. |
+
 ## Tattoo studio
 
 ### Clothing buttons

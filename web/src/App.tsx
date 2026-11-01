@@ -42,7 +42,7 @@ import type {
     TattooStacking,
     ZoomPayload,
 } from "@/lib/types"
-import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, mergeHeadValues, showFaceSkinPanel } from "@/lib/panels"
+import { enabledOverlays, HAIR_COMPONENT_ID, HEAD_OVERLAYS, initialSelection, mergeHeadValues, showFaceSkinPanel } from "@/lib/panels"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
 const GROUP_ORDER: CategoryGroup[] = ["tops", "legs", "shoes", "body", "accessories"]
@@ -135,7 +135,7 @@ function useZoom() {
     }, [flush])
 }
 
-function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton }: {
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, edgeMargin }: {
     io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
@@ -145,8 +145,10 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     pointerLock: boolean
     dragGuard: boolean
     rightButton: boolean
+    invert: boolean
+    edgeMargin?: number
 }) {
-    const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL, guard: dragGuard, rightButton }
+    const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
     const dragRef = useRef<RotateDrag | null>(null)
     if (!dragRef.current) dragRef.current = new RotateDrag(io, options)
     const drag = dragRef.current
@@ -595,11 +597,9 @@ export default function App() {
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
-        const groups = new Set(payload.categories.map((item) => item.category))
-        const firstGroup = GROUP_ORDER.find((group) => groups.has(group)) ?? "tops"
-        setActiveGroup(firstGroup)
-        const firstItem = payload.categories.find((item) => item.category === firstGroup)
-        setSelectedKey(firstItem ? itemKey(firstItem) : undefined)
+        const start = initialSelection(payload.categories, GROUP_ORDER, payload.head?.skinToneEditable === true, payload.creatorOpensOnHair)
+        setActiveGroup((start.group as CategoryGroup | undefined) ?? "tops")
+        setSelectedKey(start.item ? itemKey(start.item) : undefined)
     })
 
     useNuiEvent<OutfitSummary[]>("qbclothing:nui:outfits", (list) => setOutfits(list ?? []))
@@ -775,7 +775,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className="clothing-shell">
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} edgeMargin={open.rotateRecenterEdge} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

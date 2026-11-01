@@ -26,6 +26,17 @@ test("colour palette panels expand fully with no inner scroll area", () => {
     }
 })
 
+test("the right rail is the single scroll container, sized to its content", () => {
+    const right = rule(".rail-right")
+    assert.match(right, /bottom: auto/)
+    assert.match(right, /max-height: calc\(100vh - var\(--rail-top\) - var\(--rail-bottom\)\)/)
+    assert.match(right, /pointer-events: auto/)
+})
+
+test("colour swatches wrap into as many columns as fit", () => {
+    assert.match(rule(".swatch-grid"), /repeat\(auto-fill, minmax\(22px, 1fr\)\)/)
+})
+
 test("the wheel zoom handler lives on the viewport, not on the rail panels", () => {
     const app = readFileSync(new URL("../App.tsx", import.meta.url), "utf8")
     assert.equal(app.match(/onWheel=/g)?.length, 1)

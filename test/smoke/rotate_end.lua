@@ -72,6 +72,11 @@ H.equal(open().showControlsHint, true, 'hint option is sent on by default')
 Config.ui.showControlsHint = false
 H.equal(open().showControlsHint, false, 'hint option is read live on the next open')
 Config.ui.showControlsHint = true
+H.equal(Config.ui.creatorOpensOnHair, true, 'creator opens on hair by default')
+H.equal(open().creatorOpensOnHair, true, 'creator-start option is sent on by default')
+Config.ui.creatorOpensOnHair = false
+H.equal(open().creatorOpensOnHair, false, 'creator-start option is read live on the next open')
+Config.ui.creatorOpensOnHair = true
 
 local replied
 callbacks['qbclothing:nui:rotateEnd']({}, function(value) replied = value end)
