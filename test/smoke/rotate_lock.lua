@@ -49,6 +49,8 @@ _G.SendNUIMessage = function(message) if message.action == 'qbclothing:nui:open'
 
 dofile('config.lua')
 dofile('shared/components.lua')
+_G.RegisterCommand = _G.RegisterCommand or function() end
+_G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
 
 local function open()

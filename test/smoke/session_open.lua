@@ -92,6 +92,7 @@ Kora = {
         execute = function() writes = writes + 1; return 1 end,
     },
 }
+RegisterNetEvent = RegisterNetEvent or function() end
 dofile('server/server.lua')
 
 local function emit(name, src, ...)

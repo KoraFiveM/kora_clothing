@@ -19,3 +19,4 @@ cd "$(dirname "$0")/.."
 "${LUA:-lua}" test/smoke/tattoo_peds.lua
 "${LUA:-lua}" test/smoke/tattoo_stacking.lua
 "${LUA:-lua}" test/smoke/quicktoggle.lua
+"${LUA:-lua}" test/smoke/stock_compat.lua

@@ -35,6 +35,8 @@ _G.SetPedHeadOverlayColor = function(_, id, _, color) colors[id] = color end
 dofile('config.lua')
 Config.testMode = true
 dofile('shared/components.lua')
+_G.RegisterCommand = _G.RegisterCommand or function() end
+_G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
 local runtime = QBClothing._testRuntime
 
