@@ -742,7 +742,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             mandatory = activeSession.mandatory,
             rotatePointerLock = Config.rotatePointerLock ~= false,
             rotateDragGuard = Config.rotateDragGuard ~= false,
-            rotateMode = RotateControl and RotateControl.mode() or 'capture',
+            rotateMode = RotateControl and RotateControl.mode(activeSession.service) or 'capture',
             rotateRightButton = Config.rotateRightButton ~= false,
             rotateInvert = Config.rotateInvert == true,
             rotateCursor = Config.rotateDragCursor == 'hidden' and 'hidden' or 'grabbing',
@@ -1024,13 +1024,14 @@ RegisterNUICallback('qbclothing:nui:rotateEnd', function(_, cb)
     cb({})
 end)
 
--- Config.rotateMode = 'controls': the NUI hands the drag to Lua, which reads the
--- mouse as a game control until the button is released (client/rotate.lua).
+-- Config.rotateMode (or the menu's Config.rotateModeByService entry) = 'controls'
+-- or 'capture': the NUI hands the drag to Lua, which runs it until the button is
+-- released or the menu closes (client/rotate.lua). Nothing runs before the press.
 -- `active = false` means the NUI keeps its own cursor drag.
 RegisterNUICallback('qbclothing:nui:rotateStart', function(data, cb)
     local started = false
     if activeSession and type(data) == 'table' and RotateControl then
-        started = RotateControl.start(data.button, data.x, data.y)
+        started = RotateControl.start(data.button, data.x, data.y, activeSession.service)
     end
     cb({ active = started })
 end)
@@ -1038,7 +1039,7 @@ end)
 -- Config.rotateMode = 'recenter': the cursor got close to a screen edge mid-drag.
 RegisterNUICallback('qbclothing:nui:recenter', function(_, cb)
     local moved = false
-    if activeSession and RotateControl then moved = RotateControl.recenter() end
+    if activeSession and RotateControl then moved = RotateControl.recenter(activeSession.service) end
     cb({ moved = moved })
 end)
 

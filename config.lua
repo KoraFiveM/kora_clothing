@@ -675,6 +675,31 @@ Config.rotateMode = config and config.enum('plain', {
     live = true,
 }) or 'plain'
 
+-- Per-menu override of Config.rotateMode, keyed by the menu's service: clothing
+-- (clothing shops and wardrobes), barber and hairdresser (barber and hairdresser
+-- shops; which of the two opens follows the character's model), tattoo, and creation
+-- (character creation and admin sessions). Unset follows Config.rotateMode.
+-- Barbers and hairdressers default to 'capture': in 'plain' a fast drag can carry the
+-- cursor out of a windowed game onto a second monitor. Capture's thread only runs
+-- while the mouse button is held in that menu and stops on release or close.
+-- Character creation and the other menus stay on Config.rotateMode ('plain').
+-- Read each time a menu opens.
+local ROTATE_MODES = { 'plain', 'capture', 'pointer', 'controls', 'recenter' }
+local function rotateModeFor(default, label, menu)
+    return config and config.optional(default, config.enum(default or 'plain', { options = ROTATE_MODES }), {
+        label = label,
+        description = ('Rotate drag mode used in %s, overriding Rotate drag mode. Leave unset to use Rotate drag mode. capture holds the hidden cursor at the screen centre while you drag, so it cannot leave the window; plain never moves the cursor.'):format(menu),
+        live = true,
+    }) or default
+end
+Config.rotateModeByService = {
+    clothing = rotateModeFor(nil, 'Rotate drag mode: clothing shops', 'clothing shops and wardrobes'),
+    barber = rotateModeFor('capture', 'Rotate drag mode: barber', 'barbers and hairdressers (male characters)'),
+    hairdresser = rotateModeFor('capture', 'Rotate drag mode: hairdresser', 'barbers and hairdressers (female characters)'),
+    tattoo = rotateModeFor(nil, 'Rotate drag mode: tattoo studio', 'tattoo studios'),
+    creation = rotateModeFor(nil, 'Rotate drag mode: character creation', 'character creation and admin sessions'),
+}
+
 -- Rotation speed for the plain, capture, pointer and recenter modes (controls mode
 -- has its own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
 Config.rotateSensitivity = config and config.number(1.0, {

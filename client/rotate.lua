@@ -1,6 +1,8 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
--- Config.rotateMode:
+-- Config.rotateMode, or the menu's own Config.rotateModeByService entry when set
+-- (barbers and hairdressers default to 'capture'; every other menu, character
+-- creation included, follows Config.rotateMode):
 --   'plain'    (default) a normal press/move/release drag in the NUI. Nothing happens
 --              here: no thread, no cursor move, no focus change. The NUI turns the
 --              camera from its own mouse movement (one message per frame), so the
@@ -51,11 +53,17 @@ local CAPTURE_RETRY_FRAMES = 8     -- a pull still not seen after this many fram
 
 local active -- the running drag: { mode, control, startedAt, seen, movedAt, x, y, ... }
 
----The mode in effect. An unknown value falls back to the default ('plain'); the older
----Config.rotatePointerLock = false still turns plain 'pointer' capture off.
+---The mode in effect for a menu. `service` is the session's service ('clothing',
+---'barber', 'hairdresser', 'tattoo', 'creation'): its Config.rotateModeByService
+---entry wins when set, otherwise Config.rotateMode applies. An unknown value falls
+---back to the default ('plain'); the older Config.rotatePointerLock = false still
+---turns plain 'pointer' capture off.
+---@param service string|nil
 ---@return string
-function RotateControl.mode()
-    local mode = Config.rotateMode
+function RotateControl.mode(service)
+    local overrides = Config.rotateModeByService
+    local mode = service ~= nil and type(overrides) == 'table' and overrides[service] or nil
+    if not MODES[mode] then mode = Config.rotateMode end
     if not MODES[mode] then mode = 'plain' end
     if mode == 'pointer' and Config.rotatePointerLock == false then return 'plain' end
     return mode
@@ -191,9 +199,10 @@ end
 ---@param button number 0 = left, 2 = right
 ---@param x number cursor position as a 0..1 fraction of the screen, put back afterwards
 ---@param y number
+---@param service string|nil the open menu's service, for its rotate mode
 ---@return boolean
-function RotateControl.start(button, x, y)
-    local mode = RotateControl.mode()
+function RotateControl.start(button, x, y, service)
+    local mode = RotateControl.mode(service)
     if active or (mode ~= 'controls' and mode ~= 'capture') then return false end
     local control = BUTTON_CONTROL[tonumber(button) or 0]
     if not control then return false end
@@ -272,9 +281,10 @@ end
 local lastRecenter = -RECENTER_MIN_INTERVAL_MS
 ---Puts the cursor at the screen centre ('recenter' mode, and the NUI's fallback
 ---when 'pointer' or 'capture' could not start), throttled.
+---@param service string|nil the open menu's service, for its rotate mode
 ---@return boolean moved
-function RotateControl.recenter()
-    local mode = RotateControl.mode()
+function RotateControl.recenter(service)
+    local mode = RotateControl.mode(service)
     if mode ~= 'recenter' and mode ~= 'pointer' and mode ~= 'capture' then return false end
     local now = GetGameTimer()
     if now - lastRecenter < RECENTER_MIN_INTERVAL_MS then return false end

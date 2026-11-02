@@ -376,4 +376,119 @@ H.equal(reply.moved, true, 'the recenter fallback is allowed in capture mode')
 handlers['qbclothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'controls'
 
+-- Per-menu modes (Config.rotateModeByService): barbers and hairdressers capture so the
+-- cursor cannot leave the window; character creation and the other menus keep
+-- Config.rotateMode ('plain'), whose untouched cursor fixed the creation flicker.
+reset()
+Config.rotateMode = 'plain'
+H.equal(Config.rotateModeByService.barber, 'capture', 'barbers default to capture')
+H.equal(Config.rotateModeByService.hairdresser, 'capture', 'hairdressers default to capture')
+H.equal(Config.rotateModeByService.creation, nil, 'creation has no override by default')
+H.equal(Config.rotateModeByService.clothing, nil, 'clothing shops have no override by default')
+H.equal(Config.rotateModeByService.tattoo, nil, 'tattoo studios have no override by default')
+H.equal(RotateControl.mode('creation'), 'plain', 'creation resolves plain')
+H.equal(RotateControl.mode('barber'), 'capture', 'barber resolves capture')
+H.equal(RotateControl.mode('hairdresser'), 'capture', 'hairdresser resolves capture')
+H.equal(RotateControl.mode('clothing'), 'plain', 'clothing resolves plain')
+H.equal(RotateControl.mode('tattoo'), 'plain', 'tattoo resolves plain')
+H.equal(RotateControl.mode(), 'plain', 'no menu: Config.rotateMode')
+Config.rotateModeByService.barber = 'nonsense'
+H.equal(RotateControl.mode('barber'), 'plain', 'an unknown override falls back to Config.rotateMode')
+Config.rotateModeByService.barber = 'capture'
+Config.rotateMode = 'recenter'
+H.equal(RotateControl.mode('creation'), 'recenter', 'an unset menu follows Config.rotateMode')
+Config.rotateMode = 'plain'
+
+local function openAs(mode, service, model)
+    sent = nil
+    handlers['qbclothing:client:openSession']({ mode = mode, service = service, model = model or 'mp_m_freemode_01', skin = {}, tattoos = {} })
+    return sent
+end
+local function press() callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end) end
+local function release() callbacks['qbclothing:nui:rotateEnd']({}, function() end) end
+local function close() handlers['qbclothing:client:closeSession']({ ok = true }) end
+local function runLast() local fn = table.remove(threads); fn() end
+
+-- Character creation (new character and admin) stays plain: a press runs no thread,
+-- never moves the cursor and never touches NUI focus.
+for _, mode in ipairs({ 'firstCharacter', 'admin' }) do
+    reset()
+    H.equal(openAs(mode, 'creation').rotateMode, 'plain', mode .. ' creation opens in plain')
+    local threadsBefore, focusBefore = #threads, #focus
+    press()
+    H.equal(reply.active, false, mode .. ' creation: Lua declines the drag')
+    callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+    H.equal(reply.moved, false, mode .. ' creation: the cursor is never recentred')
+    H.equal(#threads, threadsBefore, mode .. ' creation: no drag thread')
+    H.equal(#focus, focusBefore, mode .. ' creation: NUI focus untouched')
+    H.equal(cursor, nil, mode .. ' creation: SetCursorLocation never called')
+    H.equal(RotateControl.isActive(), false, mode .. ' creation: no Lua drag')
+    close()
+end
+for _, service in ipairs({ 'clothing', 'tattoo' }) do
+    reset()
+    H.equal(openAs('shop', service).rotateMode, 'plain', service .. ' opens in plain')
+    close()
+end
+
+-- Barber: capture, but nothing runs until the button goes down; the thread starts on
+-- the press and ends on the very frame the button comes up.
+reset()
+nuiCursor, pendingPull, pulls = { 960, 540 }, false, 0
+H.equal(openAs('shop', 'barber').rotateMode, 'capture', 'the barber opens in capture')
+H.equal(RotateControl.isActive(), false, 'barber open: no drag yet')
+H.equal(pulls, 0, 'barber open: the cursor is not moved before a press')
+local threadsBefore, focusBefore = #threads, #focus
+press()
+H.equal(reply.active, true, 'barber: Lua takes the drag on the press')
+H.equal(#threads, threadsBefore + 1, 'barber: exactly one drag thread, started by the press')
+H.equal(pulls, 1, 'barber: the cursor is pulled to the centre on the press')
+H.equal(#focus, focusBefore, 'barber: capture never touches NUI focus')
+local releasedAt
+fastDrag(-1)
+local drive = onFrame
+onFrame = function(n) drive(n); if n == 12 then releasedAt = n; release() end end
+runLast()
+H.equal(RotateControl.isActive(), false, 'barber: released')
+H.equal(frame, releasedAt, 'barber: the thread stops on the frame the button comes up')
+H.ok(#rotated > 0, 'barber: the drag turned the camera')
+H.equal(cursor[1], 0.4, 'barber: cursor back where the drag began')
+local pullsAfter = pulls
+onFrame = function() end
+H.equal(#threads, threadsBefore, 'barber: no thread left after release')
+H.equal(pulls, pullsAfter, 'barber: no pull after release')
+
+-- Closing the barber mid-drag stops the thread at once, without a final pull.
+reset()
+nuiCursor, pendingPull, pulls = { 960, 540 }, false, 0
+openAs('shop', 'barber')
+press()
+H.equal(RotateControl.isActive(), true, 'barber: drag running before close')
+fastDrag(-1)
+drive = onFrame
+local closedAt
+onFrame = function(n) drive(n); if n == 7 then closedAt = n; close() end end
+runLast()
+H.equal(RotateControl.isActive(), false, 'barber: closing the menu ends the drag')
+H.equal(frame, closedAt, 'barber: the thread stops on the frame the menu closes')
+pullsAfter = pulls
+press()
+H.equal(reply.active, false, 'barber closed: a late press starts nothing')
+H.equal(pulls, pullsAfter, 'barber closed: no pull after close')
+
+-- A close before the thread's first frame also leaves nothing running.
+reset()
+openAs('shop', 'barber')
+press()
+local dragThread = threads[#threads]
+close()
+dragThread()
+H.equal(frame, 0, 'barber: a drag closed before its first frame never runs')
+
+-- The hairdresser (female characters at the same shops) captures too; the mode
+-- follows the service, so the stub's model does not matter here.
+reset()
+H.equal(openAs('shop', 'hairdresser').rotateMode, 'capture', 'the hairdresser opens in capture')
+close()
+
 H.finish()

@@ -184,6 +184,12 @@ the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
 **Rotating.** Hold the left mouse button (or the right, unless
 `Config.rotateRightButton = false`) over the character and drag. `Config.rotateMode` picks how the
 drag survives the cursor reaching the screen edge (read each time a menu opens).
+`Config.rotateModeByService` overrides it per menu, keyed by the session's service
+(`clothing`, `barber`, `hairdresser`, `tattoo`, `creation`); an unset entry follows
+`Config.rotateMode`. `barber` and `hairdresser` default to `'capture'`, so at the
+barber a fast drag cannot carry the cursor out of the window onto a second monitor.
+Character creation, clothing shops and tattoo studios stay on `Config.rotateMode`
+(`'plain'`).
 `Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
 the plain, capture, pointer and recenter modes:
 
@@ -373,6 +379,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.camera.holdStill` (default `true`) — pause idle fidgets, stop the ped turning to look at the camera, and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
 - `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
 - `Config.rotateMode` (default `'plain'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
+- `Config.rotateModeByService` (default `{ barber = 'capture', hairdresser = 'capture' }`; `clothing`, `tattoo` and `creation` unset) — per-menu `rotateMode` override; unset entries follow `Config.rotateMode`
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
 - `Config.camera.transitionMs` (default `500`) — time a change of view takes to settle; position, look-at height and fov ease together, never snap.
