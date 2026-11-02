@@ -329,6 +329,16 @@ behaviour applies: wait for the ped to be active and alive, then open.
 
 The hair, facial hair, eyebrows and chest hair boxes (and the barber shirt button) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `qb_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
 
+## Closing menus when the player goes down
+
+If a player enters last stand / bleed-out or dies while a clothing, barber, surgeon, tattoo or outfit menu is open, the menu runs the normal Cancel (preview reverted, NUI closed, camera, focus and HUD restored). It listens to kora_ambulance's `emsDown` player state bag and also polls while a menu is open, because last stand keeps the ped alive and a plain "is dead" check misses it. The one-time first-character creation is never cancelled.
+
+| `Config.closeWhenDowned` option | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | Close open menus on last stand / death. Off keeps the old behaviour (only a ped death closes the tattoo and barber-shirt menus). |
+| `blockOpen` | `true` | Also refuse to open a menu while downed or dead. |
+| `checkIntervalMs` | `250` | Watchdog poll interval while a menu is open (minimum 50). |
+
 ## Quick clothing toggles (`/c <part>`)
 
 Take one item off, or put it back, without opening the clothing menu:

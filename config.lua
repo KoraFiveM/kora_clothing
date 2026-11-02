@@ -1004,6 +1004,34 @@ Config.quickToggle = {
     end)(),
 }
 
+-- Closing the menus when the player goes down.
+--   enabled         : while any fitting-room menu (clothing, barber, surgeon, tattoo,
+--                     outfits, admin) is open and the player enters last stand / bleed-out
+--                     or dies, the menu runs the normal Cancel (preview reverted, NUI
+--                     closed, camera/focus/HUD restored). Detected from kora_ambulance's
+--                     `emsDown` player state bag plus a watchdog. The one-time mandatory
+--                     first-character creation is never cancelled. Off = only a ped death
+--                     closes the tattoo / barber-shirt menus (legacy behaviour).
+--   blockOpen       : also refuse to open a menu while downed or dead.
+--   checkIntervalMs : watchdog poll interval while a menu is open (minimum 50).
+Config.closeWhenDowned = {
+    enabled = config and config.boolean(true, {
+        label = 'Close appearance menus when the player goes down',
+        description = 'When enabled, any open clothing, barber, surgeon, tattoo or outfit menu is cancelled (preview changes reverted) as soon as the player enters last stand, bleed-out or dies. The mandatory first-character creation is never cancelled.',
+        live = true,
+    }) or true,
+    blockOpen = config and config.boolean(true, {
+        label = 'Block opening appearance menus while downed',
+        description = 'When enabled, menus cannot be opened while the player is in last stand or dead. Only applies while "Close appearance menus when the player goes down" is on.',
+        live = true,
+    }) or true,
+    checkIntervalMs = config and config.integer(250, {
+        label = 'Downed watchdog interval (ms)',
+        description = 'How often, while a menu is open, the downed / dead state is re-checked as a backstop to the state-bag listener.',
+        min = 50,
+    }) or 250,
+}
+
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if Kora and Kora.config and Kora.config.adopt then
     local tattooStripItem = Kora.config.object({

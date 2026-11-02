@@ -12,7 +12,8 @@ _G.exports = setmetatable({}, { __call = function() end, __index = function() re
 _G.PlayerId = function() return 1 end
 _G.GetPlayerServerId = function() return 1 end
 _G.LocalPlayer = { state = {} }
-_G.AddStateBagChangeHandler = function() end
+local bagHandlers = {}
+_G.AddStateBagChangeHandler = function(filter, _, fn) bagHandlers[filter] = fn end
 _G.vector4 = function(x, y, z, w) return { x = x, y = y, z = z, w = w } end
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
 _G.PlayerPedId = function() return 1 end
@@ -177,6 +178,34 @@ watch()
 dead = false
 sameAs(original, 'after death')
 H.equal(triggered[#triggered].name, 'qbclothing:server:cancelSession', 'dying in the studio ends the session')
+
+-- Last stand keeps the ped alive (IsEntityDead false): the emsDown state bag
+-- value, via the watchdog or the state-bag listener, still cancels the session.
+original = open()
+watch = threads[#threads]
+LocalPlayer.state.emsDown = 'laststand'
+watch()
+LocalPlayer.state.emsDown = false
+sameAs(original, 'after last stand')
+H.equal(triggered[#triggered].name, 'qbclothing:server:cancelSession', 'last stand ends the session')
+
+original = open()
+local before = #triggered
+H.equal(before, 0)
+bagHandlers.emsDown('player:1', 'emsDown', 'laststand')
+sameAs(original, 'after last stand bag change')
+H.equal(#triggered, before + 1, 'state bag change cancels once')
+bagHandlers.emsDown('player:1', 'emsDown', 'dead')
+H.equal(#triggered, before + 1, 'a second down event does not cancel twice')
+netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
+
+-- Opening while downed is refused and the server session handed back.
+LocalPlayer.state.emsDown = 'dead'
+messages, triggered = {}, {}
+netEvents['qbclothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {} })
+H.equal(openMessage(), nil, 'no menu while downed')
+H.equal(triggered[#triggered].name, 'qbclothing:server:cancelSession', 'server session handed back')
+LocalPlayer.state.emsDown = false
 
 -- Resource stop while bared.
 original = open()

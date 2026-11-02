@@ -11,6 +11,8 @@ _G.RegisterNUICallback = function() end
 _G.PlayerId = function() return 1 end
 _G.GetPlayerServerId = function() return 1 end
 _G.LocalPlayer = { state = {} }
+_G.IsEntityDead = function() return false end
+_G.PlayerPedId = _G.PlayerPedId or function() return 1 end
 _G.AddStateBagChangeHandler = function() end
 
 local polyZones, boxZones, requests = {}, {}, {}

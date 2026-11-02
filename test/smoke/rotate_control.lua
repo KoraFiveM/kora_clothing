@@ -56,6 +56,8 @@ dofile('config.lua')
 dofile('shared/components.lua')
 _G.RegisterCommand = _G.RegisterCommand or function() end
 _G.TriggerEvent = _G.TriggerEvent or function() end
+_G.IsEntityDead = _G.IsEntityDead or function() return false end
+_G.PlayerPedId = _G.PlayerPedId or function() return 1 end
 dofile('client/client.lua')
 
 dofile('client/rotate.lua')

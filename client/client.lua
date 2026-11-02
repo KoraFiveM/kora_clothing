@@ -9,6 +9,7 @@ local disableControlsThread = false
 local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
 local previewTattoos = {}
 local startUndressDeathWatch -- assigned below triggerOrError; cancels a tattoo session if the player dies in it
+local closeWhenDowned, playerIsDowned -- assigned below triggerOrError; Config.closeWhenDowned state
 local setTattooPedsFaded -- assigned in the tattoo artist section at the end of the file
 
 -- Component 0 is the freemode head drawable. On its own it does nothing
@@ -636,6 +637,13 @@ end
 RegisterNetEvent('qbclothing:client:openSession', function(payload)
     if type(payload) ~= 'table' then return end
 
+    -- The server granted this session a round trip ago; if the player went down
+    -- meanwhile, hand it straight back instead of showing the menu.
+    if not payload.mandatory and closeWhenDowned() and Config.closeWhenDowned.blockOpen and playerIsDowned() then
+        Kora.events.trigger('qbclothing:server:cancelSession')
+        return
+    end
+
     -- Freeze AFTER the model swap, not before: SetPlayerModel (inside
     -- applyModel) destroys the old ped entity and creates a new one, so a
     -- freeze applied to the pre-swap handle would not carry over.
@@ -670,8 +678,9 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     if activeSession.service == 'tattoo' then
         setTattooPedsFaded(true)
     end
-    -- A bared tattoo studio or barber preview must never outlive a death.
-    if activeSession.service == 'tattoo' or topToggleAvailable(activeSession.service) then
+    -- Every menu closes when the player goes down (Config.closeWhenDowned); a
+    -- bared tattoo studio or barber preview must never outlive a death either way.
+    if closeWhenDowned() or activeSession.service == 'tattoo' or topToggleAvailable(activeSession.service) then
         startUndressDeathWatch(activeSession)
     end
 
@@ -1047,25 +1056,51 @@ RegisterNUICallback('qbclothing:nui:cancel', function(_, cb)
     cb({ ok = true })
 end)
 
--- A player who dies in the studio would otherwise be stuck on a menu with a
--- half-undressed corpse: put the preview clothing back and end the session.
+-- A player who goes down in the studio would otherwise be stuck on a menu
+-- (browsing hairstyles, toggling the shirt) over a half-undressed body: put the
+-- preview clothing back and end the session through the normal Cancel path.
 -- A mandatory session cannot be cancelled, so it only restores the clothing.
+--
+-- Last stand keeps the ped alive above the fatal health line, so IsEntityDead
+-- alone never fires for it: kora_ambulance publishes `emsDown`
+-- ('laststand' | 'dead' | false) on the player state bag, which is read here too.
+closeWhenDowned = function()
+    return Config.closeWhenDowned and Config.closeWhenDowned.enabled == true
+end
+
+playerIsDowned = function()
+    if closeWhenDowned() and LocalPlayer.state.emsDown then return true end
+    return IsEntityDead(PlayerPedId())
+end
+
+local function endSessionDowned(session)
+    if session.downedHandled then return end
+    session.downedHandled = true
+    restoreTemporaryOverride(PlayerPedId())
+    undressActive = {}
+    if not session.mandatory then triggerOrError('qbclothing:server:cancelSession') end
+end
+
 startUndressDeathWatch = function(session)
     CreateThread(function()
         while activeSession == session do
-            if IsEntityDead(PlayerPedId()) then
-                restoreTemporaryOverride(PlayerPedId())
-                undressActive = {}
-                if not session.mandatory then triggerOrError('qbclothing:server:cancelSession') end
+            if playerIsDowned() then
+                endSessionDowned(session)
                 return
             end
-            Wait(500)
+            local cfg = Config.closeWhenDowned
+            Wait(closeWhenDowned() and math.max(50, tonumber(cfg.checkIntervalMs) or 250) or 500)
         end
     end)
 end
 
+AddStateBagChangeHandler('emsDown', ('player:%s'):format(GetPlayerServerId(PlayerId())), function(_, _, value)
+    if value and activeSession and closeWhenDowned() then endSessionDowned(activeSession) end
+end)
+
 local function openSession(mode, extra)
     if activeSession then return end
+    if closeWhenDowned() and Config.closeWhenDowned.blockOpen and playerIsDowned() then return end
     triggerOrError('qbclothing:server:requestSession', mode, extra)
 end
 
