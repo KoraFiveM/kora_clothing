@@ -214,13 +214,47 @@ local function frameHeading(ped)
 end
 
 -- Idle fidget animations (looking around, shifting weight) are paused while a
--- menu holds the ped still, and allowed again when it closes.
+-- menu holds the ped still, and allowed again when it closes. The player's own
+-- on-foot behaviour is replaced by a stand-still task and head IK is switched
+-- off as well: left alone, the player ped turns its head and upper body to look
+-- at the camera, so while the orbit swings round it the ped keeps turning and
+-- seems to move in place. Freezing the ped does not stop that.
 local stilledPed
 
+local function exists(ped)
+    return ped and (type(DoesEntityExist) ~= 'function' or DoesEntityExist(ped))
+end
+
 local function setAmbientAnims(ped, enabled)
-    if not ped or (type(DoesEntityExist) == 'function' and not DoesEntityExist(ped)) then return end
+    if not exists(ped) then return end
     if type(SetPedCanPlayAmbientAnims) == 'function' then SetPedCanPlayAmbientAnims(ped, enabled) end
     if type(SetPedCanPlayAmbientBaseAnims) == 'function' then SetPedCanPlayAmbientBaseAnims(ped, enabled) end
+end
+
+local function holdPed(ped)
+    if not exists(ped) then return end
+    setAmbientAnims(ped, false)
+    if type(TaskStandStill) == 'function' then TaskStandStill(ped, -1) end
+    if type(SetPedCanHeadIk) == 'function' then SetPedCanHeadIk(ped, false) end
+    stilledPed = ped
+end
+
+-- A ped that went down meanwhile is left to the death handling, which plays its
+-- own animation: clearing tasks would stand it up for a moment.
+local function pedDown(ped)
+    if type(IsPedDeadOrDying) == 'function' and IsPedDeadOrDying(ped, true) then return true end
+    if type(IsPedRagdoll) == 'function' and IsPedRagdoll(ped) then return true end
+    local state = LocalPlayer and LocalPlayer.state
+    return state ~= nil and state.emsDown == true
+end
+
+local function releasePed()
+    local ped = stilledPed
+    stilledPed = nil
+    if not exists(ped) then return end
+    setAmbientAnims(ped, true)
+    if type(SetPedCanHeadIk) == 'function' then SetPedCanHeadIk(ped, true) end
+    if type(ClearPedTasks) == 'function' and not pedDown(ped) then ClearPedTasks(ped) end
 end
 
 -- Keeps a camera height at least `minAbove` metres above the floor
@@ -375,10 +409,7 @@ function Camera.start(ped)
     active = true
     held.ped = nil
     frameAnchor(ped)
-    if Config.camera.holdStill ~= false then
-        setAmbientAnims(ped, false)
-        stilledPed = ped
-    end
+    if Config.camera.holdStill ~= false then holdPed(ped) end
 
     local zone = initialZone()
     local first = Config.camera.zones[zone]
@@ -525,10 +556,7 @@ end
 
 function Camera.stop()
     active = false
-    if stilledPed then
-        setAmbientAnims(stilledPed, true)
-        stilledPed = nil
-    end
+    releasePed()
     if cam then
         RenderScriptCams(false, true, 300, true, true)
         DestroyCam(cam, false)

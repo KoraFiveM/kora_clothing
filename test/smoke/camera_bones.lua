@@ -106,10 +106,46 @@ H.equal(ambient[1][2], 9); H.equal(ambient[1][3], false); H.equal(ambient[2][3],
 Camera.stop()
 H.equal(#ambient, 4, 'and allowed again on close')
 H.equal(ambient[3][3], true); H.equal(ambient[4][3], true)
-Config.camera.holdStill = false
+
+-- The player ped turns its head and body to look at the camera unless it is
+-- tasked to stand still with head IK off; both are handed back on close.
+local tasks = {}
+local dead = false
+_G.TaskStandStill = function(ped, ms) tasks[#tasks + 1] = { 'stand', ped, ms } end
+_G.SetPedCanHeadIk = function(ped, on) tasks[#tasks + 1] = { 'headIk', ped, on } end
+_G.ClearPedTasks = function(ped) tasks[#tasks + 1] = { 'clear', ped } end
+_G.IsPedDeadOrDying = function() return dead end
+Camera.start(9)
+H.equal(tasks[1][1], 'stand', 'the ped is tasked to stand still')
+H.equal(tasks[1][2], 9); H.equal(tasks[1][3], -1, 'for as long as the menu is open')
+H.equal(tasks[2][1], 'headIk'); H.equal(tasks[2][3], false, 'head IK is off so it does not follow the camera')
+Camera.rotate(90.0)
+H.equal(#tasks, 2, 'rotating never re-tasks the ped')
+Camera.stop()
+H.equal(tasks[3][1], 'headIk'); H.equal(tasks[3][3], true, 'head IK is back on close')
+H.equal(tasks[4][1], 'clear'); H.equal(tasks[4][2], 9, 'and the stand-still task is cleared')
+Camera.stop()
+H.equal(#tasks, 4, 'a second stop does nothing')
+
+tasks = {}
+Camera.start(9)
+dead = true
+Camera.stop()
+H.equal(#tasks, 3, 'a ped that went down keeps the death animation (tasks not cleared)')
+dead = false
+tasks = {}
+_G.LocalPlayer = { state = { emsDown = true } }
 Camera.start(9)
 Camera.stop()
-H.equal(#ambient, 4, 'holdStill off leaves the animations alone')
+H.equal(#tasks, 3, 'nor while kora_ambulance reports the player down')
+_G.LocalPlayer = nil
+
+Config.camera.holdStill = false
+tasks, ambient = {}, {}
+Camera.start(9)
+Camera.stop()
+H.equal(#ambient, 0, 'holdStill off leaves the animations alone')
+H.equal(#tasks, 0, 'and the ped tasks too')
 Config.camera.holdStill = true
 
 H.finish()

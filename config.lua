@@ -848,7 +848,9 @@ Config.ui = {
 --   trackOffset  : metres above the tracked bone to look at.
 Config.camera = {
     -- Hold the character still while a menu is open: its idle fidget animations
-    -- (shifting weight, looking around) are paused, and the camera is aimed at
+    -- (shifting weight, looking around) are paused, it is given a stand-still
+    -- task with head IK off (the player ped otherwise turns its head and upper
+    -- body to follow the orbiting camera), and the camera is aimed at
     -- where the ped stands, measured once when the menu opens (and again if the
     -- model changes), instead of following its spine and head bones every frame.
     -- Following the breathing / idle animation made the whole view sway, so the
@@ -856,7 +858,7 @@ Config.camera = {
     -- keeps the old per-frame tracking. Read when a menu opens.
     holdStill = config and config.boolean(true, {
         label = 'Hold the character still in menus',
-        description = 'Pauses the idle fidget animations and keeps the camera fixed on where the character stands while a clothing, barber, tattoo or creator menu is open, so the character does not sway or appear to move in place while you rotate. Turn off to let the camera follow the idle animation as before.',
+        description = 'Pauses the idle fidget animations, stops the character turning its head and body to look at the camera, and keeps the camera fixed on where the character stands while a clothing, barber, tattoo or creator menu is open, so the character does not sway or appear to move in place while you rotate. Turn off to let the camera follow the idle animation and leave its tasks alone, as before.',
         live = true,
     }) or true,
     -- Frame the face and shoes zones on the ped's head and foot bones, and size

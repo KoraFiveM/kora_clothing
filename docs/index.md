@@ -168,8 +168,13 @@ shifting weight, looking around). With `Config.camera.holdStill` (default
 aimed from one measurement of where the ped stands (taken when the menu opens,
 and again if the model changes) instead of following its spine and head bones
 every frame. Following them made the whole view sway, so the ped looked like it
-was moving in place, most of all while rotating. Nothing re-tasks the ped while
-it rotates: only the camera orbits. `false` keeps the old per-frame tracking.
+was moving in place, most of all while rotating. The ped is also given a
+stand-still task and its head IK is switched off for the menu: the player's
+normal on-foot behaviour turns the head and upper body to look at the camera, so
+as the orbit swung round the ped kept turning towards it. Both are handed back
+when the menu closes (a ped that went down meanwhile keeps the death handling's
+animation). Only the camera orbits; the ped's heading never changes. `false`
+keeps the old per-frame tracking and leaves the ped's tasks alone.
 
 **Categories.** Choosing a category does not move the camera by default, so the
 player's own rotation and zoom survive tab changes and the preset buttons stay
@@ -365,7 +370,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.headOverlays.<facialHair|eyebrows|chestHair>.followHairColor` (default `false`) — `true` hides that overlay's color palette and always uses the primary hair color. This replaces the old "Match hair colour" button, which is gone from the menu
 - `Config.interactDistance` (2.0) — kora_target zone range; the server accepts a shop session from inside the zone or within this distance plus one metre of it
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
-- `Config.camera.holdStill` (default `true`) — pause idle fidgets and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
+- `Config.camera.holdStill` (default `true`) — pause idle fidgets, stop the ped turning to look at the camera, and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
 - `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
 - `Config.rotateMode` (default `'plain'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
