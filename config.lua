@@ -418,10 +418,11 @@ Config.tattooStrip = {
 -- entry per instance. The server validates every instance, caps each tattoo at
 -- `maxStack` and prices each added instance itself.
 --
--- `peds`    : an optional tattoo artist standing in each tattoo shop. Targeting
--- the artist ("Get tattooed") opens the same studio as the shop's zone, which
--- keeps working. While the studio is open the artist is faded out locally so
--- they do not block the view.
+-- `peds`    : a tattoo artist standing in each tattoo shop. Targeting the artist
+-- ("Get tattooed") opens the studio; while the artist is there the shop's own
+-- zone (its sprite and "Open ..." prompt) is taken down, and it comes back
+-- whenever there is no artist. While the studio is open the artist is faded
+-- out locally so they do not block the view.
 Config.tattoo = {
     -- Duplicate button in the studio list. Off keeps one instance per tattoo
     -- (extra instances are dropped server-side). Read each time a skin is
@@ -540,15 +541,15 @@ Config.tattoo = {
     },
 
     peds = {
-        -- Off by default: servers with their own tattoo MLO or artist ped would
-        -- otherwise get a second artist standing in the same spot. When on,
-        -- every shop with service = 'tattoo' gets one (see below). Read while
-        -- the player is moving about, so it can be flipped without a restart.
-        enabled = config and config.boolean(false, {
+        -- On by default, like the shop clerks elsewhere (kora_inventory's
+        -- Config.ShopClerks, Ammu-Nation): every shop with service = 'tattoo'
+        -- gets one (see below). Turn off on a map or MLO that already has its own
+        -- artist. Applied live: the artists are rebuilt when this changes.
+        enabled = config and config.boolean(true, {
             label = 'Tattoo artist peds',
-            description = 'Spawns a frozen tattoo artist ped in each tattoo shop (client side, only while you are nearby). Targeting the artist with "Get tattooed" opens the tattoo studio. The artist is faded out while you are in the studio so they do not block the view. Leave off if your map or MLO already has its own artist. The decorative shop clerk for these shops is not spawned while this is on, to avoid two peds in one spot.',
+            description = 'Spawns a frozen tattoo artist ped in each tattoo shop (client side, only while you are nearby). Targeting the artist with "Get tattooed" opens the tattoo studio, and the shop zone prompt is hidden while the artist is there. The artist is faded out while you are in the studio so they do not block the view. Turn off if your map or MLO already has its own artist; the shop zone is then used as before. The decorative shop clerk for these shops is not spawned while this is on, to avoid two peds in one spot.',
             live = true,
-        }) or false,
+        }) or true,
         -- Opacity (0 invisible .. 255 fully visible) of the artist while the
         -- studio menu is open. Local to the player in the studio.
         alpha = config and config.integer(0, {
@@ -558,7 +559,7 @@ Config.tattoo = {
             live = true,
         }) or 0,
         -- Players within this many metres of the shop have the artist spawned;
-        -- it is deleted again beyond it (plus a small margin).
+        -- it is deleted again when they leave (a kora_lib zone, no polling).
         scopeRadius = config and config.number(40.0, {
             min = 5.0, max = 300.0,
             label = 'Artist spawn distance',
@@ -571,18 +572,22 @@ Config.tattoo = {
             description = 'Ped model used for the tattoo artist when a shop does not set its own. The default shops already name u_m_y_tattoo_01.',
             live = true,
         }) or 'u_m_y_tattoo_01',
-        -- Optional ambient scenario for the artist, e.g. 'WORLD_HUMAN_STAND_IMPATIENT'.
-        -- nil leaves the ped idle.
-        scenario = config and config.optional(nil, config.string('WORLD_HUMAN_STAND_IMPATIENT'), {
+        -- Ambient scenario the artist plays. nil or '' leaves the ped idle. Pick
+        -- one without a hand prop (clipboard, phone, coffee): fading only
+        -- reaches the ped, so a prop would stay floating in the studio view.
+        scenario = config and config.optional('WORLD_HUMAN_STAND_IMPATIENT', config.string('WORLD_HUMAN_STAND_IMPATIENT'), {
             label = 'Artist scenario',
-            description = 'Optional GTA scenario the artist plays while standing there, for example WORLD_HUMAN_STAND_IMPATIENT. Leave unset for a plain idle ped.',
+            description = 'GTA scenario the artist plays while standing there. Default WORLD_HUMAN_STAND_IMPATIENT. Leave unset for a plain idle ped. Avoid scenarios with a hand prop (clipboard, phone): the prop is not faded with the artist in the studio.',
             live = true,
-        }) or nil,
+        }) or 'WORLD_HUMAN_STAND_IMPATIENT',
         -- Per shop, in Config.shops: `tattooPed = { model = '...', coords = vector4(...), scenario = '...' }`
         -- overrides the model (default: the shop's own `ped`), the position
         -- (default: the shop's `coords`) and the scenario; `tattooPed = false`
-        -- gives that shop no artist. Keep the artist within a metre or two of
-        -- the shop's `coords`: the server only opens a session for players near them.
+        -- gives that shop no artist. `coords` use the same height as the shop's:
+        -- where a standing player is (/coords or GetEntityCoords, about 1.0 above
+        -- the floor); the artist is stood 1.0 below that, on the floor. Keep the
+        -- artist within a metre or two of the shop's zone: the server only opens
+        -- a session for players near it.
     },
 }
 

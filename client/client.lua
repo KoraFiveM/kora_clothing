@@ -1681,7 +1681,7 @@ local function registerTargetShop(index, shop, zone)
     local spriteCoords = vector3(shop.coords.x, shop.coords.y, shop.coords.z)
 
     if zone.points then
-        exports.kora_target:addPolyZone({
+        return exports.kora_target:addPolyZone({
             points = zone.points,
             thickness = zone.thickness,
             minZ = zone.minZ,
@@ -1691,9 +1691,8 @@ local function registerTargetShop(index, shop, zone)
             spriteCoords = spriteCoords,
             drawSprite = Config.showTargetHints,
         })
-        return
     end
-    exports.kora_target:addBoxZone({
+    return exports.kora_target:addBoxZone({
         -- shop.coords is a vector4 (heading in .w) and addBoxZone only
         -- reads x/y/z off it, so the heading is passed separately as
         -- the box's own rotation rather than being read from coords.
@@ -1707,12 +1706,32 @@ local function registerTargetShop(index, shop, zone)
     })
 end
 
--- A client-local, frozen artist per tattoo shop, only while the player is near.
--- It carries a kora_target "Get tattooed" option that opens the same session as
--- the shop's storefront zone (which stays registered, so both work). While the
--- studio menu is open the artist is faded out so it does not block the camera.
-local tattooPeds = {} -- shop index -> { ped = entity, targetId = id | nil }
+-- Tattoo artists (Config.tattoo.peds): a client-local, frozen artist per tattoo
+-- shop with a "Get tattooed" target that opens the same studio as the shop.
+-- Each artist is a Kora.zones sphere of `scopeRadius`: the ped is created when
+-- the player walks into it and deleted when they leave, so nothing polls.
+-- While an artist stands in a shop, that shop's storefront zone is taken down,
+-- so the shop is not offered twice and the zone sprite and "Open ..." prompt do
+-- not sit next to the artist. Whenever there is no artist (option off, player
+-- away, model missing, kora_target refused the entity) the storefront zone is
+-- back. While the studio menu is open the artist is faded so it does not block
+-- the camera.
+local tattooArtists = {} -- shop index -> { model, coords, scenario, zone, inside, spawning, ped, targetId }
 local tattooPedsFaded = false
+local storefrontZones = {} -- shop index -> kora_target zone id ('target' interaction mode only)
+
+local function showStorefront(index)
+    if Config.interactionMode == 'textui' or storefrontZones[index] then return end
+    local shop = Config.shops[index]
+    storefrontZones[index] = registerTargetShop(index, shop, shop.zone or Config.shopZoneDefault)
+end
+
+local function hideStorefront(index)
+    local id = storefrontZones[index]
+    if not id then return end
+    storefrontZones[index] = nil
+    pcall(function() exports.kora_target:removeZone(id) end)
+end
 
 local function tattooPedsEnabled()
     local peds = Config.tattoo and Config.tattoo.peds
@@ -1726,8 +1745,10 @@ local function tattooPedSpec(shop)
     local override = type(shop.tattooPed) == 'table' and shop.tattooPed or {}
     local model = override.model or shop.ped or peds.model
     local coords = override.coords or shop.coords
-    if type(model) ~= 'string' or not coords then return nil end
-    return model, coords, override.scenario or peds.scenario
+    if type(model) ~= 'string' or model == '' or not coords then return nil end
+    local scenario = override.scenario
+    if scenario == nil then scenario = peds.scenario end
+    return model, coords, scenario
 end
 
 local function applyTattooPedAlpha(ped, faded)
@@ -1741,45 +1762,50 @@ end
 
 setTattooPedsFaded = function(faded)
     tattooPedsFaded = faded == true and tattooPedsEnabled()
-    for _, entry in pairs(tattooPeds) do applyTattooPedAlpha(entry.ped, tattooPedsFaded) end
-end
-
-local function removeTattooPed(index)
-    local entry = tattooPeds[index]
-    if not entry then return end
-    tattooPeds[index] = nil
-    if entry.targetId then
-        pcall(function() exports.kora_target:removeEntity(entry.ped, entry.targetId) end)
+    for _, artist in pairs(tattooArtists) do
+        if artist.ped then applyTattooPedAlpha(artist.ped, tattooPedsFaded) end
     end
-    if DoesEntityExist(entry.ped) then DeleteEntity(entry.ped) end
 end
 
-local function spawnTattooPed(index, model, coords, scenario)
-    local hash = joaat(model)
-    if not IsModelInCdimage(hash) then return end
-    RequestModel(hash)
-    local deadline = GetGameTimer() + 5000
-    while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(25) end
-    if not HasModelLoaded(hash) then return end
+-- `restore` = false on resource stop, where nothing is registered again.
+local function despawnTattooPed(index, artist, restore)
+    local ped, targetId = artist.ped, artist.targetId
+    artist.ped, artist.targetId = nil, nil
+    if ped then
+        if targetId then pcall(function() exports.kora_target:removeEntity(ped, targetId) end) end
+        if restore == false then
+            if DoesEntityExist(ped) then DeleteEntity(ped) end
+        else
+            Kora.entities.remove(ped)
+        end
+    end
+    if restore ~= false then showStorefront(index) end
+end
 
-    -- Shop coords are floor level but a ped is placed by its middle, so find the
-    -- ground and stand the artist on it instead of sinking them to the knees.
-    RequestCollisionAtCoord(coords.x, coords.y, coords.z)
-    local z = coords.z + 1.0
-    local found, groundZ = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z + 2.0, false)
-    if found then z = groundZ + 1.0 end
+local function spawnTattooPed(index, artist)
+    local coords = artist.coords
+    -- Shop coords are where a standing player is (GetEntityCoords, about 1.0
+    -- above the floor) and CreatePed stands the ped on the z it is given, so the
+    -- artist goes 1.0 lower. No ground probe: at scopeRadius the shop interior
+    -- is usually not loaded yet, so a probe from above finds the roof and the
+    -- frozen artist was left standing on it, out of sight.
+    local ped = Kora.entities.create(artist.model, {
+        x = coords.x, y = coords.y, z = coords.z - 1.0, heading = tonumber(coords.w) or 0.0,
+    }, { preset = 'static' })
+    if not ped then
+        print(('[kora_clothing] tattoo artist model %s could not be spawned'):format(tostring(artist.model)))
+        return
+    end
+    -- The player may have left, or the option been changed, while the model streamed.
+    if not artist.inside or tattooArtists[index] ~= artist then
+        Kora.entities.remove(ped)
+        return
+    end
+    artist.ped = ped
 
-    local ped = CreatePed(4, hash, coords.x, coords.y, z, coords.w or 0.0, false, false)
-    SetModelAsNoLongerNeeded(hash)
-    if ped == 0 or not DoesEntityExist(ped) then return end
-
-    SetEntityInvincible(ped, true)
-    SetBlockingOfNonTemporaryEvents(ped, true)
-    FreezeEntityPosition(ped, true)
-    if type(scenario) == 'string' and scenario ~= '' then TaskStartScenarioInPlace(ped, scenario, 0, true) end
-
-    local entry = { ped = ped }
-    tattooPeds[index] = entry
+    if type(artist.scenario) == 'string' and artist.scenario ~= '' then
+        TaskStartScenarioInPlace(ped, artist.scenario, 0, true)
+    end
     if tattooPedsFaded then applyTattooPedAlpha(ped, true) end
 
     -- Text prompt servers open the shop from the zone prompt only.
@@ -1795,39 +1821,58 @@ local function spawnTattooPed(index, model, coords, scenario)
             },
         }, Config.interactDistance)
     end)
-    if ok then entry.targetId = targetId end
-end
-
--- One pass: spawn artists the player is near, delete the ones they left (with
--- a margin so a player on the edge does not flicker one in and out).
-local function syncTattooPeds()
-    if not tattooPedsEnabled() then
-        for index in pairs(tattooPeds) do removeTattooPed(index) end
-        return
-    end
-
-    local player = GetEntityCoords(PlayerPedId())
-    local radius = tonumber(Config.tattoo.peds.scopeRadius) or 40.0
-    for index, shop in ipairs(Config.shops) do
-        local model, coords, scenario = tattooPedSpec(shop)
-        if model then
-            local distance = #(player - vector3(coords.x, coords.y, coords.z))
-            local entry = tattooPeds[index]
-            if entry and (distance > radius + 5.0 or not DoesEntityExist(entry.ped)) then
-                removeTattooPed(index)
-                entry = nil
-            end
-            if not entry and distance <= radius then spawnTattooPed(index, model, coords, scenario) end
-        end
+    if ok and targetId then
+        artist.targetId = targetId
+        hideStorefront(index)
     end
 end
 
-CreateThread(function()
-    while true do
-        syncTattooPeds()
-        Wait(1500)
+local function registerTattooArtist(index, shop)
+    local model, coords, scenario = tattooPedSpec(shop)
+    if not model then return end
+    local artist = { model = model, coords = coords, scenario = scenario, inside = false, spawning = false }
+    tattooArtists[index] = artist
+    artist.zone = Kora.zones.sphere({
+        coords = vector3(coords.x, coords.y, coords.z),
+        radius = tonumber(Config.tattoo.peds.scopeRadius) or 40.0,
+        onEnter = function()
+            artist.inside = true
+            if artist.spawning or artist.ped then return end
+            artist.spawning = true
+            -- Model streaming yields; zone callbacks must not.
+            CreateThread(function()
+                local ok, err = pcall(spawnTattooPed, index, artist)
+                artist.spawning = false
+                if not ok then print(('[kora_clothing] tattoo artist could not be spawned: %s'):format(tostring(err))) end
+            end)
+        end,
+        onExit = function()
+            artist.inside = false
+            despawnTattooPed(index, artist)
+        end,
+    })
+end
+
+-- (Re)builds every artist from the live config. Runs at start and whenever a
+-- Config.tattoo.peds setting changes, including kora_lib's config snapshot
+-- arriving after start with this server's config.local.lua values.
+local function refreshTattooArtists()
+    for index, artist in pairs(tattooArtists) do
+        tattooArtists[index] = nil
+        artist.inside = false
+        if artist.zone then artist.zone.remove() end
+        despawnTattooPed(index, artist)
     end
-end)
+    if not tattooPedsEnabled() then return end
+    for index, shop in ipairs(Config.shops) do registerTattooArtist(index, shop) end
+    setTattooPedsFaded(tattooPedsFaded)
+end
+
+if Kora and Kora.config and Kora.config.onChange then
+    for _, key in ipairs({ 'enabled', 'scopeRadius', 'model', 'scenario' }) do
+        Kora.config.onChange('tattoo.peds.' .. key, function() refreshTattooArtists() end)
+    end
+end
 
 CreateThread(function()
     local textUiMode = Config.interactionMode == 'textui'
@@ -1850,7 +1895,7 @@ CreateThread(function()
         if textUiMode then
             registerTextUiShop(index, shop, zone)
         else
-            registerTargetShop(index, shop, zone)
+            showStorefront(index)
         end
 
         -- An enabled tattoo artist (above) takes the clerk's place at its shop.
@@ -1879,11 +1924,13 @@ CreateThread(function()
             end
         end
     end
+
+    refreshTattooArtists()
 end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
-    for index in pairs(tattooPeds) do removeTattooPed(index) end
+    for index, artist in pairs(tattooArtists) do despawnTattooPed(index, artist, false) end
     suppressPopulation(false)
     if activeSession then
         restoreHudForSession(activeSession)
@@ -1910,6 +1957,6 @@ if Config.testMode then
     QBClothing._testRuntime = {
         applySkin = applySkin, reapplyColours = reapplyColours, refreshHairVariation = refreshHairVariation,
         currentSkinSnapshot = currentSkinSnapshot, headPayload = headPayload,
-        syncTattooPeds = syncTattooPeds, tattooPeds = tattooPeds,
+        refreshTattooArtists = refreshTattooArtists, tattooArtists = tattooArtists, storefrontZones = storefrontZones,
     }
 end

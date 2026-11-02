@@ -347,7 +347,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.tattoo.undress.enabled` (default `true`) — clothing buttons in the tattoo studio (see [Tattoo studio](#tattoo-studio)); `false` returns to the fixed `Config.tattooStrip` with no buttons
 - `Config.tattoo.undress.autoUndressOnOpen` (default `{ 'top', 'legs', 'headwear' }`) — part ids bared when the studio opens; `{}` opens fully dressed
 - `Config.tattoo.undress.parts` — one button per part: the bare component drawables per freemode model (`male` / `female`) and the prop slots cleared
-- `Config.tattoo.peds.enabled` (default `false`) — a tattoo artist ped in each tattoo shop with a "Get tattooed" target; `alpha` (0), `scopeRadius` (40.0m), `model` (`u_m_y_tattoo_01`) and `scenario` (unset) tune it
+- `Config.tattoo.peds.enabled` (default `true`) — a tattoo artist ped in each tattoo shop with a "Get tattooed" target, replacing the shop zone prompt while it stands there; `alpha` (0), `scopeRadius` (40.0m), `model` (`u_m_y_tattoo_01`) and `scenario` (`WORLD_HUMAN_STAND_IMPATIENT`) tune it
 - `Config.ui.clothingToggles` — preview clothing switches stacked on the left of the menu, under My Outfits (see [Preview clothing switches](#preview-clothing-switches)):
   - `enabled` (default `true`) — master switch
   - `services` (default `{ 'barber', 'hairdresser' }`) — menus that show them (`barber`, `hairdresser`, `clothing`, `creation`)
@@ -444,18 +444,20 @@ The camera zone buttons work the same with parts bared.
 
 ### Tattoo artist ped
 
-With `Config.tattoo.peds.enabled = true` every shop with `service = 'tattoo'` gets a client-side, frozen, invincible artist while the player is within `scopeRadius`. Targeting them ("Get tattooed") opens the same studio as the shop zone, which stays registered, so both work. While the studio is open the artist is set to `Config.tattoo.peds.alpha` (0 = invisible) for that player only, and is reset on close. Artists are deleted when the player walks away, when the option is turned off and when the resource stops.
+Every shop with `service = 'tattoo'` gets a client-side, frozen, invincible artist (`Config.tattoo.peds.enabled`, on by default like the shop clerks in kora_inventory). Each artist is a kora_lib zone of `scopeRadius` metres: the ped is created when the player walks into it and deleted when they leave, so nothing polls. Targeting the artist ("Get tattooed") opens the studio. While the artist stands there the shop's own zone is taken down, so there is no second "Open Tattoo Artist" option and no zone sprite next to the artist; the zone comes back whenever there is no artist (player away, option off, model missing). While the studio is open the artist is set to `Config.tattoo.peds.alpha` (0 = invisible) for that player only, and is reset on close. Artists are also deleted when the option is turned off and when the resource stops.
 
-It is off by default so servers with their own tattoo MLO or artist are not surprised by a second ped. When on, the decorative `Config.shopPeds` clerk is not also spawned at tattoo shops.
+Turn it off on a map or MLO that already has its own tattoo artist; the shop zone is then used as before. While it is on, the decorative `Config.shopPeds` clerk is not also spawned at tattoo shops. Changes to `enabled`, `scopeRadius`, `model` and `scenario` apply live. With `Config.interactionMode = 'textui'` the artist is decoration and the shop opens from the prompt.
 
-The default shops already name `u_m_y_tattoo_01` and the artist stands at the shop's `coords`. A shop can override this in `Config.shops`:
+The artist plays `scenario` (default `WORLD_HUMAN_STAND_IMPATIENT`; unset or `''` for a plain idle). Avoid scenarios with a hand prop such as a clipboard or phone: fading only reaches the ped, so the prop would stay in view in the studio.
+
+The default shops already name `u_m_y_tattoo_01` and the artist stands at the shop's `coords`, which are a standing player's position (as `/coords` or `GetEntityCoords` report, about 1.0 above the floor); the ped is placed 1.0 lower, on the floor. A shop can override this in `Config.shops` (same height convention):
 
 ```lua
 tattooPed = { model = 'u_m_y_tattoo_01', coords = vector4(x, y, z, heading), scenario = 'WORLD_HUMAN_STAND_IMPATIENT' },
 -- or tattooPed = false for no artist at this shop
 ```
 
-Keep the artist within a metre or two of the shop's `coords`: the server only opens a session for players near them.
+Keep the artist within a metre or two of the shop's zone: the server only opens a session for players near it.
 
 ## Pause-map blips
 

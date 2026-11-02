@@ -17,8 +17,8 @@ _G.RegisterNUICallback = function() end
 -- Every CreateThread this test's code paths reach (the reconcile's own
 -- callback-trigger thread, and the shop-ped spawn loop at chunk load -- see
 -- Config.shops override below) never calls Wait, so they run to completion
--- synchronously. The tattoo artist poll loop does call Wait: a thread runs in
--- a coroutine and simply parks at its first Wait.
+-- synchronously. A thread still runs in a coroutine, so one that calls Wait
+-- simply parks there.
 _G.CreateThread = function(fn)
     local ok, err = coroutine.resume(coroutine.create(fn))
     if not ok then error(err, 0) end

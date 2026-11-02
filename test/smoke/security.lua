@@ -263,12 +263,14 @@ H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return 
 -- Shop interaction is geometry, not a ped: a ped-bound target dies with the
 -- ped (unstreamed model, shoved out of place, deleted by another resource) and
 -- leaves the shop silently unopenable.
--- The one ped-bound target is the optional tattoo artist (Config.tattoo.peds,
--- off by default), an extra way in next to the storefront zone, never a
--- replacement for it.
+-- The one ped-bound target is the tattoo artist (Config.tattoo.peds). It only
+-- stands in for the storefront zone while the artist exists: whenever the
+-- artist is gone the storefront zone is registered again.
 local _, entityTargets = client:gsub('exports.kora_target:addEntity', '')
-H.equal(entityTargets, 1, 'the only ped-bound target is the optional tattoo artist')
+H.equal(entityTargets, 1, 'the only ped-bound target is the tattoo artist')
 H.ok(client:find('local function tattooPedsEnabled()', 1, true) and client:find('if not tattooPedsEnabled() then', 1, true), 'the artist is spawned only when Config.tattoo.peds.enabled')
+H.ok(client:find('if restore ~= false then showStorefront(index) end', 1, true), 'the storefront zone comes back when the artist is gone')
+H.ok(client:find('artist.zone = Kora.zones.sphere({', 1, true) and not client:find('syncTattooPeds', 1, true), 'artists spawn from kora_lib zones, not a polling loop')
 H.ok(client:find('exports.kora_target:addBoxZone({', 1, true) and client:find('exports.kora_target:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
 H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')

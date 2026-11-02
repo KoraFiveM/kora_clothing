@@ -31,6 +31,8 @@ _G.Kora = {
     zones = {
         poly = function(opts) textZones[#textZones + 1] = opts end,
         box = function(opts) textZones[#textZones + 1] = opts end,
+        -- Tattoo artist scopes (Config.tattoo.peds); no artist spawns here.
+        sphere = function() return { remove = function() end } end,
     },
     textui = {
         show = function(text, opts) prompts[#prompts + 1] = { text = text, key = opts.key }; return #prompts end,
