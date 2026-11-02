@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RotateDrag, type DragOptions, type RotateMode } from "./rotateDrag.ts"
+import { RotateDrag, dragCursor, type DragOptions, type RotateMode } from "./rotateDrag.ts"
 
 const W = 1000
 const H = 600
@@ -274,4 +274,24 @@ test("useRecenter does nothing without a running drag", () => {
     drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
     drag.move(sample(510, 10))
     assert.deepEqual(log.rotated, [-5])
+})
+
+test("only a plain drag may show the cursor; every mode that moves it hides it", () => {
+    assert.equal(dragCursor("plain", "grabbing"), "grabbing")
+    assert.equal(dragCursor("plain", "hidden"), "hidden")
+    for (const mode of ["capture", "recenter", "pointer", "controls"] as const) {
+        assert.equal(dragCursor(mode, "grabbing"), "hidden", mode)
+    }
+})
+
+test("plain: a long drag sends only movementX turns, never a recentre or a Lua start", async () => {
+    const { drag, log } = setup("plain")
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    await tick()
+    for (let x = 500; x < 990; x += 10) drag.move({ clientX: x, clientY: 300, movementX: 10, buttons: 1, width: W, height: H })
+    assert.equal(log.recenters, 0)
+    assert.deepEqual(log.starts, [])
+    assert.equal(log.rotated.length, 49)
+    drag.up()
+    assert.equal(log.ends, 1)
 })

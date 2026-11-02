@@ -14,7 +14,7 @@ import type { ClothingToggle, ClothingToggleId, SetClothingTogglePayload, SetClo
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
-import { RotateDrag } from "@/lib/rotateDrag"
+import { RotateDrag, dragCursor } from "@/lib/rotateDrag"
 import type { DragIO, RotateMode } from "@/lib/rotateDrag"
 import type {
     CameraPayload,
@@ -159,7 +159,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     /** Config.rotateSensitivity: multiplier on the degrees turned per pixel. */
     sensitivity: number
     edgeMargin?: number
-    /** Config.rotateDragCursor: shown for the whole drag. */
+    /** Config.rotateDragCursor: shown for the whole drag of a plain drag (see dragCursor). */
     cursor: "grabbing" | "hidden"
 }) {
     const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * sensitivity * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
@@ -242,8 +242,8 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
-            // Hidden for the whole drag, wherever the cursor is (capture mode pulls it to the centre).
-            document.documentElement.dataset.dragCursor = cursor
+            // One cursor for the whole drag: the configured one for a plain drag, none when the cursor is moved by the game.
+            document.documentElement.dataset.dragCursor = dragCursor(mode, cursor)
             document.documentElement.classList.add("is-rotating")
             // Lua-owned drags turn the camera without a move ever counting here.
             if (mode === "capture" || mode === "controls") onInteract()
@@ -924,7 +924,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className={open.showScrollbar === true ? "clothing-shell show-scrollbars" : "clothing-shell"}>
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "capture"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "plain"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

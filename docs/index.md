@@ -180,9 +180,19 @@ the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
 `Config.rotateRightButton = false`) over the character and drag. `Config.rotateMode` picks how the
 drag survives the cursor reaching the screen edge (read each time a menu opens).
 `Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
-the capture, pointer, recenter and plain modes:
+the plain, capture, pointer and recenter modes:
 
-- `'capture'` (default) — the NUI hands the drag to `client/rotate.lua` but keeps
+- `'plain'` (default) — a normal press/move/release drag. The NUI turns the
+  camera from the mouse movement it sees (`movementX`), one
+  `qbclothing:nui:rotate` message per animation frame, and the cursor is never
+  touched: no Lua thread, no `SetCursorLocation`, no NUI focus change. A full-screen
+  overlay pins one cursor for the whole drag (`Config.rotateDragCursor`:
+  `'grabbing'` or `'hidden'`). The cursor stops at the screen edge, so a very long
+  drag the same way needs a second click.
+- Every mode below moves the cursor itself to keep rotating at the edge. A visible
+  cursor that is moved flickers (arrow / hand), so in these modes the cursor is
+  always hidden for the drag and `Config.rotateDragCursor` is ignored.
+- `'capture'` — the NUI hands the drag to `client/rotate.lua` but keeps
   its focus and cursor, so it always sees the button come up. Every frame Lua
   reads the cursor (`GetNuiCursorPosition`), turns the camera by how far it
   moved, and once it is more than 8% of the screen from the centre pulls it
@@ -212,7 +222,6 @@ the capture, pointer, recenter and plain modes:
 - `'recenter'` — the cursor drag stays in the NUI; near a screen edge the NUI
   asks Lua (`qbclothing:nui:recenter`, throttled) to `SetCursorLocation(0.5, 0.5)`
   and ignores the resulting jump.
-- `'plain'` — a normal press/move/release drag.
 
 Every mode ends the drag on mouse release, window blur, Escape and menu close
 (`Config.rotateDragGuard`).
@@ -358,12 +367,12 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.holdStill` (default `true`) — pause idle fidgets and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
 - `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
-- `Config.rotateMode` (default `'capture'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
+- `Config.rotateMode` (default `'plain'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
 - `Config.camera.transitionMs` (default `500`) — time a change of view takes to settle; position, look-at height and fov ease together, never snap.
 - `Config.camera.occlusionMaxSwing` (default `55`°) — furthest the camera may swing round an obstruction; keeps it in front of the character (`180` = old side/rear behaviour).
-- `Config.rotateDragCursor` (`'grabbing'` default, or `'hidden'`) — cursor held for the whole rotate drag.
+- `Config.rotateDragCursor` (`'grabbing'` default, or `'hidden'`) — cursor held for the whole rotate drag in `'plain'` mode; the modes that move the cursor always hide it.
 - `Config.bucket.suppressClientPopulation` (default `true`) — while a new character is created, also zero this client's ped/vehicle population budgets and clear nearby ones (restored on close). The personal routing bucket + `Config.bucket.disablePopulation` already isolate the player server-side.
 
 ## Menu text and languages

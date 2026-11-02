@@ -111,12 +111,12 @@ local function lastFocus() local f = focus[#focus]; return f and f[1], f and f[2
 local function runThread() local fn = table.remove(threads, 1); fn() end
 local function lastMessage() return messages[#messages] end
 
-H.equal(Config.rotateMode, 'capture', 'capture is the default mode')
+H.equal(Config.rotateMode, 'plain', 'plain (no cursor moves) is the default mode')
 H.equal(Config.rotateSensitivity, 1.0, 'rotate sensitivity defaults to 1')
 H.equal(Config.rotateRightButton, true, 'right button rotates by default')
-H.equal(RotateControl.mode(), 'capture', 'mode resolves to capture')
+H.equal(RotateControl.mode(), 'plain', 'mode resolves to plain')
 Config.rotateMode = 'nonsense'
-H.equal(RotateControl.mode(), 'capture', 'unknown mode falls back to capture')
+H.equal(RotateControl.mode(), 'plain', 'unknown mode falls back to plain')
 Config.rotateMode = 'pointer'
 H.equal(RotateControl.mode(), 'pointer', 'pointer mode')
 Config.rotatePointerLock = false
@@ -137,6 +137,9 @@ handlers['qbclothing:client:closeSession']({ ok = true })
 reset()
 Config.rotateMode = 'plain'
 H.equal(RotateControl.start(0, 0.4, 0.6), false, 'not started outside controls mode')
+H.equal(#threads, 0, 'a plain drag runs no Lua thread')
+H.equal(#focus, 0, 'a plain drag never touches NUI focus')
+H.equal(cursor, nil, 'a plain drag never moves the cursor')
 Config.rotateMode = 'controls'
 Config.rotateRightButton = false
 H.equal(RotateControl.start(2, 0.4, 0.6), false, 'right button refused when disabled')
@@ -337,7 +340,28 @@ callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, functi
 handlers['qbclothing:client:closeSession']({ ok = true })
 H.equal(RotateControl.isActive(), false, 'closing the menu ends the capture drag')
 H.equal(open().rotateMode, 'capture', 'payload carries capture')
+Config.rotateMode = 'plain'
+H.equal(open().rotateMode, 'plain', 'payload carries plain')
+Config.rotateMode = 'capture'
 handlers['qbclothing:client:closeSession']({ ok = true })
+
+-- Plain (the default): the callbacks never start a Lua drag or move the cursor; the
+-- NUI's batched rotate messages are the whole drag.
+reset()
+Config.rotateMode = 'plain'
+open()
+local threadsBefore, focusBefore = #threads, #focus -- the session's own, not the drag's
+callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+H.equal(reply.active, false, 'plain: Lua declines the drag')
+callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+H.equal(reply.moved, false, 'plain: the cursor is never recentred')
+H.equal(cursor, nil, 'plain: SetCursorLocation never called')
+H.equal(#threads, threadsBefore, 'plain: no per-frame thread')
+H.equal(#focus, focusBefore, 'plain: NUI focus untouched during the drag')
+callbacks['qbclothing:nui:rotate']({ deltaDeg = 3.0 }, function() end)
+H.equal(#rotated, 1, 'plain: the NUI delta turns the camera')
+handlers['qbclothing:client:closeSession']({ ok = true })
+Config.rotateMode = 'capture'
 
 -- Without the cursor natives capture declines, and the NUI falls back to recentring.
 reset()

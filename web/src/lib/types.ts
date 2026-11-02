@@ -101,7 +101,7 @@ export interface OpenPayload {
     mandatory: boolean
     rotatePointerLock?: boolean
     rotateDragGuard?: boolean
-    /** Config.rotateMode; absent (an older Lua side) means the pointer-lock drag. */
+    /** Config.rotateMode; absent (an older Lua side) means the plain drag. */
     rotateMode?: "capture" | "controls" | "recenter" | "pointer" | "plain"
     /** Config.rotateRightButton; absent means on. */
     rotateRightButton?: boolean

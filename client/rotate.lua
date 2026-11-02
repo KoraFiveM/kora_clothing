@@ -1,7 +1,11 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
 -- Config.rotateMode:
---   'capture'  (default) the NUI keeps its focus and cursor, so it always sees the
+--   'plain'    (default) a normal press/move/release drag in the NUI. Nothing happens
+--              here: no thread, no cursor move, no focus change. The NUI turns the
+--              camera from its own mouse movement (one message per frame), so the
+--              cursor it draws is never disturbed.
+--   'capture'  the NUI keeps its focus and cursor, so it always sees the
 --              button come up, and hands the drag to this file. Every frame the
 --              cursor is read (GetNuiCursorPosition), the camera turns by how far
 --              it moved, and once it strays a little from the screen centre it is
@@ -26,7 +30,6 @@
 --   'pointer'  the browser Pointer Lock request (Config.rotatePointerLock); the NUI
 --              turns the camera from movementX and never toggles NUI focus. FiveM's
 --              NUI refuses the lock, so in practice it falls back to recenter.
---   'plain'    a normal press/move/release drag, no capture.
 
 RotateControl = {}
 
@@ -48,12 +51,12 @@ local CAPTURE_RETRY_FRAMES = 8     -- a pull still not seen after this many fram
 
 local active -- the running drag: { mode, control, startedAt, seen, movedAt, x, y, ... }
 
----The mode in effect. An unknown value falls back to the default; the older
+---The mode in effect. An unknown value falls back to the default ('plain'); the older
 ---Config.rotatePointerLock = false still turns plain 'pointer' capture off.
 ---@return string
 function RotateControl.mode()
     local mode = Config.rotateMode
-    if not MODES[mode] then mode = 'capture' end
+    if not MODES[mode] then mode = 'plain' end
     if mode == 'pointer' and Config.rotatePointerLock == false then return 'plain' end
     return mode
 end

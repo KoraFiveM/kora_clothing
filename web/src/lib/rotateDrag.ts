@@ -2,7 +2,10 @@
 // drag can start, move and end are testable.
 //
 // Modes (Config.rotateMode):
-//   capture   (default) Lua owns the drag once it accepts rotateStart, as in
+//   plain     (default) a normal cursor drag turning the camera from movementX; the
+//             cursor is never moved, so it cannot flicker. Also what pointer becomes
+//             when Config.rotatePointerLock is off.
+//   capture   Lua owns the drag once it accepts rotateStart, as in
 //             controls, but NUI focus and the cursor never change: Lua reads the
 //             cursor every frame and pulls it back to the centre itself. The NUI
 //             ignores pointer moves meanwhile (they include those pulls), still sees
@@ -12,11 +15,18 @@
 //             pointer events and must not treat the resulting blur as the end.
 //   recenter  a normal cursor drag; near a screen edge Lua is asked to move the
 //             cursor back to the centre, and that synthetic jump is ignored.
-//   pointer / plain  a normal cursor drag using movementX (pointer lock itself is
-//             requested by the caller). When the lock is refused the caller calls
-//             useRecenter() and the drag carries on as recenter.
+//   pointer   a normal cursor drag using movementX (pointer lock itself is requested
+//             by the caller). When the lock is refused the caller calls useRecenter()
+//             and the drag carries on as recenter.
 
 export type RotateMode = "capture" | "controls" | "recenter" | "pointer" | "plain"
+
+/** The cursor a drag shows. Only a plain drag leaves the cursor alone, so only it can
+ * honour Config.rotateDragCursor; every other mode moves the cursor itself (or hands
+ * the mouse to the game), and a visible cursor that gets moved flickers. */
+export function dragCursor(mode: RotateMode, configured: "grabbing" | "hidden"): "grabbing" | "hidden" {
+    return mode === "plain" ? configured : "hidden"
+}
 
 export interface DragIO {
     /** Degrees to add to the orbit (already scaled). */

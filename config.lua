@@ -653,26 +653,29 @@ Config.rotateDragGuard = config and config.boolean(true, {
     live = true,
 }) or true
 
--- How drag-to-rotate keeps working when the cursor reaches the screen edge.
--- 'capture' (default): while the button is held the game script reads the cursor
--- every frame, turns the character by how far it moved and pulls it straight back
--- to the screen centre, so it can never reach an edge or leave the window (even
--- onto a second monitor). The cursor is hidden while dragging, comes back where
--- the drag began, and NUI focus is never toggled (no blink). 'pointer' asks the
--- browser for pointer lock, which FiveM's NUI refuses, so it falls back to the
--- NUI asking for a recentre near the edge (a fast flick can outrun that).
--- 'controls' hides the cursor and reads the mouse as a game control (it toggles
--- NUI focus, which can flash the cursor, and stops at the screen edge on some
--- setups); 'recenter' moves the cursor back to the centre near an edge; 'plain'
--- captures nothing. Read each time the menu opens.
-Config.rotateMode = config and config.enum('capture', {
-    options = { 'capture', 'pointer', 'controls', 'recenter', 'plain' },
+-- How drag-to-rotate is read.
+-- 'plain' (default): the NUI turns the character from the mouse movement it sees
+-- (movementX, batched to one message per frame) and never touches the cursor: the
+-- game script runs no per-frame loop, never calls SetCursorLocation and never
+-- changes NUI focus, so the one cursor the NUI draws (see rotateDragCursor) stays
+-- steady for the whole drag. The trade-off is that the cursor stops at the screen
+-- edge, so a very long drag in one direction needs a second click.
+-- The other modes keep rotating at the edge by moving the cursor themselves, which
+-- makes a visible cursor jump and flicker between arrow and hand, so while one of
+-- them is active the cursor is always hidden for the drag (rotateDragCursor is
+-- ignored). 'capture': Lua reads the cursor every frame and pulls it back to the
+-- centre. 'recenter': the NUI asks Lua to put it back at the centre near an edge.
+-- 'pointer' asks the browser for pointer lock, which FiveM refuses, so it falls
+-- back to recenter. 'controls' hides the cursor and reads the mouse as a game
+-- control (it toggles NUI focus). Read each time the menu opens.
+Config.rotateMode = config and config.enum('plain', {
+    options = { 'plain', 'capture', 'pointer', 'controls', 'recenter' },
     label = 'Rotate drag mode',
-    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. capture (recommended): the cursor is held at the centre while you drag, so it can never hit an edge or leave the game window, and comes back where you started. pointer: browser pointer lock, which FiveM refuses, so it recentres near the edge instead. controls: the cursor is hidden and the game reads the mouse (switches NUI focus, which can flash the cursor). recenter: the cursor is moved back to the centre near the edge. plain: no capture.",
+    description = "How rotating the character with the mouse is read. plain (default): the cursor is never moved, so it stays one steady icon for the whole drag, but it stops at the screen edge. capture: the cursor is hidden and held at the centre while you drag, so rotation never stops at an edge. pointer: browser pointer lock, which FiveM refuses, so it recentres near the edge instead. controls: the cursor is hidden and the game reads the mouse (switches NUI focus). recenter: the cursor is hidden and moved back to the centre near the edge. Every mode except plain hides the cursor while dragging.",
     live = true,
-}) or 'capture'
+}) or 'plain'
 
--- Rotation speed for the capture, pointer, recenter and plain modes (controls mode
+-- Rotation speed for the plain, capture, pointer and recenter modes (controls mode
 -- has its own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
 Config.rotateSensitivity = config and config.number(1.0, {
     min = 0.1, max = 10.0,
@@ -696,12 +699,13 @@ Config.rotateInvert = config and config.boolean(false, {
     live = true,
 }) or false
 
--- Cursor shown while a rotate drag is held. 'grabbing' pins the closed-hand
--- cursor for the whole drag (a full-screen overlay owns it, so nothing under the
--- pointer can change it); 'hidden' hides it instead.
+-- Cursor shown while a rotate drag is held (rotateMode = 'plain'). 'grabbing' pins
+-- the closed-hand cursor for the whole drag (a full-screen overlay owns it, so
+-- nothing under the pointer can change it); 'hidden' hides it instead. Modes that
+-- move the cursor themselves always hide it, whatever this says.
 Config.rotateDragCursor = config and config.enum('grabbing', {
     label = 'Cursor while rotating',
-    description = 'Which cursor is shown while you hold click to rotate the character. Grabbing keeps a closed-hand cursor for the whole drag; Hidden hides the cursor until you let go.',
+    description = 'Which cursor is shown while you hold click to rotate the character (plain drag mode; the other modes always hide it). Grabbing keeps a closed-hand cursor for the whole drag; Hidden hides the cursor until you let go.',
     options = {
         { value = 'grabbing', label = 'Grabbing hand' },
         { value = 'hidden', label = 'Hidden' },
