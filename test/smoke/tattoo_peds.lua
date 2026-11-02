@@ -88,6 +88,7 @@ _G.SetPedPropIndex = function() end
 _G.ClearPedDecorations = function() end
 
 local spheres, clerks, changeHandlers = {}, 0, {}
+local blipCalls = {}
 _G.Kora = {
     notify = { send = function() end },
     events = { trigger = function(name, mode, extra) requests[#requests + 1] = { name = name, mode = mode, extra = extra }; return true end },
@@ -111,7 +112,7 @@ _G.Kora = {
             return sphere
         end,
     },
-    blips = { create = function() end, setInfo = function() end },
+    blips = { create = function(coords, opts) blipCalls[#blipCalls + 1] = { coords = coords, opts = opts } end, setInfo = function() end },
     textui = { show = function() return 1 end, hide = function() end },
     keybind = { add = function() end },
 }
@@ -166,6 +167,37 @@ end
 shopsThread()
 H.equal(#liveSpheres(), #tattooShops, 'one scope per tattoo shop, none elsewhere')
 for index in ipairs(Config.shops) do H.ok(storefrontOf(index), 'storefront zone registered for shop ' .. index) end
+
+-- The default tattoo shops are exactly these six map locations (the two older
+-- entries at the Davis and Vespucci shops were merged into them, not kept as
+-- extra shops), each with an artist at the vector4 and one tattoo blip.
+local defaultTattooShops = {
+    { 1321.61, -1653.76, 52.28, 354.98 },
+    { 324.22, 180.12, 103.59, 102.14 },
+    { 1865.25, 3747.23, 33.03, 45.15 },
+    { -295.18, 6200.49, 31.49, 256.39 },
+    { -3169.57, 1077.46, 20.83, 200.35 },
+    { -1155.34, -1426.97, 4.95, 337.35 },
+}
+H.equal(#tattooShops, #defaultTattooShops, 'exactly six default tattoo shops (older duplicates removed)')
+local tattooBlips = 0
+for _, blip in ipairs(blipCalls) do
+    if blip.opts.category == 'Tattoo' then tattooBlips = tattooBlips + 1 end
+end
+H.equal(tattooBlips, #defaultTattooShops, 'one tattoo blip per tattoo shop, none doubled')
+for n, want in ipairs(defaultTattooShops) do
+    local shop = Config.shops[tattooShops[n]]
+    H.ok(shop and shop.coords.x == want[1] and shop.coords.y == want[2] and shop.coords.z == want[3] and shop.coords.w == want[4],
+        ('tattoo shop %d stands at vector4(%s, %s, %s, %s)'):format(n, want[1], want[2], want[3], want[4]))
+    H.ok(shop.blip and shop.blip.enabled and shop.blip.category == 'Tattoo', 'tattoo shop ' .. n .. ' has a Tattoo blip')
+    H.ok(shop.zone and shop.zone.points and #shop.zone.points >= 3, 'tattoo shop ' .. n .. ' has a target zone')
+    local sx, sy = 0.0, 0.0
+    for _, point in ipairs(shop.zone.points) do sx = sx + point.x; sy = sy + point.y end
+    local off = math.sqrt((sx / #shop.zone.points - want[1]) ^ 2 + (sy / #shop.zone.points - want[2]) ^ 2)
+    H.ok(off < 0.5, 'tattoo shop ' .. n .. ' zone is centred on the artist')
+    local artist = runtime.tattooArtists[tattooShops[n]]
+    H.ok(artist and artist.coords.w == want[4], 'tattoo shop ' .. n .. ' artist faces the configured heading')
+end
 local sphere = sphereFor(first)
 H.equal(sphere.opts.radius, 40.0)
 H.equal(sphere.opts.coords.z, first.coords.z)

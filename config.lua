@@ -277,13 +277,13 @@ Config.shops = {
     {
         service = 'tattoo', free = false, label = 'Tattoo Artist',
         ped = 'u_m_y_tattoo_01',
-        coords = vector4(1322.6, -1651.9, 52.28, 130.0),
+        coords = vector4(1321.61, -1653.76, 52.28, 354.98),
         zone = {
             points = {
-                vector3(1321.19, -1651.78, 52.28),
-                vector3(1322.48, -1653.31, 52.28),
-                vector3(1324.01, -1652.02, 52.28),
-                vector3(1322.72, -1650.49, 52.28),
+                vector3(1322.69, -1652.85, 52.28),
+                vector3(1320.70, -1652.68, 52.28),
+                vector3(1320.53, -1654.67, 52.28),
+                vector3(1322.52, -1654.84, 52.28),
             },
             minZ = 51.18, maxZ = 53.38,
         },
@@ -292,13 +292,73 @@ Config.shops = {
     {
         service = 'tattoo', free = false, label = 'Tattoo Artist',
         ped = 'u_m_y_tattoo_01',
-        coords = vector4(-1153.6, -1425.7, 4.95, 120.0),
+        coords = vector4(324.22, 180.12, 103.59, 102.14),
         zone = {
             points = {
-                vector3(-1154.97, -1425.33, 4.95),
-                vector3(-1153.97, -1427.07, 4.95),
-                vector3(-1152.23, -1426.07, 4.95),
-                vector3(-1153.23, -1424.33, 4.95),
+                vector3(323.03, 180.89, 103.59),
+                vector3(323.45, 178.93, 103.59),
+                vector3(325.41, 179.35, 103.59),
+                vector3(324.99, 181.31, 103.59),
+            },
+            minZ = 102.49, maxZ = 104.69,
+        },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
+    },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(1865.25, 3747.23, 33.03, 45.15),
+        zone = {
+            points = {
+                vector3(1865.25, 3748.64, 33.03),
+                vector3(1863.84, 3747.23, 33.03),
+                vector3(1865.25, 3745.82, 33.03),
+                vector3(1866.66, 3747.23, 33.03),
+            },
+            minZ = 31.93, maxZ = 34.13,
+        },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
+    },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(-295.18, 6200.49, 31.49, 256.39),
+        zone = {
+            points = {
+                vector3(-294.44, 6199.28, 31.49),
+                vector3(-293.97, 6201.23, 31.49),
+                vector3(-295.92, 6201.70, 31.49),
+                vector3(-296.39, 6199.75, 31.49),
+            },
+            minZ = 30.39, maxZ = 32.59,
+        },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
+    },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(-3169.57, 1077.46, 20.83, 200.35),
+        zone = {
+            points = {
+                vector3(-3170.16, 1076.17, 20.83),
+                vector3(-3168.28, 1076.87, 20.83),
+                vector3(-3168.98, 1078.75, 20.83),
+                vector3(-3170.86, 1078.05, 20.83),
+            },
+            minZ = 19.73, maxZ = 21.93,
+        },
+        blip = { enabled = true, sprite = 75, color = 1, scale = 0.8, shortRange = true, category = 'Tattoo' },
+    },
+    {
+        service = 'tattoo', free = false, label = 'Tattoo Artist',
+        ped = 'u_m_y_tattoo_01',
+        coords = vector4(-1155.34, -1426.97, 4.95, 337.35),
+        zone = {
+            points = {
+                vector3(-1154.03, -1426.43, 4.95),
+                vector3(-1155.88, -1425.66, 4.95),
+                vector3(-1156.65, -1427.51, 4.95),
+                vector3(-1154.80, -1428.28, 4.95),
             },
             minZ = 3.85, maxZ = 6.05,
         },
