@@ -116,8 +116,32 @@ local function pointInPolygon(x, y, points)
     return inside
 end
 
-local function withinShopZone(pos, zone, shopCoords)
-    if not zone then return false end
+-- Horizontal distance from (x, y) to the nearest polygon edge.
+local function distanceToPolygonEdge(x, y, points)
+    local best = math.huge
+    local previous = points[#points]
+    for _, point in ipairs(points) do
+        local ex, ey = point.x - previous.x, point.y - previous.y
+        local lengthSq = ex * ex + ey * ey
+        local t = lengthSq > 0 and math.max(0, math.min(1, ((x - previous.x) * ex + (y - previous.y) * ey) / lengthSq)) or 0
+        local dx, dy = x - (previous.x + ex * t), y - (previous.y + ey * t)
+        best = math.min(best, math.sqrt(dx * dx + dy * dy))
+        previous = point
+    end
+    return best
+end
+
+-- How far below/above a vertical band a height is (0 inside it).
+local function outsideBand(z, minZ, maxZ)
+    if z < minZ then return minZ - z end
+    if z > maxZ then return z - maxZ end
+    return 0.0
+end
+
+---Metres from `pos` to the shop's zone volume: 0 inside it, math.huge for a
+---zone that cannot be measured.
+local function distanceToShopZone(pos, zone, shopCoords)
+    if not zone then return math.huge end
 
     if zone.points then
         local minZ, maxZ
@@ -128,14 +152,16 @@ local function withinShopZone(pos, zone, shopCoords)
             for _, point in ipairs(zone.points) do minZ = math.min(minZ, point.z) end
             maxZ = minZ + zone.thickness
         else
-            return false
+            return math.huge
         end
 
-        return pos.z >= minZ and pos.z <= maxZ and pointInPolygon(pos.x, pos.y, zone.points)
+        local horizontal = pointInPolygon(pos.x, pos.y, zone.points) and 0.0 or distanceToPolygonEdge(pos.x, pos.y, zone.points)
+        local vertical = outsideBand(pos.z, minZ, maxZ)
+        return math.sqrt(horizontal * horizontal + vertical * vertical)
     end
 
     local size = zone.size
-    if not size then return false end
+    if not size then return math.huge end
 
     -- kora_lib box zones rotate their XY footprint around shop.coords and use a
     -- vertical band centred on its Z coordinate.
@@ -145,10 +171,14 @@ local function withinShopZone(pos, zone, shopCoords)
     local localY = -dx * math.sin(rotation) + dy * math.cos(rotation)
     local halfZ = size.z / 2
 
-    return math.abs(localX) <= size.x / 2
-        and math.abs(localY) <= size.y / 2
-        and pos.z >= shopCoords.z - halfZ
-        and pos.z <= shopCoords.z + halfZ
+    local ex = math.max(0.0, math.abs(localX) - size.x / 2)
+    local ey = math.max(0.0, math.abs(localY) - size.y / 2)
+    local ez = outsideBand(pos.z, shopCoords.z - halfZ, shopCoords.z + halfZ)
+    return math.sqrt(ex * ex + ey * ey + ez * ez)
+end
+
+local function withinShopZone(pos, zone, shopCoords)
+    return distanceToShopZone(pos, zone, shopCoords) == 0.0
 end
 
 local function nearShop(src, shop)
@@ -156,16 +186,19 @@ local function nearShop(src, shop)
     if ped == 0 or not DoesEntityExist(ped) then return false end
     local pos = GetEntityCoords(ped)
 
+    -- The target lets a player use the zone from Config.interactDistance away
+    -- (kora_target measures from the point aimed at, usually the counter's
+    -- near face), so a player normally stands in front of the zone, not in it.
+    -- Requiring the player to be inside the footprint refused those requests
+    -- without a word and the menu simply did not open. The same reach plus one
+    -- metre of slack (as for zone-less shops) is allowed from the zone volume.
+    local reach = (tonumber(Config.interactDistance) or 2.0) + 1.0
     local zone = shop.zone or Config.shopZoneDefault
     if withinShopZone(pos, zone, shop.coords) then return true end
+    if zone then return distanceToShopZone(pos, zone, shop.coords) <= reach end
 
-    -- Keep the historical counter-radius fallback for legacy locations that
-    -- have no zone data. Configured zones are deliberately not widened here:
-    -- target visibility already enforces their client-side distance, while
-    -- this check remains the authoritative server-side boundary.
-    if zone then return false end
     local dx, dy, dz = pos.x - shop.coords.x, pos.y - shop.coords.y, pos.z - shop.coords.z
-    return (dx * dx + dy * dy + dz * dz) <= (Config.interactDistance + 1.0) ^ 2
+    return (dx * dx + dy * dy + dz * dz) <= reach * reach
 end
 
 -- Clamps to a generous plausible range. The true per-model/per-slot cap can
@@ -532,7 +565,10 @@ local function requestSession(src, mode, extra, opening)
         shopIndex = tonumber(type(extra) == 'table' and extra.shopId or extra)
         local shop = shopIndex and Config.shops[shopIndex]
         if not shop then return end
-        if not nearShop(src, shop) then return end
+        if not nearShop(src, shop) then
+            TriggerClientEvent('qbclothing:client:sessionError', src, ('Move closer to the %s to open it.'):format(shop.label or 'shop'))
+            return
+        end
         shopLabel = shop.label
         service = shop.service or 'clothing'
         free = shop.free == true
@@ -618,11 +654,17 @@ local function requestSession(src, mode, extra, opening)
     })
 end
 
+-- How long a session open may wait on its database reads before a new request
+-- may replace it, so a read that never answers cannot lock the menu until the
+-- player reconnects.
+local OPENING_TIMEOUT_SECONDS = 30
+
 Kora.events.register('qbclothing:server:requestSession', function(src, mode, extra)
     if sessions[src] then return end
-    if openingSessions[src] then return end
+    local pending = openingSessions[src]
+    if pending and os.time() - pending.startedAt < OPENING_TIMEOUT_SECONDS then return end
 
-    local opening = {}
+    local opening = { startedAt = os.time() }
     openingSessions[src] = opening
     local ok, err = pcall(requestSession, src, mode, extra, opening)
     if openingSessions[src] == opening then openingSessions[src] = nil end

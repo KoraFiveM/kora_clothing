@@ -675,4 +675,37 @@ start('firstCharacter')
 H.equal(buckets[7], Config.bucket.base + 7, 'isolation survives a missing population native')
 emit('QBCore:Server:OnPlayerUnload', 7, 7)
 SetRoutingBucketPopulationEnabled = native
+
+-- Shops open from where the target can be used: up to Config.interactDistance
+-- (plus a metre of slack) outside the zone, not only from inside it. Further
+-- away is refused with a message instead of in silence.
+saved = { model = Shared.models.male, skin = {} }
+local reach = Config.interactDistance + 1.0
+local boxShop = #Config.shops + 1
+Config.shops[boxShop] = { service = 'clothing', label = 'Test Box', coords = vector4(0.0, 100.0, 10.0, 0.0),
+    zone = { size = vector3(2.0, 1.6, 2.2), rotation = 0.0 } }
+local polyShop = #Config.shops + 1
+Config.shops[polyShop] = { service = 'clothing', label = 'Test Poly', coords = vector4(11.0, 11.0, 10.0, 0.0),
+    zone = { points = { vector3(10.0, 10.0, 10.0), vector3(12.0, 10.0, 10.0), vector3(12.0, 12.0, 10.0), vector3(10.0, 12.0, 10.0) }, minZ = 9.0, maxZ = 12.0 } }
+for _, case in ipairs({
+    { shop = boxShop, at = vector3(0.0, 100.0, 10.5), opens = true, why = 'inside the box' },
+    { shop = boxShop, at = vector3(0.0, 100.8 + reach - 0.2, 10.5), opens = true, why = 'in front of the box within reach' },
+    { shop = boxShop, at = vector3(0.0, 100.8 + reach + 0.5, 10.5), opens = false, why = 'beyond reach of the box' },
+    { shop = polyShop, at = vector3(11.0, 11.0, 10.5), opens = true, why = 'inside the polygon' },
+    { shop = polyShop, at = vector3(11.0, 12.0 + reach - 0.2, 10.5), opens = true, why = 'in front of the polygon within reach' },
+    { shop = polyShop, at = vector3(11.0, 12.0 + reach + 0.5, 10.5), opens = false, why = 'beyond reach of the polygon' },
+    { shop = polyShop, at = vector3(11.0, 11.0, 30.0), opens = false, why = 'a floor above the polygon' },
+}) do
+    position = case.at
+    local count, errors = #opens, #sessionErrors
+    start('shop', { shopId = case.shop })
+    H.equal(#opens, count + (case.opens and 1 or 0), case.why)
+    if case.opens then
+        cancel()
+    else
+        H.equal(#sessionErrors, errors + 1, case.why .. ' tells the player why')
+    end
+end
+Config.shops[polyShop], Config.shops[boxShop] = nil, nil
+position = Config.shops[2].coords
 H.finish()

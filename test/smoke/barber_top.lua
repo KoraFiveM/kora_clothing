@@ -1,7 +1,10 @@
--- Barber / hairdresser shirt toggle: preview only, restored on every way out of the menu.
+-- Preview clothing switches (Config.ui.clothingToggles: Hat, Shirt, Pants,
+-- Shoes) in the barber / hairdresser menu: preview only, restored on every way
+-- out of the menu. Also the open path: refused with a message while downed, and
+-- a session left without its screen is cleared instead of blocking every open.
 local H = dofile('test/harness.lua')
 
-local netEvents, nuiCallbacks, stopHandlers, threads, messages, triggered = {}, {}, {}, {}, {}, {}
+local netEvents, nuiCallbacks, stopHandlers, threads, messages, triggered, notices = {}, {}, {}, {}, {}, {}, {}
 _G.RegisterNetEvent = function(name, fn) netEvents[name] = fn end
 _G.AddEventHandler = function(name, fn) if name == 'onResourceStop' then stopHandlers[#stopHandlers + 1] = fn end end
 _G.RegisterNUICallback = function(name, fn) nuiCallbacks[name] = fn end
@@ -19,6 +22,8 @@ _G.GetEntityModel = function() return 'mp_m_freemode_01' end
 _G.joaat = function(value) return value end
 _G.FreezeEntityPosition = function() end
 _G.SetNuiFocus = function() end
+local nuiFocused = true
+_G.IsNuiFocused = function() return nuiFocused end
 _G.SendNUIMessage = function(message) messages[#messages + 1] = message end
 local cameraZone
 _G.Camera = { start = function() end, stop = function() end, setZone = function(zone) cameraZone = zone end, setCategory = function() end, currentZone = function() return cameraZone or 'full' end }
@@ -65,9 +70,17 @@ local function sameAs(original, label)
     H.equal(props[1] and props[1].d, 3, label .. ': glasses back')
 end
 
+-- kora_lib's cache reports the death edge; the menu reacts to it instead of polling.
+local cacheHandlers = {}
+local outfitSkin
 _G.QB = {
-    notify = { send = function() end },
+    notify = { send = function(notice) notices[#notices + 1] = notice end },
     events = { trigger = function(name, ...) triggered[#triggered + 1] = { name = name, args = { ... } }; return true end },
+    cache = {
+        isDead = function() return dead end,
+        onChange = function(key, fn) cacheHandlers[key] = fn end,
+    },
+    callback = { trigger = function() return 'mp_m_freemode_01', outfitSkin end },
 }
 _G.Kora = _G.QB
 
@@ -102,6 +115,16 @@ local function call(name, data)
     nuiCallbacks[name](data, function(value) reply = value end)
     return reply
 end
+local function toggle(id, removed) return call('qbclothing:nui:setClothingToggle', { id = id, removed = removed }) end
+local function stateOf(list, id)
+    for _, entry in ipairs(list or {}) do if entry.id == id then return entry.removed end end
+end
+local function ids(list)
+    local out = {}
+    for _, entry in ipairs(list or {}) do out[#out + 1] = entry.id end
+    return table.concat(out, ',')
+end
+local function close(cancelled) netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = cancelled }) end
 
 local function topIs(expected, label)
     for _, id in ipairs({ 3, 8, 11 }) do
@@ -114,99 +137,186 @@ _G.LoadResourceFile = function() return '{}' end
 _G.json = { decode = function() return { ui = { color = 'Color', none = 'None' } } end }
 _G.Kora.lang = function(key) if key == 'ui.none' then return 'Ninguno' end return key end
 
--- Default on, for barbers and hairdressers only.
-H.equal(Config.ui.barberTopToggle, true)
+-- Defaults: on, for barbers and hairdressers, all four switches.
+local cfg = Config.ui.clothingToggles
+H.equal(cfg.enabled, true)
+H.equal(table.concat(cfg.services, ','), 'barber,hairdresser')
+H.equal(cfg.items.hat and cfg.items.shirt and cfg.items.pants and cfg.items.shoes, true)
+H.equal(Config.ui.barberTopToggle, nil, 'the shirt-only option is replaced')
+
 local original = open('barber')
 local data = openMessage()
-H.equal(data.topToggle.active, false, 'barber gets the shirt button, dressed')
+H.equal(ids(data.clothingToggles), 'hat,shirt,pants,shoes', 'barber gets the four switches, in order')
+H.equal(stateOf(data.clothingToggles, 'hat'), true, 'the barber already took the hat off')
+H.equal(stateOf(data.clothingToggles, 'shirt'), false)
+H.equal(props[0], nil, 'hat off for the cut')
 H.equal(data.undress, nil, 'the tattoo toolbar is not sent to barbers')
+H.equal(data.topToggle, nil, 'the old shirt button is gone')
 topIs(false, 'dressed')
 H.equal(data.strings.color, 'Color', 'English default reads Color')
 H.equal(data.strings.none, 'Ninguno', 'a translation replaces the default')
 
--- Toggle off and on.
-local reply = call('qbclothing:nui:setTop', { undressed = true })
+-- Each switch takes its item off and puts the real one back.
+local reply = toggle('shirt', true)
 H.equal(reply.ok, true)
-H.equal(reply.active, true)
-topIs(true, 'bared')
-H.equal(comps[4].d, original[4].d, 'legs untouched')
+H.equal(stateOf(reply.toggles, 'shirt'), true)
+topIs(true, 'shirt off')
+H.equal(comps[4].d, original[4].d, 'pants untouched')
 H.equal(comps[2].d, original[2].d, 'hair untouched')
-reply = call('qbclothing:nui:setTop', { undressed = false })
-H.equal(reply.active, false)
-topIs(false, 'put back')
-call('qbclothing:nui:setTop', { undressed = true })
-call('qbclothing:nui:setTop', { undressed = true })
-call('qbclothing:nui:setTop', { undressed = false })
-topIs(false, 'bared twice then dressed once keeps the real original')
-H.equal(#triggered, 0, 'toggling sends nothing to the server')
-H.equal(call('qbclothing:nui:setTop', 'garbage').ok, false)
+reply = toggle('shirt', false)
+H.equal(stateOf(reply.toggles, 'shirt'), false)
+topIs(false, 'shirt back on')
+toggle('shirt', true); toggle('shirt', true); toggle('shirt', false)
+topIs(false, 'off twice then on once keeps the real original')
+toggle('pants', true)
+H.equal(comps[4].d, 21, 'male pants off')
+toggle('shoes', true)
+H.equal(comps[6].d, 34, 'male shoes off')
+toggle('pants', false); toggle('shoes', false)
+H.equal(comps[4].d, original[4].d, 'pants back')
+H.equal(comps[6].d, original[6].d, 'shoes back')
+reply = toggle('hat', false)
+H.equal(props[0] and props[0].d, 5, 'hat back on for a look')
+H.equal(stateOf(reply.toggles, 'hat'), false)
+toggle('hat', true)
+H.equal(props[0], nil, 'hat off again')
+H.equal(#triggered, 0, 'switching sends nothing to the server')
+H.equal(call('qbclothing:nui:setClothingToggle', 'garbage').ok, false)
+H.equal(toggle('gloves', true).ok, false, 'unknown switch refused')
 
--- Confirm never saves the bare top, and the ped gets it back.
-call('qbclothing:nui:setTop', { undressed = true })
+-- Confirm never saves a removed item, and the ped gets everything back.
+toggle('shirt', true); toggle('pants', true); toggle('shoes', true)
 call('qbclothing:nui:confirm', {})
 local confirm = triggered[#triggered]
-for _, id in ipairs({ 3, 8, 11 }) do
+for _, id in ipairs({ 3, 4, 6, 8, 11 }) do
     H.equal(confirm.args[1].skin.components[tostring(id)].d, original[id].d, 'confirm snapshot carries the original ' .. id)
 end
-netEvents['qbclothing:client:closeSession']({ ok = true })
+H.equal(confirm.args[1].skin.props['0'].d, 5, 'confirm snapshot carries the original hat')
+close()
 sameAs(original, 'after confirm')
-H.equal(call('qbclothing:nui:setTop', { undressed = true }).ok, false, 'no toggle without a session')
+H.equal(toggle('shirt', true).ok, false, 'no switches without a session')
 
 -- Cancel / Esc.
 original = open('barber')
-call('qbclothing:nui:setTop', { undressed = true })
-netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
+toggle('shirt', true); toggle('shoes', true)
+close(true)
 sameAs(original, 'after cancel')
 
--- Death while bared.
+-- Death while items are off: the cache's isDead change ends the session.
 original = open('barber')
-call('qbclothing:nui:setTop', { undressed = true })
-local watch = threads[#threads]
+toggle('shirt', true); toggle('pants', true)
+H.equal(type(cacheHandlers.isDead), 'function', 'listens to the kora_lib cache death change')
 dead = true
-watch()
+cacheHandlers.isDead(true, false)
 dead = false
 sameAs(original, 'after death')
 H.equal(triggered[#triggered].name, 'qbclothing:server:cancelSession')
+close(true)
 
--- Resource stop while bared.
+-- Resource stop while items are off.
 original = open('hairdresser')
-call('qbclothing:nui:setTop', { undressed = true })
+toggle('shirt', true); toggle('shoes', true)
 for _, handler in ipairs(stopHandlers) do handler('kora_clothing') end
 sameAs(original, 'after resource stop')
+close(true)
 
--- Female models use the same bare components.
+-- Female models use the female bare values.
 _G.GetEntityModel = function() return 'mp_f_freemode_01' end
 original = open('hairdresser')
-call('qbclothing:nui:setTop', { undressed = true })
-topIs(true, 'female bared')
-netEvents['qbclothing:client:closeSession']({ ok = true })
+toggle('shirt', true); toggle('pants', true); toggle('shoes', true)
+topIs(true, 'female shirt off')
+H.equal(comps[4].d, 15, 'female pants off')
+H.equal(comps[6].d, 35, 'female shoes off')
+close()
 sameAs(original, 'female after confirm')
 _G.GetEntityModel = function() return 'mp_m_freemode_01' end
+
+-- Wearing a saved outfit keeps the switches as they were; turning one back on
+-- puts on the outfit's item, and cancel still returns to the opening look.
+original = open('barber')
+toggle('shirt', true)
+outfitSkin = { components = {}, props = { ['0'] = { d = 9, t = 0 } } }
+for id = 0, 11 do outfitSkin.components[tostring(id)] = { d = 60 + id, t = 1 } end
+reply = call('qbclothing:nui:loadOutfit', { id = 1 })
+H.equal(reply.ok, true)
+H.equal(stateOf(reply.clothingToggles, 'shirt'), true, 'shirt stays off on the new outfit')
+H.equal(comps[11].d, 15)
+H.equal(props[0], nil, 'the outfit hat is off too, like the switch says')
+toggle('shirt', false)
+H.equal(comps[11].d, 71, 'shirt back on is the outfit top')
+toggle('hat', false)
+H.equal(props[0] and props[0].d, 9, 'hat back on is the outfit hat')
+close(true)
+sameAs(original, 'cancel after an outfit')
 
 -- Works with the tattoo undress feature switched off, using the stock bare values.
 Config.tattoo.undress.enabled = false
 original = open('barber')
-call('qbclothing:nui:setTop', { undressed = true })
-topIs(true, 'bared with tattoo undress off')
-netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
+toggle('shirt', true)
+topIs(true, 'shirt off with tattoo undress off')
+close(true)
 sameAs(original, 'restored')
 Config.tattoo.undress.enabled = true
 
--- Other services never get the button or the callback.
+-- Other menus get no switches unless listed in services.
 for _, service in ipairs({ 'clothing', 'tattoo' }) do
     original = open(service)
-    H.equal(openMessage().topToggle, nil, service .. ' has no shirt button')
-    H.equal(call('qbclothing:nui:setTop', { undressed = true }).ok, false)
-    netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
+    H.equal(openMessage().clothingToggles, nil, service .. ' has no switches')
+    H.equal(toggle('shirt', true).ok, false)
+    close(true)
 end
+cfg.services = { 'barber', 'hairdresser', 'clothing' }
+original = open('clothing')
+H.equal(ids(openMessage().clothingToggles), 'hat,shirt,pants,shoes', 'a listed clothing shop shows them')
+H.equal(stateOf(openMessage().clothingToggles, 'hat'), false, 'a clothing shop leaves the hat on')
+close(true)
+cfg.services = { 'barber', 'hairdresser' }
 
--- Config off: no button, callback refused, nothing bared.
-Config.ui.barberTopToggle = false
+-- Single switches off, the legacy shirt option, and the master switch.
+cfg.items.pants = false
 original = open('barber')
-H.equal(openMessage().topToggle, nil, 'no button when disabled')
-H.equal(call('qbclothing:nui:setTop', { undressed = true }).ok, false)
+H.equal(ids(openMessage().clothingToggles), 'hat,shirt,shoes')
+H.equal(toggle('pants', true).ok, false)
+H.equal(comps[4].d, original[4].d)
+close(true)
+cfg.items.pants = true
+Config.ui.barberTopToggle = false
+open('barber')
+H.equal(ids(openMessage().clothingToggles), 'hat,pants,shoes', 'barberTopToggle = false still hides the shirt')
+close(true)
+Config.ui.barberTopToggle = nil
+cfg.enabled = false
+open('barber')
+H.equal(openMessage().clothingToggles, nil, 'no switches when disabled')
+H.equal(toggle('shirt', true).ok, false)
 topIs(false, 'top untouched when disabled')
-netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
-Config.ui.barberTopToggle = true
+close(true)
+cfg.enabled = true
+
+-- Opening while downed is refused with a message, not in silence.
+messages, triggered, notices = {}, {}, {}
+LocalPlayer.state.emsDown = 'laststand'
+netEvents['qb-clothing:client:openMenu'](2)
+H.equal(#triggered, 0, 'no request while downed')
+H.equal(notices[#notices] and notices[#notices].type, 'error', 'the player is told why')
+LocalPlayer.state.emsDown = false
+netEvents['qb-clothing:client:openMenu'](2)
+H.equal(triggered[#triggered].name, 'qbclothing:server:requestSession')
+
+-- A menu really on screen ignores a second open; one that lost its screen
+-- (no NUI focus) is cleared and the request goes through.
+original = open('barber')
+toggle('shirt', true)
+triggered = {}
+netEvents['qb-clothing:client:openMenu'](2)
+H.equal(#triggered, 0, 'an open menu is left alone')
+nuiFocused = false
+messages = {}
+netEvents['qb-clothing:client:openMenu'](2)
+H.equal(triggered[1] and triggered[1].name, 'qbclothing:server:cancelSession', 'the stale session is dropped server-side')
+H.equal(triggered[2] and triggered[2].name, 'qbclothing:server:requestSession', 'and the new menu is requested')
+H.equal(messages[#messages].action, 'qbclothing:nui:close')
+sameAs(original, 'stale session cleared')
+nuiFocused = true
 
 H.finish()

@@ -731,18 +731,55 @@ Config.ui = {
         description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
         live = true,
     }) or true,
-    -- A button in the barber and hairdresser menu that takes the top off and
-    -- puts it back, so chest hair can be seen. Preview only: it lives on the
-    -- local ped, is never sent to the server or saved, and the original
-    -- clothing comes back when the button is pressed again and whenever the
-    -- menu closes (confirm, cancel, Esc, death, resource stop). The bare
-    -- drawables are the `top` part of Config.tattoo.undress.parts (components
-    -- 3, 8 and 11 for male and female freemode peds). Read each time a menu opens.
-    barberTopToggle = config and config.boolean(true, {
-        label = 'Barber shirt toggle',
-        description = 'Shows a button in the barber and hairdresser menu that takes the top off and puts it back so chest hair can be seen. Preview only: nothing is saved or charged and the original clothing is restored whenever the menu closes. The bare clothing comes from the top part of the tattoo studio undress parts. Turn off to hide the button.',
-        live = true,
-    }) or true,
+    -- Preview clothing switches stacked on the left of the menu, under My
+    -- Outfits: Hat, Shirt, Pants and Shoes. Each takes that item off and puts
+    -- it back, so chest hair or a new cut can be seen. Preview only: the change
+    -- lives on the local ped, is never sent to the server, saved or charged,
+    -- and the real clothing comes back when the switch is turned back on and
+    -- whenever the menu closes (confirm, cancel, Esc, going down, resource
+    -- stop). Shirt, Pants and Shoes use the matching part (top, legs, shoes) of
+    -- Config.tattoo.undress.parts for the bare look; Hat clears the hat prop.
+    -- Barbers and hairdressers already take the hat off when they open, so the
+    -- Hat switch starts off there. Read each time a menu opens.
+    --   enabled  : master switch for all of them.
+    --   services : menus that show them: barber, hairdresser, clothing, creation
+    --              (the tattoo studio has its own undress buttons).
+    --   items    : each switch on or off.
+    -- (Replaces Config.ui.barberTopToggle; setting that to false still hides the Shirt switch.)
+    clothingToggles = {
+        enabled = config and config.boolean(true, {
+            label = 'Preview clothing switches',
+            description = 'Shows Hat, Shirt, Pants and Shoes switches on the left of the menu, under My Outfits, that take that item off and put it back so hair, chest hair or a style can be seen. Preview only: nothing is saved or charged and the real clothing comes back when the menu closes. Choose the menus and the switches below.',
+            live = true,
+        }) or true,
+        services = config and config.list({ 'barber', 'hairdresser' }, config.string('barber'), {
+            label = 'Menus with clothing switches',
+            description = 'Menus that show the preview clothing switches: barber, hairdresser, clothing, creation. Barbers and hairdressers by default.',
+            live = true,
+        }) or { 'barber', 'hairdresser' },
+        items = {
+            hat = config and config.boolean(true, {
+                label = 'Hat switch',
+                description = 'Shows the Hat switch (takes the hat off and puts it back).',
+                live = true,
+            }) or true,
+            shirt = config and config.boolean(true, {
+                label = 'Shirt switch',
+                description = 'Shows the Shirt switch (takes the top, undershirt and gloves off and puts them back), for example to see chest hair.',
+                live = true,
+            }) or true,
+            pants = config and config.boolean(true, {
+                label = 'Pants switch',
+                description = 'Shows the Pants switch (takes the pants off and puts them back).',
+                live = true,
+            }) or true,
+            shoes = config and config.boolean(true, {
+                label = 'Shoes switch',
+                description = 'Shows the Shoes switch (takes the shoes off and puts them back).',
+                live = true,
+            }) or true,
+        },
+    },
 }
 
 -- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
@@ -1012,8 +1049,10 @@ Config.quickToggle = {
 --                     `emsDown` player state bag plus a watchdog. The one-time mandatory
 --                     first-character creation is never cancelled. Off = only a ped death
 --                     closes the tattoo / barber-shirt menus (legacy behaviour).
---   blockOpen       : also refuse to open a menu while downed or dead.
---   checkIntervalMs : watchdog poll interval while a menu is open (minimum 50).
+--   blockOpen       : also refuse to open a menu while downed or dead (the player is told why).
+--   checkIntervalMs : only used with a kora_lib that has no cache module: poll interval
+--                     while a menu is open (minimum 50). Otherwise the kora_lib cache's
+--                     isDead change and the state bag close the menu with no polling.
 Config.closeWhenDowned = {
     enabled = config and config.boolean(true, {
         label = 'Close appearance menus when the player goes down',
@@ -1027,7 +1066,7 @@ Config.closeWhenDowned = {
     }) or true,
     checkIntervalMs = config and config.integer(250, {
         label = 'Downed watchdog interval (ms)',
-        description = 'How often, while a menu is open, the downed / dead state is re-checked as a backstop to the state-bag listener.',
+        description = 'Only used when kora_lib has no cache module: how often, while a menu is open, the downed / dead state is polled. With the cache, menus close on its death event and the state bag without polling.',
         min = 50,
     }) or 250,
 }

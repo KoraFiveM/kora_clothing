@@ -1,4 +1,4 @@
-// Menu text for the hair, grooming and shirt controls. The game sends the
+// Menu text for the hair, grooming and clothing switch controls. The game sends the
 // resolved text with the session (locales/en.json plus any translation kora_lib
 // finds for the server's language), so wording is changed in the locale files,
 // not here. These defaults only cover the browser dev harness and a payload
@@ -16,10 +16,14 @@ export const DEFAULT_STRINGS = {
     primaryColor: "Primary Color (Base)",
     secondaryColor: "Secondary Color (Highlights)",
     none: "None",
-    topOff: "Take shirt off",
-    topOn: "Put shirt on",
-    topGroup: "Preview chest hair",
-    topHint: "Preview only: your clothing is not changed or saved",
+    clothingToggles: "Clothing",
+    hat: "Hat",
+    shirt: "Shirt",
+    pants: "Pants",
+    shoes: "Shoes",
+    toggleOn: "On",
+    toggleOff: "Off",
+    togglesHint: "Preview only: nothing is saved or charged",
 }
 
 export type StringKey = keyof typeof DEFAULT_STRINGS

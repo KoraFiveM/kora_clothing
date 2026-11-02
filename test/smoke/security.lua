@@ -60,7 +60,8 @@ H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-su
 -- to dress for free forever. Pricing must apply to every OTHER mode too
 -- (wardrobe shares the same live editor as shop), not just 'shop'.
 H.ok(server:find("if mode == 'firstCharacter' and saved then return end", 1, true), 'firstCharacter cannot be replayed once a skin is already saved')
-H.ok(server:find('if not nearShop(src, shop) then return end', 1, true), 'shop sessions require server-measured proximity')
+H.ok(server:find('if not nearShop(src, shop) then', 1, true) and server:find("'Move closer to the %s to open it.'", 1, true),
+    'shop sessions require server-measured proximity, and a refusal is shown to the player')
 H.ok(server:find('local function withinShopZone(pos, zone, shopCoords)', 1, true),
     'shop-session proximity uses the configured target geometry, not only the blip/counter point')
 H.ok(server:find('pointInPolygon(pos.x, pos.y, zone.points)', 1, true),

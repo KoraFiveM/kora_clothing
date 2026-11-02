@@ -165,6 +165,21 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
 .icon-btn.danger:hover { color: hsl(var(--danger)); border-color: hsl(var(--danger) / .5); }
 .outfits-empty { padding: 4px 2px 6px; color: hsl(var(--muted-foreground)); font-size: 11.5px; }
 
+/* --- preview clothing switches (left rail, under My Outfits) --- */
+
+.toggle-list { display: flex; flex-direction: column; gap: 3px; }
+.toggle-row { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid transparent; border-radius: 7px; padding: 8px 9px; color: hsl(var(--muted-foreground)); background: transparent; cursor: pointer; text-align: left; font-size: 12.5px; font-weight: 600; transition: background 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1), color 160ms cubic-bezier(0.16,1,0.3,1); }
+.toggle-row:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+.toggle-row > svg { display: block; flex: none; }
+.toggle-row .toggle-label { flex: 1; min-width: 0; }
+.toggle-row .toggle-state { color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.toggle-track { position: relative; flex: none; width: 30px; height: 16px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--muted)); transition: background 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1); }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 999px; background: hsl(var(--muted-foreground)); transition: transform 160ms cubic-bezier(0.16,1,0.3,1), background 160ms cubic-bezier(0.16,1,0.3,1); }
+.toggle-row[aria-checked="true"] { color: hsl(var(--foreground)); }
+.toggle-row[aria-checked="true"] .toggle-state { color: hsl(var(--primary)); }
+.toggle-row[aria-checked="true"] .toggle-track { border-color: hsl(var(--brand-border)); background: hsl(var(--brand-soft)); }
+.toggle-row[aria-checked="true"] .toggle-knob { transform: translateX(14px); background: hsl(var(--primary)); }
+
 /* --- bottom bar --- */
 
 .bottom-bar { position: absolute; left: 50%; bottom: 20px; z-index: 2; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 12px; background: hsl(var(--surface)); box-shadow: 0 18px 50px rgb(0 0 0 / .5); }
@@ -212,7 +227,7 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
   .panel-pad { padding: 8px; }
   .tab { gap: 7px; padding: 8px; font-size: 11px; }
   .tab svg { width: 15px; height: 15px; }
-  .item-row { padding: 7px; font-size: 11px; }
+  .item-row, .toggle-row { padding: 7px; font-size: 11px; }
   .detail-sub, .section-title { font-size: 9px; }
   .section-head { font-size: 11px; }
   .detail-title { font-size: 14px; }

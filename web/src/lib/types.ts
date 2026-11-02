@@ -1,4 +1,4 @@
-import type { TopTogglePayload } from "./topToggle.ts"
+import type { ClothingToggle } from "./clothingToggles.ts"
 import type { UndressPayload } from "./undress.ts"
 
 export interface NuiWireMessage<T = unknown> {
@@ -122,8 +122,8 @@ export interface OpenPayload {
     head?: HeadPayload | null
     /** Tattoo studio clothing buttons (Config.tattoo.undress); absent elsewhere. */
     undress?: UndressPayload | null
-    /** Barber / hairdresser shirt button (Config.ui.barberTopToggle); absent elsewhere. */
-    topToggle?: TopTogglePayload | null
+    /** Preview clothing switches (Config.ui.clothingToggles); absent where the menu has none. */
+    clothingToggles?: ClothingToggle[] | null
     /** Menu text from the game's locale files; see strings.ts. */
     strings?: Record<string, string>
     tattoos: TattooItem[]
@@ -197,7 +197,7 @@ export interface LoadOutfitResponse {
     head?: HeadPayload | null
     selectedTattoos?: string[]
     undress?: UndressPayload | null
-    topToggle?: TopTogglePayload | null
+    clothingToggles?: ClothingToggle[] | null
 }
 
 export interface ConfirmPayload {

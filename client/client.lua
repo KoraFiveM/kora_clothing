@@ -516,35 +516,73 @@ local function reapplyUndress(ped, model, active)
     end
 end
 
--- Barber / hairdresser "shirt off" preview, so chest hair can be seen. It rides
--- on the same temporaryOverride as the tattoo undress buttons, so confirm,
--- cancel, Esc, death and resource stop all put the original top back and the
--- confirm snapshot never carries the bare one. The bare drawables are the `top`
--- part of Config.tattoo.undress.parts (read whether or not the tattoo buttons
--- are enabled), with the stock freemode values as a fallback.
-local BARE_TOP = {
-    id = 'top',
-    male = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
-    female = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
-    props = {},
+-- Preview clothing switches (Config.ui.clothingToggles): Hat, Shirt, Pants and
+-- Shoes stacked on the left of the menu, so a barber customer can see chest
+-- hair, or the cut without a hat in the way. They ride on the same
+-- temporaryOverride as the tattoo undress buttons, so confirm, cancel, Esc,
+-- going down and resource stop all put the real clothing back and the confirm
+-- snapshot never carries a removed item. Shirt, Pants and Shoes take their bare
+-- drawables from the matching part of Config.tattoo.undress.parts (read whether
+-- or not the tattoo buttons are enabled), with the stock freemode values as a
+-- fallback; Hat only clears the hat prop. A part's id is its undressActive key.
+local TOGGLE_ORDER = { 'hat', 'shirt', 'pants', 'shoes' }
+local TOGGLE_PARTS = {
+    hat = { id = 'hat', male = {}, female = {}, props = { 0 } },
+    shirt = {
+        id = 'top',
+        male = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+        female = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+        props = {},
+    },
+    pants = { id = 'legs', male = { { id = 4, d = 21, t = 0 } }, female = { { id = 4, d = 15, t = 0 } }, props = {} },
+    shoes = { id = 'shoes', male = { { id = 6, d = 34, t = 0 } }, female = { { id = 6, d = 35, t = 0 } }, props = {} },
 }
 
-local function barberTopPart()
+local function togglePart(item)
+    local fallback = TOGGLE_PARTS[item]
+    if not fallback or item == 'hat' then return fallback end
     local cfg = Config.tattoo and Config.tattoo.undress
     for _, part in ipairs(type(cfg) == 'table' and cfg.parts or {}) do
-        if part.id == 'top' then return part end
+        if part.id == fallback.id then return part end
     end
-    return BARE_TOP
+    return fallback
 end
 
-local function topToggleAvailable(service)
-    return (service == 'barber' or service == 'hairdresser') and (Config.ui or {}).barberTopToggle ~= false
+---The switches this service offers, in display order (empty when none).
+local function availableToggles(service)
+    local cfg = (Config.ui or {}).clothingToggles
+    if type(cfg) ~= 'table' or cfg.enabled == false then return {} end
+    local offered = false
+    for _, name in ipairs(cfg.services or {}) do
+        if name == service then offered = true; break end
+    end
+    if not offered then return {} end
+    local items = type(cfg.items) == 'table' and cfg.items or {}
+    local list = {}
+    for _, item in ipairs(TOGGLE_ORDER) do
+        -- The older shirt-only option, Config.ui.barberTopToggle = false, still hides the shirt.
+        local legacyOff = item == 'shirt' and (Config.ui or {}).barberTopToggle == false
+        if items[item] ~= false and not legacyOff then list[#list + 1] = item end
+    end
+    return list
 end
 
----What the NUI needs for the shirt button; nil when this session has none.
-local function topTogglePayload(service)
-    if not topToggleAvailable(service) then return nil end
-    return { active = undressActive.top == true }
+local function toggleOffered(service, item)
+    for _, offered in ipairs(availableToggles(service)) do
+        if offered == item then return true end
+    end
+    return false
+end
+
+---What the NUI needs to draw the switches; nil when this session has none.
+local function togglesPayload(service)
+    local items = availableToggles(service)
+    if #items == 0 then return nil end
+    local list = {}
+    for _, item in ipairs(items) do
+        list[#list + 1] = { id = item, removed = undressActive[TOGGLE_PARTS[item].id] == true }
+    end
+    return list
 end
 
 ---@return table|false  -- { d, t } if a hat was worn, else false (nothing to restore)
@@ -672,6 +710,11 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     -- what the player actually walked in wearing, not whatever the ped's
     -- default/previous state happened to be.
     applyTemporaryStrip(ped, activeSession.service, currentModelName(ped))
+    -- Barbers and hairdressers take the hat off as they open (above), so the
+    -- Hat switch starts in the removed position there.
+    if temporaryOverride and temporaryOverride.props[0] ~= nil and toggleOffered(activeSession.service, 'hat') then
+        undressActive.hat = true
+    end
 
     startControlLock()
     Camera.start(ped)
@@ -680,7 +723,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     end
     -- Every menu closes when the player goes down (Config.closeWhenDowned); a
     -- bared tattoo studio or barber preview must never outlive a death either way.
-    if closeWhenDowned() or activeSession.service == 'tattoo' or topToggleAvailable(activeSession.service) then
+    if closeWhenDowned() or activeSession.service == 'tattoo' or togglesPayload(activeSession.service) then
         startUndressDeathWatch(activeSession)
     end
 
@@ -712,7 +755,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             hair = hairPayload(activeSession.service),
             head = head,
             undress = undressPayload(activeSession.service),
-            topToggle = topTogglePayload(activeSession.service),
+            clothingToggles = togglesPayload(activeSession.service),
             strings = uiStrings(),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
@@ -738,8 +781,9 @@ RegisterNetEvent('qbclothing:client:sessionError', function(message)
     notify(message, 'error')
 end)
 
-RegisterNetEvent('qbclothing:client:closeSession', function(result)
-    if not activeSession then return end
+-- Ends the client side of the open session: camera, focus, HUD, the frozen ped
+-- and the live preview. `result` is what the server sent with closeSession.
+local function closeSessionLocally(result)
     stopRotate('close')
     Camera.stop()
     stopControlLock()
@@ -783,6 +827,11 @@ RegisterNetEvent('qbclothing:client:closeSession', function(result)
     restoreRadarForSession(session)
     if refreshShopPrompt then refreshShopPrompt() end
     TriggerEvent('qb-clothing:client:onMenuClose')
+end
+
+RegisterNetEvent('qbclothing:client:closeSession', function(result)
+    if not activeSession then return end
+    closeSessionLocally(result)
 end)
 
 RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
@@ -905,14 +954,15 @@ RegisterNUICallback('qbclothing:nui:setUndress', function(data, cb)
     cb({ ok = true, active = activeUndressParts(cfg) })
 end)
 
--- Preview-only shirt button in the barber and hairdresser menu (see barberTopPart).
-RegisterNUICallback('qbclothing:nui:setTop', function(data, cb)
-    if not activeSession or type(data) ~= 'table' or not topToggleAvailable(activeSession.service) then
+-- Preview-only clothing switches (see TOGGLE_PARTS): `id` is hat, shirt, pants
+-- or shoes, `removed` which way. The reply is every switch's real state.
+RegisterNUICallback('qbclothing:nui:setClothingToggle', function(data, cb)
+    if not activeSession or type(data) ~= 'table' or not toggleOffered(activeSession.service, data.id) then
         cb({ ok = false }); return
     end
     local ped = PlayerPedId()
-    setPartUndressed(ped, currentModelName(ped), barberTopPart(), data.undressed == true)
-    cb({ ok = true, active = undressActive.top == true })
+    setPartUndressed(ped, currentModelName(ped), togglePart(data.id), data.removed == true)
+    cb({ ok = true, toggles = togglesPayload(activeSession.service) })
 end)
 
 RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
@@ -1003,17 +1053,25 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     -- re-bare whatever was bared against the newly loaded look.
     if activeSession.service == 'tattoo' then
         reapplyUndress(ped, currentModelName(ped), wasUndressed)
-    elseif undressActive.top and topToggleAvailable(activeSession.service) then
-        local part, model = barberTopPart(), currentModelName(ped)
-        for _, entry in ipairs(part[Shared.modelGender(model)] or {}) do
-            if temporaryOverride then temporaryOverride.components[entry.id] = nil end
+    else
+        -- A switch left in the removed position stays removed on the new
+        -- outfit, which becomes what turning it back puts on.
+        local model = currentModelName(ped)
+        for _, item in ipairs(availableToggles(activeSession.service)) do
+            local part = togglePart(item)
+            if undressActive[part.id] then
+                if temporaryOverride then
+                    for _, entry in ipairs(part[Shared.modelGender(model)] or {}) do temporaryOverride.components[tonumber(entry.id)] = nil end
+                    for _, id in ipairs(part.props or {}) do temporaryOverride.props[id] = nil end
+                end
+                setPartUndressed(ped, model, part, true)
+            end
         end
-        setPartUndressed(ped, model, part, true)
     end
     cb({
         ok = true,
         undress = undressPayload(activeSession.service),
-        topToggle = topTogglePayload(activeSession.service),
+        clothingToggles = togglesPayload(activeSession.service),
         model = currentModelName(ped),
         categories = buildCategoryPayload(ped, activeSession.service),
         hair = hairPayload(activeSession.service),
@@ -1068,9 +1126,23 @@ closeWhenDowned = function()
     return Config.closeWhenDowned and Config.closeWhenDowned.enabled == true
 end
 
+-- kora_lib's cache tracks the engine death flag and reports when it changes,
+-- so nothing here has to poll while a menu is open.
+local function pedIsDead()
+    local cache = Kora and Kora.cache
+    if cache and cache.isDead then return cache.isDead() == true end
+    return IsEntityDead(PlayerPedId())
+end
+
 playerIsDowned = function()
     if closeWhenDowned() and LocalPlayer.state.emsDown then return true end
-    return IsEntityDead(PlayerPedId())
+    return pedIsDead()
+end
+
+-- Whether a death ends this session: every menu under Config.closeWhenDowned,
+-- otherwise still the ones that show removed clothing.
+local function closesOnDeath(session)
+    return closeWhenDowned() or session.service == 'tattoo' or togglesPayload(session.service) ~= nil
 end
 
 local function endSessionDowned(session)
@@ -1081,7 +1153,19 @@ local function endSessionDowned(session)
     if not session.mandatory then triggerOrError('qbclothing:server:cancelSession') end
 end
 
+local deathEvents = false
+if Kora and Kora.cache and Kora.cache.onChange then
+    deathEvents = pcall(Kora.cache.onChange, 'isDead', function(dead)
+        local session = activeSession
+        if dead and session and closesOnDeath(session) then endSessionDowned(session) end
+    end)
+end
+
+-- Fallback for a kora_lib without the cache module: a light poll while the
+-- menu is open. With the cache, the isDead change above and the emsDown
+-- state bag below cover it.
 startUndressDeathWatch = function(session)
+    if deathEvents then return end
     CreateThread(function()
         while activeSession == session do
             if playerIsDowned() then
@@ -1098,9 +1182,24 @@ AddStateBagChangeHandler('emsDown', ('player:%s'):format(GetPlayerServerId(Playe
     if value and activeSession and closeWhenDowned() then endSessionDowned(activeSession) end
 end)
 
+-- A session still recorded here while no NUI has focus has lost its screen:
+-- with the menu up the player could not be aiming at a shop. Close what is left
+-- of it and have the server drop it too, so the new request is served rather
+-- than ignored until a reconnect. False while the menu really is on screen.
+local function clearStaleSession()
+    if activeSession.mandatory then return false end
+    if type(IsNuiFocused) ~= 'function' or IsNuiFocused() then return false end
+    closeSessionLocally({ ok = true, cancelled = true })
+    triggerOrError('qbclothing:server:cancelSession')
+    return true
+end
+
 local function openSession(mode, extra)
-    if activeSession then return end
-    if closeWhenDowned() and Config.closeWhenDowned.blockOpen and playerIsDowned() then return end
+    if activeSession and not clearStaleSession() then return end
+    if closeWhenDowned() and Config.closeWhenDowned.blockOpen and playerIsDowned() then
+        notify("You can't use this while you're down.", 'error')
+        return
+    end
     triggerOrError('qbclothing:server:requestSession', mode, extra)
 end
 

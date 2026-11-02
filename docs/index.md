@@ -266,7 +266,9 @@ TriggerClientEvent('qbclothing:client:closeSession', src, result)
 TriggerClientEvent('qbclothing:client:wearItem', src, model, skin)   -- clothingAsItem use handler
 ```
 A session is entered by `requestSession` (shop sessions require standing
-within `Config.interactDistance` of the shop's `coords`), finalised by
+inside the shop's target zone or within `Config.interactDistance` plus one
+metre of it, the same reach the kora_target option has; anyone further away
+is told to move closer), finalised by
 `confirmSession` (server re-diffs, prices and persists — never trusts the
 client's price), and torn down by `cancelSession` or `closeSession`. Shop
 sessions are also reachable via kora_target zones placed on each configured
@@ -318,26 +320,40 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.tattoo.undress.autoUndressOnOpen` (default `{ 'top', 'legs', 'headwear' }`) — part ids bared when the studio opens; `{}` opens fully dressed
 - `Config.tattoo.undress.parts` — one button per part: the bare component drawables per freemode model (`male` / `female`) and the prop slots cleared
 - `Config.tattoo.peds.enabled` (default `false`) — a tattoo artist ped in each tattoo shop with a "Get tattooed" target; `alpha` (0), `scopeRadius` (40.0m), `model` (`u_m_y_tattoo_01`) and `scenario` (unset) tune it
-- `Config.ui.barberTopToggle` (default `true`) — a "Take shirt off / Put shirt on" button in the barber and hairdresser menu so chest hair can be seen. Preview only: the top is bared on the local ped (the `top` part of `Config.tattoo.undress.parts`, components 3, 8 and 11), never saved or charged, and put back on a second press, confirm, cancel, Esc, death and resource stop
+- `Config.ui.clothingToggles` — preview clothing switches stacked on the left of the menu, under My Outfits (see [Preview clothing switches](#preview-clothing-switches)):
+  - `enabled` (default `true`) — master switch
+  - `services` (default `{ 'barber', 'hairdresser' }`) — menus that show them (`barber`, `hairdresser`, `clothing`, `creation`)
+  - `items.hat` / `items.shirt` / `items.pants` / `items.shoes` (each default `true`) — which switches are shown
+  - It replaces `Config.ui.barberTopToggle`; setting that to `false` still hides the Shirt switch
 - `Config.headOverlays.<facialHair|eyebrows|chestHair>.followHairColor` (default `false`) — `true` hides that overlay's color palette and always uses the primary hair color. This replaces the old "Match hair colour" button, which is gone from the menu
-- `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and kora_target zone range
+- `Config.interactDistance` (2.0) — kora_target zone range; the server accepts a shop session from inside the zone or within this distance plus one metre of it
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
 
 ## Menu text and languages
 
-The hair, facial hair, eyebrows and chest hair boxes (and the barber shirt button) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `qb_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
+The hair, facial hair, eyebrows and chest hair boxes (and the clothing switches) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `qb_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
+
+## Preview clothing switches
+
+Barbers and hairdressers show four switches on the left of the menu, under My Outfits: Hat, Shirt, Pants and Shoes. Each takes that item off the ped and puts it back, so chest hair or a new cut can be seen. On means worn. Barbers and hairdressers take the hat off as they open, so the Hat switch starts off there.
+
+They are a preview only. The change lives on the local ped and is never sent to the server, saved or charged. The real clothing comes back when the switch is turned on again and whenever the menu closes: confirm, cancel, Esc, going down or a resource stop. The confirm snapshot always carries the real items. Wearing a saved outfit keeps each switch where it was, and turning one back on then puts on the outfit's item.
+
+Shirt (top, undershirt and arms/gloves), Pants and Shoes use the matching part of `Config.tattoo.undress.parts` (`top`, `legs`, `shoes`) for the bare look, with the stock freemode values if that list has no such part. Hat clears the hat prop only. Configure them with `Config.ui.clothingToggles` (see the config list above).
 
 ## Closing menus when the player goes down
 
-If a player enters last stand / bleed-out or dies while a clothing, barber, surgeon, tattoo or outfit menu is open, the menu runs the normal Cancel (preview reverted, NUI closed, camera, focus and HUD restored). It listens to kora_ambulance's `emsDown` player state bag and also polls while a menu is open, because last stand keeps the ped alive and a plain "is dead" check misses it. The one-time first-character creation is never cancelled.
+If a player enters last stand / bleed-out or dies while a clothing, barber, surgeon, tattoo or outfit menu is open, the menu runs the normal Cancel (preview reverted, NUI closed, camera, focus and HUD restored). It reacts to kora_ambulance's `emsDown` player state bag (last stand keeps the ped alive, so a plain "is dead" check misses it) and to the kora_lib cache's `isDead` change, so nothing polls while a menu is open. The one-time first-character creation is never cancelled.
 
 | `Config.closeWhenDowned` option | Default | Meaning |
 | --- | --- | --- |
-| `enabled` | `true` | Close open menus on last stand / death. Off keeps the old behaviour (only a ped death closes the tattoo and barber-shirt menus). |
-| `blockOpen` | `true` | Also refuse to open a menu while downed or dead. |
-| `checkIntervalMs` | `250` | Watchdog poll interval while a menu is open (minimum 50). |
+| `enabled` | `true` | Close open menus on last stand / death. Off keeps the old behaviour (only a ped death closes the tattoo studio and menus with clothing switches). |
+| `blockOpen` | `true` | Also refuse to open a menu while downed or dead; the player is told why. |
+| `checkIntervalMs` | `250` | Only with a kora_lib that has no cache module: poll interval while a menu is open (minimum 50). |
+
+A menu that is still recorded as open while no NUI has focus (it lost its screen) no longer blocks the next shop visit: the leftover session is cancelled and the new menu opens.
 
 ## Quick clothing toggles (`/c <part>`)
 

@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, Minus, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
+import { ChevronDown, Copy, Minus, Mouse, Move, ChevronLeft, ChevronRight, CircleAlert, Footprints, Gem, Glasses, HardHat, Maximize2, PersonStanding, Save, Shirt, Smile, Trash2, User, UserRound, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd } from "@/lib/dragGuard"
@@ -9,8 +9,8 @@ import { resolveStrings } from "@/lib/strings"
 import type { Strings } from "@/lib/strings"
 import { resolveStepEdit } from "@/lib/stepper"
 import { countOf, duplicateTattoo, instanceLabel, instancePrice, removeTattooInstance, stackLimit, tattooTotal, toggleTattoo as toggleTattooId } from "@/lib/tattoos"
-import { toggleTop, topBare, topToggleVisible } from "@/lib/topToggle"
-import type { SetTopPayload, SetTopResponse } from "@/lib/topToggle"
+import { toggleRequest, togglesFrom } from "@/lib/clothingToggles"
+import type { ClothingToggle, ClothingToggleId, SetClothingTogglePayload, SetClothingToggleResponse } from "@/lib/clothingToggles"
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
@@ -282,14 +282,30 @@ function UndressToolbar({ parts, active, onToggle, onToggleAll }: {
     </div>
 }
 
-/** Barber / hairdresser preview: take the top off to see chest hair, put it back.
- * The game bares and restores it on the local ped; nothing is saved. Same
- * pill as the tattoo undress buttons. */
-function TopToggle({ bare, strings, onToggle }: { bare: boolean; strings: Strings; onToggle: () => void }) {
-    return <div className="undress-toolbar" role="group" aria-label={strings.topGroup}>
-        <button type="button" className="undress-all" title={strings.topHint} aria-pressed={bare} onClick={onToggle}>
-            <Shirt size={16} /><span>{bare ? strings.topOn : strings.topOff}</span>
-        </button>
+const TOGGLE_ICON: Record<ClothingToggleId, typeof Shirt> = { hat: HardHat, shirt: Shirt, pants: PersonStanding, shoes: Footprints }
+
+/** Preview switches stacked under My Outfits (Config.ui.clothingToggles): each
+ * takes one item off the local ped and puts it back. On means worn; nothing
+ * is saved or charged, and the game restores everything when the menu closes. */
+function ClothingTogglesPanel({ toggles, strings, onToggle }: {
+    toggles: ClothingToggle[]
+    strings: Strings
+    onToggle: (toggle: ClothingToggle) => void
+}) {
+    return <div className="panel panel-pad">
+        <p className="section-title">{strings.clothingToggles}</p>
+        <div className="toggle-list" role="group" aria-label={strings.clothingToggles}>
+            {toggles.map((toggle) => {
+                const Icon = TOGGLE_ICON[toggle.id]
+                const worn = !toggle.removed
+                return <button key={toggle.id} type="button" className="toggle-row" role="switch" aria-checked={worn} title={strings.togglesHint} onClick={() => onToggle(toggle)}>
+                    <Icon size={16} />
+                    <span className="toggle-label">{strings[toggle.id]}</span>
+                    <span className="toggle-state">{worn ? strings.toggleOn : strings.toggleOff}</span>
+                    <span className="toggle-track" aria-hidden="true"><span className="toggle-knob" /></span>
+                </button>
+            })}
+        </div>
     </div>
 }
 
@@ -667,7 +683,7 @@ export default function App() {
     const [hairSection, setHairSection] = useState<HairSection>("hair")
     const [zone, setZone] = useState<Zone>("full")
     const [undressActive, setUndressActive] = useState<string[]>([])
-    const [topIsBare, setTopIsBare] = useState(false)
+    const [toggles, setToggles] = useState<ClothingToggle[]>([])
     const [error, setError] = useState<string>()
     const [saveName, setSaveName] = useState("")
     const [outfitsExpanded, setOutfitsExpanded] = useState(false)
@@ -680,7 +696,7 @@ export default function App() {
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
         setHair(null); setHead(null); setBaselineHair(null); setBaselineHead(null)
-        setSelectedKey(undefined); setZone("full"); setUndressActive([]); setTopIsBare(false); setError(undefined); setSaveName("")
+        setSelectedKey(undefined); setZone("full"); setUndressActive([]); setToggles([]); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false); setHintDismissed(false)
     }, [])
 
@@ -694,7 +710,7 @@ export default function App() {
         setHead(payload.head ?? null)
         setBaselineHead(payload.head ?? null)
         setUndressActive(activeParts(payload.undress?.active))
-        setTopIsBare(topBare(payload.topToggle))
+        setToggles(togglesFrom(payload.clothingToggles))
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
@@ -813,10 +829,10 @@ export default function App() {
         if (response.ok) setUndressActive(activeParts(response.active))
     }, [])
 
-    // Preview-only, like sendUndress: the game answers with whether the top is off now.
-    const sendTop = useCallback(async (request: SetTopPayload) => {
-        const response = await sendIntent<SetTopPayload, SetTopResponse>("qbclothing:nui:setTop", request)
-        if (response.ok) setTopIsBare(response.active === true)
+    // Preview-only, like sendUndress: the game answers with every switch's real state.
+    const sendToggle = useCallback(async (toggle: ClothingToggle) => {
+        const response = await sendIntent<SetClothingTogglePayload, SetClothingToggleResponse>("qbclothing:nui:setClothingToggle", toggleRequest(toggle))
+        if (response.ok) setToggles(togglesFrom(response.toggles))
     }, [])
 
     const wearOutfit = useCallback(async (id: number) => {
@@ -827,7 +843,7 @@ export default function App() {
             if (response.hair) setHair(response.hair)
             setHead(response.head ?? null)
             if (response.undress) setUndressActive(activeParts(response.undress.active))
-            if (response.topToggle) setTopIsBare(topBare(response.topToggle))
+            if (response.clothingToggles) setToggles(togglesFrom(response.clothingToggles))
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -907,8 +923,6 @@ export default function App() {
             onToggleAll={() => void sendUndress(toggleAll(open.undress!.parts, undressActive))}
         />}
 
-        {topToggleVisible(open.topToggle) && <TopToggle bare={topIsBare} strings={strings} onToggle={() => void sendTop(toggleTop(topIsBare))} />}
-
         <ControlsHint visible={hintVisible(hintOn, hintDismissed)} />
 
         {error && <div className="error-banner" role="alert">
@@ -933,6 +947,7 @@ export default function App() {
                 onWear={(id) => void wearOutfit(id)}
                 onDelete={deleteOutfit}
             />
+            {toggles.length > 0 && <ClothingTogglesPanel toggles={toggles} strings={strings} onToggle={(toggle) => void sendToggle(toggle)} />}
         </div>
 
         {/* A tattoo-only session (Config.services.tattoo has no components/props)

@@ -11,9 +11,13 @@
         "primaryColor": "Primary Color (Base)",
         "secondaryColor": "Secondary Color (Highlights)",
         "none": "None",
-        "topOff": "Take shirt off",
-        "topOn": "Put shirt on",
-        "topGroup": "Preview chest hair",
-        "topHint": "Preview only: your clothing is not changed or saved"
+        "clothingToggles": "Clothing",
+        "hat": "Hat",
+        "shirt": "Shirt",
+        "pants": "Pants",
+        "shoes": "Shoes",
+        "toggleOn": "On",
+        "toggleOff": "Off",
+        "togglesHint": "Preview only: nothing is saved or charged"
     }
 }
