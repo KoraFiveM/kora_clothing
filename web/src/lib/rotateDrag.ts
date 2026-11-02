@@ -2,6 +2,11 @@
 // drag can start, move and end are testable.
 //
 // Modes (Config.rotateMode):
+//   capture   (default) Lua owns the drag once it accepts rotateStart, as in
+//             controls, but NUI focus and the cursor never change: Lua reads the
+//             cursor every frame and pulls it back to the centre itself. The NUI
+//             ignores pointer moves meanwhile (they include those pulls), still sees
+//             the release, and tells Lua. Declined, the drag carries on as recenter.
 //   controls  Lua owns the drag once it accepts rotateStart: the cursor is hidden
 //             and the mouse is read as a game control, so the NUI sees no more
 //             pointer events and must not treat the resulting blur as the end.
@@ -11,7 +16,7 @@
 //             requested by the caller). When the lock is refused the caller calls
 //             useRecenter() and the drag carries on as recenter.
 
-export type RotateMode = "controls" | "recenter" | "pointer" | "plain"
+export type RotateMode = "capture" | "controls" | "recenter" | "pointer" | "plain"
 
 export interface DragIO {
     /** Degrees to add to the orbit (already scaled). */
@@ -94,7 +99,7 @@ export class RotateDrag {
         this.lastX = sample.clientX
         this.lastY = sample.clientY
         const token = ++this.token
-        if (this.opts.mode === "controls") {
+        if (this.opts.mode === "controls" || this.opts.mode === "capture") {
             this.pending = true
             this.io.start(button, sample.clientX / Math.max(1, sample.width), sample.clientY / Math.max(1, sample.height))
                 .catch(() => false)
@@ -111,8 +116,14 @@ export class RotateDrag {
         }
         this.pending = false
         if (!this.active) { if (accepted) this.io.end(); return }
-        if (accepted) { this.luaOwned = true; return }
-        // Declined: keep the plain drag, unless the window was lost meanwhile.
+        if (accepted) {
+            this.luaOwned = true
+            // Capture never switches focus, so a blur while waiting was real.
+            if (this.opts.mode === "capture" && this.lostWhilePending) this.finish()
+            return
+        }
+        // Declined: keep the plain drag (capture recentres instead), unless the window was lost meanwhile.
+        if (this.opts.mode === "capture") { this.recenterFallback = true; this.resync = true }
         if (this.lostWhilePending) this.finish()
     }
 
@@ -127,12 +138,16 @@ export class RotateDrag {
 
     /** Returns true when the sample turned the camera. */
     move(sample: PointerSample): boolean {
-        if (!this.active || this.luaOwned) return false
+        if (!this.active) return false
+        const captured = this.opts.mode === "capture" && (this.luaOwned || this.pending)
+        if (this.luaOwned && !captured) return false
         // The button came up somewhere we could not see.
         if (this.opts.guard && sample.buttons !== undefined && (sample.buttons & buttonBit(this.button)) === 0) {
             this.finish()
             return false
         }
+        // Lua turns the camera from the cursor and its own pulls move it: nothing to add here.
+        if (captured) return false
         if (this.opts.mode !== "recenter" && !this.recenterFallback) {
             const delta = sample.movementX ?? 0
             if (delta === 0) return false
@@ -176,10 +191,11 @@ export class RotateDrag {
     up() { this.finish() }
 
     /** Blur, the cursor left the window, capture lost: only honoured with the guard on
-     * (or forced, for blur), and never while Lua owns the drag (the focus switch itself causes a blur). */
+     * (or forced, for blur). A controls drag ignores them (the focus switch itself
+     * causes a blur); a capture drag only ends on a real window blur (forced). */
     lost(force = false) {
         if (!this.active || (!this.opts.guard && !force)) return
-        if (this.luaOwned) return
+        if (this.luaOwned && (this.opts.mode === "controls" || !force)) return
         if (this.pending) { this.lostWhilePending = true; return }
         this.finish()
     }

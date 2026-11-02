@@ -636,26 +636,30 @@ Config.rotateDragGuard = config and config.boolean(true, {
 }) or true
 
 -- How drag-to-rotate keeps working when the cursor reaches the screen edge.
--- 'pointer' (default) asks the browser for pointer lock on mouse down and turns the
--- character by the mouse movement deltas, so the cursor never reaches the edge and
--- NUI focus is never toggled (no cursor blink); if the lock is refused the drag
--- falls back to 'recenter'. 'controls' hides the cursor for the drag and reads
--- the mouse as a game control (it toggles NUI focus, which can flash the cursor);
--- 'recenter' moves the cursor back to the screen centre near an edge; 'plain'
+-- 'capture' (default): while the button is held the game script reads the cursor
+-- every frame, turns the character by how far it moved and pulls it straight back
+-- to the screen centre, so it can never reach an edge or leave the window (even
+-- onto a second monitor). The cursor is hidden while dragging, comes back where
+-- the drag began, and NUI focus is never toggled (no blink). 'pointer' asks the
+-- browser for pointer lock, which FiveM's NUI refuses, so it falls back to the
+-- NUI asking for a recentre near the edge (a fast flick can outrun that).
+-- 'controls' hides the cursor and reads the mouse as a game control (it toggles
+-- NUI focus, which can flash the cursor, and stops at the screen edge on some
+-- setups); 'recenter' moves the cursor back to the centre near an edge; 'plain'
 -- captures nothing. Read each time the menu opens.
-Config.rotateMode = config and config.enum('pointer', {
-    options = { 'pointer', 'controls', 'recenter', 'plain' },
+Config.rotateMode = config and config.enum('capture', {
+    options = { 'capture', 'pointer', 'controls', 'recenter', 'plain' },
     label = 'Rotate drag mode',
-    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. pointer: the mouse is locked while you hold the button so rotation never stops at the screen edge (falls back to recentre if the lock is refused). controls: the cursor is hidden and the game reads the mouse (switches NUI focus, which can flash the cursor). recenter: the cursor is moved back to the centre near the edge. plain: no capture.",
+    description = "How rotating the character with the mouse survives the cursor reaching the screen edge. capture (recommended): the cursor is held at the centre while you drag, so it can never hit an edge or leave the game window, and comes back where you started. pointer: browser pointer lock, which FiveM refuses, so it recentres near the edge instead. controls: the cursor is hidden and the game reads the mouse (switches NUI focus, which can flash the cursor). recenter: the cursor is moved back to the centre near the edge. plain: no capture.",
     live = true,
-}) or 'pointer'
+}) or 'capture'
 
--- Rotation speed for the pointer, recenter and plain modes (controls mode has its
--- own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
+-- Rotation speed for the capture, pointer, recenter and plain modes (controls mode
+-- has its own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
 Config.rotateSensitivity = config and config.number(1.0, {
     min = 0.1, max = 10.0,
     label = 'Rotate sensitivity',
-    description = 'How fast the character turns per pixel of mouse movement while dragging to rotate (pointer, recenter and plain modes). 1.0 is the default; raise it to turn faster, lower it for finer control.',
+    description = 'How fast the character turns per pixel of mouse movement while dragging to rotate (capture, pointer, recenter and plain modes). 1.0 is the default; raise it to turn faster, lower it for finer control.',
     live = true,
 }) or 1.0
 
@@ -702,12 +706,12 @@ Config.rotateControlsIdleSeconds = config and config.number(0.4, {
     live = true,
 }) or 0.4
 
--- rotateMode = 'controls' only. Hard stop for one drag, so a missed button
+-- rotateMode = 'controls' and 'capture'. Hard stop for one drag, so a missed button
 -- release can never leave the menu stuck without a cursor.
 Config.rotateControlsMaxSeconds = config and config.number(30.0, {
     min = 2.0, max = 300.0,
-    label = 'Longest single rotate drag (controls mode)',
-    description = 'Safety limit in seconds: a rotate drag in controls mode always ends, and the cursor returns, after this long even if no button release was detected.',
+    label = 'Longest single rotate drag (controls and capture modes)',
+    description = 'Safety limit in seconds: a rotate drag in controls or capture mode always ends, and the cursor returns, after this long even if no button release was detected.',
     live = true,
 }) or 30.0
 
@@ -726,6 +730,15 @@ Config.ui = {
     -- selected, so hair, hair colour, facial hair and eyebrows are visible at
     -- once instead of behind Style > Hair. Which of those parts are offered is
     -- still decided by Config.headOverlays. Off keeps the old start on Tops.
+    -- The menu columns scroll with the mouse wheel anywhere over them, the arrow
+    -- keys and touchpads either way; this only decides whether the grey
+    -- scrollbar is drawn at their edge. Off (default) hides it. Read each time a
+    -- menu opens.
+    showScrollbar = config and config.boolean(false, {
+        label = 'Show menu scrollbars',
+        description = 'Draws a scrollbar at the edge of the menu columns when they are longer than the screen. Off by default: the columns still scroll with the mouse wheel anywhere over them and with the arrow keys.',
+        live = true,
+    }) or false,
     creatorOpensOnHair = config and config.boolean(true, {
         label = 'Creator opens on hair and grooming',
         description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
@@ -799,6 +812,18 @@ Config.ui = {
 --                  the framing follows the real height of any ped model.
 --   trackOffset  : metres above the tracked bone to look at.
 Config.camera = {
+    -- Hold the character still while a menu is open: its idle fidget animations
+    -- (shifting weight, looking around) are paused, and the camera is aimed at
+    -- where the ped stands, measured once when the menu opens (and again if the
+    -- model changes), instead of following its spine and head bones every frame.
+    -- Following the breathing / idle animation made the whole view sway, so the
+    -- ped looked like it was moving in place, most of all while rotating. Off
+    -- keeps the old per-frame tracking. Read when a menu opens.
+    holdStill = config and config.boolean(true, {
+        label = 'Hold the character still in menus',
+        description = 'Pauses the idle fidget animations and keeps the camera fixed on where the character stands while a clothing, barber, tattoo or creator menu is open, so the character does not sway or appear to move in place while you rotate. Turn off to let the camera follow the idle animation as before.',
+        live = true,
+    }) or true,
     -- Frame the face and shoes zones on the ped's head and foot bones, and size
     -- the camera limits from them, instead of from the model bounding box. Fixes
     -- the face view stopping at the shoulders and the shoes view dropping under

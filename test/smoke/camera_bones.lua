@@ -71,4 +71,45 @@ approx(runtime.clampAboveGround(29.0, 30.0, 0.15), 30.15, 'camera under the grou
 approx(runtime.clampAboveGround(31.0, 30.0, 0.15), 31.0, 'camera above the ground is left alone')
 approx(runtime.clampAboveGround(31.0, 30.0, 'x'), 31.0, 'bad clearance is treated as zero')
 
+-- Config.camera.holdStill: the idle animation sways the spine and head bones;
+-- held still, the camera is aimed from one measurement instead of chasing them.
+local sway, model = 0.0, 'mp_m_freemode_01'
+local bones = { [24816] = 1.0, [31086] = 1.68, [14201] = 0.12, [52301] = 0.1 }
+_G.GetPedBoneCoords = function(_, bone) return { x = 5.0 + sway, y = 2.0, z = bones[bone] + sway } end
+_G.GetEntityModel = function() return model end
+H.equal(Config.camera.holdStill, true, 'held still by default')
+local first = runtime.frameAnchor(7)
+sway = 0.03
+local later = runtime.frameAnchor(7)
+H.equal(later.x, first.x, 'anchor does not follow the sway (x)')
+H.equal(later.z, first.z, 'anchor does not follow the sway (z)')
+model = 'mp_f_freemode_01'
+H.ok(runtime.frameAnchor(7).z ~= first.z, 'a new model is measured again')
+H.ok(runtime.frameAnchor(8).x == 5.03, 'so is a new ped')
+Config.camera.holdStill = false
+sway = 0.05
+approx(runtime.frameAnchor(8).z, 1.05, 'holdStill off follows the bones every frame as before')
+Config.camera.holdStill = true
+
+-- Idle fidgets are paused for the menu and allowed again when it closes.
+local ambient = {}
+_G.SetPedCanPlayAmbientAnims = function(ped, on) ambient[#ambient + 1] = { 'anims', ped, on } end
+_G.SetPedCanPlayAmbientBaseAnims = function(ped, on) ambient[#ambient + 1] = { 'base', ped, on } end
+_G.DoesEntityExist = function() return true end
+_G.GetEntityHeading = function() return 0.0 end
+_G.CreateCam = function() return 1 end
+_G.SetCamActive, _G.RenderScriptCams, _G.DestroyCam = function() end, function() end, function() end
+_G.CreateThread = function() end
+Camera.start(9)
+H.equal(#ambient, 2, 'both ambient animation kinds paused')
+H.equal(ambient[1][2], 9); H.equal(ambient[1][3], false); H.equal(ambient[2][3], false)
+Camera.stop()
+H.equal(#ambient, 4, 'and allowed again on close')
+H.equal(ambient[3][3], true); H.equal(ambient[4][3], true)
+Config.camera.holdStill = false
+Camera.start(9)
+Camera.stop()
+H.equal(#ambient, 4, 'holdStill off leaves the animations alone')
+Config.camera.holdStill = true
+
 H.finish()

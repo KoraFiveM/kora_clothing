@@ -111,12 +111,12 @@ local function lastFocus() local f = focus[#focus]; return f and f[1], f and f[2
 local function runThread() local fn = table.remove(threads, 1); fn() end
 local function lastMessage() return messages[#messages] end
 
-H.equal(Config.rotateMode, 'pointer', 'pointer lock is the default mode')
+H.equal(Config.rotateMode, 'capture', 'capture is the default mode')
 H.equal(Config.rotateSensitivity, 1.0, 'rotate sensitivity defaults to 1')
 H.equal(Config.rotateRightButton, true, 'right button rotates by default')
-H.equal(RotateControl.mode(), 'pointer', 'mode resolves to pointer')
+H.equal(RotateControl.mode(), 'capture', 'mode resolves to capture')
 Config.rotateMode = 'nonsense'
-H.equal(RotateControl.mode(), 'pointer', 'unknown mode falls back to pointer')
+H.equal(RotateControl.mode(), 'capture', 'unknown mode falls back to capture')
 Config.rotateMode = 'pointer'
 H.equal(RotateControl.mode(), 'pointer', 'pointer mode')
 Config.rotatePointerLock = false
@@ -260,6 +260,96 @@ H.equal(reply.moved, false, 'throttled when repeated at once')
 clock = clock + 100
 callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, true, 'allowed again after the interval')
+Config.rotateMode = 'controls'
+
+-- Capture mode: Lua reads the cursor every frame, turns by its travel and pulls it
+-- back to the centre itself, so a fast drag can never carry it to an edge or out
+-- of the window. NUI focus is never touched.
+reset()
+Config.rotateMode = 'capture'
+local nuiCursor = { 480, 810 }   -- where the button went down (0.25, 0.75 of 1920x1080)
+local pendingPull, pulls, furthest = false, 0, 0
+_G.GetActiveScreenResolution = function() return 1920, 1080 end
+_G.GetNuiCursorPosition = function() return nuiCursor[1], nuiCursor[2] end
+_G.SetCursorLocation = function(x, y)
+    cursor = { x, y }
+    if x == 0.5 and y == 0.5 then pendingPull, pulls = true, pulls + 1 end
+end
+local hand = 40 -- pixels per frame: 2400 px/s at 60 fps, more than a screen width a second
+local function fastDrag(stopAt)
+    onFrame = function(n)
+        if pendingPull then nuiCursor, pendingPull = { 960, 540 }, false end -- the pull lands next frame
+        nuiCursor[1] = nuiCursor[1] + hand
+        furthest = math.max(furthest, math.abs(nuiCursor[1] - 960))
+        if n == stopAt then RotateControl.stop('nui') end
+    end
+end
+H.equal(RotateControl.start(0, 0.25, 0.75), true, 'capture drag starts')
+H.equal(#focus, 0, 'capture never touches NUI focus')
+H.equal(keepInput, false, 'the game does not get the mouse')
+H.equal(pulls, 1, 'the cursor is pulled to the centre at once')
+fastDrag(60)
+runThread()
+H.equal(RotateControl.isActive(), false, 'released')
+H.equal(#rotated, 59, 'turned every frame after the first pull landed')
+local total = 0
+for _, deg in ipairs(rotated) do total = total + deg end
+H.ok(math.abs(total - (-59 * hand * 0.15)) < 1e-6, 'every pixel the hand moved turned the camera, the pull jumps did not')
+H.ok(furthest < 1920 * 0.08 + hand + 1, 'the cursor never got further than one pull distance from the centre')
+H.ok(pulls > 10, 'pulled back again and again during the drag')
+H.equal(#focus, 0, 'still no focus change')
+H.equal(cursor[1], 0.25, 'cursor put back where the drag began (x)'); H.equal(cursor[2], 0.75, 'cursor put back where the drag began (y)')
+H.ok(rotateEnds >= 1, 'camera settled')
+
+-- Leftward, inverted and with sensitivity: same pull, opposite turn.
+reset()
+nuiCursor, pendingPull, pulls, furthest = { 960, 540 }, false, 0, 0
+hand = -25
+Config.rotateInvert, Config.rotateSensitivity = true, 2.0
+RotateControl.start(0, 0.5, 0.5)
+fastDrag(30)
+runThread()
+H.equal(rotated[1], -25 * 0.15 * 2.0, 'invert and sensitivity apply')
+H.ok(furthest < 1920 * 0.08 + 26, 'held near the centre going left too')
+Config.rotateInvert, Config.rotateSensitivity = false, 1.0
+hand = 40
+
+-- The safety limit ends a drag whose release was never seen, and tells the NUI.
+reset()
+nuiCursor, pendingPull = { 960, 540 }, false
+Config.rotateControlsMaxSeconds = 1.0
+RotateControl.start(0, 0.5, 0.5)
+onFrame = function() if pendingPull then pendingPull = false end end
+runThread()
+H.equal(RotateControl.isActive(), false, 'safety stop')
+H.equal(lastMessage().data.reason, 'timeout')
+Config.rotateControlsMaxSeconds = 30.0
+
+-- Through the NUI callbacks, with a session; a menu closing mid-drag ends it.
+reset()
+open()
+callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+H.equal(reply.active, true, 'session open: Lua takes the capture drag')
+callbacks['qbclothing:nui:rotateEnd']({}, function() end)
+H.equal(RotateControl.isActive(), false, 'rotateEnd stops it')
+H.equal(cursor[1], 0.4, 'cursor back where it began')
+callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+handlers['qbclothing:client:closeSession']({ ok = true })
+H.equal(RotateControl.isActive(), false, 'closing the menu ends the capture drag')
+H.equal(open().rotateMode, 'capture', 'payload carries capture')
+handlers['qbclothing:client:closeSession']({ ok = true })
+
+-- Without the cursor natives capture declines, and the NUI falls back to recentring.
+reset()
+local savedRead = _G.GetNuiCursorPosition
+_G.GetNuiCursorPosition = nil
+H.equal(RotateControl.start(0, 0.5, 0.5), false, 'declined without GetNuiCursorPosition')
+_G.GetNuiCursorPosition = savedRead
+open()
+clock = clock + 1000 -- past the recentre throttle left by the recenter tests above
+callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+H.equal(reply.moved, true, 'the recenter fallback is allowed in capture mode')
+handlers['qbclothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'controls'
 
 H.finish()

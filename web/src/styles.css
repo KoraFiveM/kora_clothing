@@ -23,6 +23,8 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    background of its own. */
 .clothing-viewport { position: absolute; inset: 0; z-index: 0; pointer-events: auto; cursor: grab; touch-action: none; }
 .clothing-viewport:active { cursor: none; } /* hidden while dragging: no blink when Lua takes over, nothing to watch recentre */
+/* The same for the whole page while a drag runs, whatever is under the cursor. */
+html.is-rotating, html.is-rotating * { cursor: none !important; }
 
 .headline { position: absolute; top: 82px; left: 50%; z-index: 1; transform: translateX(-50%); text-align: center; pointer-events: none; }
 .headline h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 12px rgb(0 0 0 / .6); }
@@ -92,6 +94,11 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    negative margin so the panels stay exactly where they were. Each gutter must be at
    least offset + blur of --panel-shadow-* on that side (layout.test.ts checks it). */
 .rail { --shadow-gutter-in: 44px; --shadow-gutter-top: 28px; --shadow-gutter-bottom: 56px; --shadow-gutter-l: var(--shadow-gutter-in); --shadow-gutter-r: var(--edge-inset); box-sizing: content-box; padding: var(--shadow-gutter-top) var(--shadow-gutter-r) var(--shadow-gutter-bottom) var(--shadow-gutter-l); margin: calc(-1 * var(--shadow-gutter-top)) calc(-1 * var(--shadow-gutter-r)) calc(-1 * var(--shadow-gutter-bottom)) calc(-1 * var(--shadow-gutter-l)); min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* The rails scroll with the wheel anywhere over them (lib/railWheel.ts) and the arrow
+   keys; the grey bar itself is hidden unless Config.ui.showScrollbar is on.
+   scrollbar-width covers current Chromium, the pseudo-element FiveM's older CEF. */
+.clothing-shell:not(.show-scrollbars) .rail { scrollbar-width: none; }
+.clothing-shell:not(.show-scrollbars) .rail::-webkit-scrollbar { display: none; width: 0; height: 0; }
 /* Inner side of each rail (towards the screen centre) gets the full shadow room; the outer side is the edge inset, which keeps the right rail's scrollbar on screen. */
 .rail-left { --shadow-gutter-l: var(--edge-inset); --shadow-gutter-r: var(--shadow-gutter-in); }
 .rail > * { flex-shrink: 0; }

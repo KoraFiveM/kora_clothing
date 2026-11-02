@@ -162,6 +162,15 @@ fit any ped model or height, and the camera is never lower than
 floor, so the shoes view cannot go under the map. `Config.camera.frameToBones =
 false` returns to the fixed spine offsets.
 
+**Holding still.** A frozen ped still plays its idle animation (breathing,
+shifting weight, looking around). With `Config.camera.holdStill` (default
+`true`) those idle fidgets are paused while a menu is open, and the camera is
+aimed from one measurement of where the ped stands (taken when the menu opens,
+and again if the model changes) instead of following its spine and head bones
+every frame. Following them made the whole view sway, so the ped looked like it
+was moving in place, most of all while rotating. Nothing re-tasks the ped while
+it rotates: only the camera orbits. `false` keeps the old per-frame tracking.
+
 **Categories.** Choosing a category does not move the camera by default, so the
 player's own rotation and zoom survive tab changes and the preset buttons stay
 the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
@@ -171,13 +180,24 @@ the way to reframe. Set `Config.camera.resetOnCategoryChange = true` to jump to
 `Config.rotateRightButton = false`) over the character and drag. `Config.rotateMode` picks how the
 drag survives the cursor reaching the screen edge (read each time a menu opens).
 `Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
-the pointer, recenter and plain modes:
+the capture, pointer, recenter and plain modes:
 
-- `'pointer'` (default) — the browser Pointer Lock request on mouse down
-  (`Config.rotatePointerLock`, `false` = plain drag). The character turns by the
-  `movementX` deltas, so the cursor never reaches the edge and NUI focus is never
-  toggled (no cursor blink). If the lock is refused the drag falls back to
-  `'recenter'`.
+- `'capture'` (default) — the NUI hands the drag to `client/rotate.lua` but keeps
+  its focus and cursor, so it always sees the button come up. Every frame Lua
+  reads the cursor (`GetNuiCursorPosition`), turns the camera by how far it
+  moved, and once it is more than 8% of the screen from the centre pulls it
+  back (`SetCursorLocation(0.5, 0.5)`), ignoring the jump the pull causes. The
+  pull happens in the same frame rather than after a round trip from the NUI,
+  so even a fast flick cannot carry the cursor to a screen edge or out of the
+  window onto another monitor. The cursor is hidden for the drag and put back
+  where the drag began; NUI focus never changes, so nothing blinks. The drag
+  ends on release, a window blur, Escape, menu close or
+  `Config.rotateControlsMaxSeconds`. If the cursor natives are missing Lua
+  declines and the NUI recentres near the edge instead.
+- `'pointer'` — the browser Pointer Lock request on mouse down
+  (`Config.rotatePointerLock`, `false` = plain drag), turning by `movementX`.
+  FiveM's NUI refuses the lock, so in practice the drag falls back to
+  `'recenter'`, which a fast flick can outrun.
 - `'controls'` — the NUI hands the drag to Lua. While the button is
   held the cursor is hidden (`SetNuiFocus(true, false)`), the mouse reaches the
   game as `INPUT_LOOK_LR`, and `client/rotate.lua` turns the camera from that
@@ -196,6 +216,14 @@ the pointer, recenter and plain modes:
 
 Every mode ends the drag on mouse release, window blur, Escape and menu close
 (`Config.rotateDragGuard`).
+
+**Scrolling the menu.** The menu columns are click-through (only their panels
+take input), and FiveM's NUI does not scroll a column from a wheel over one of
+its panels, which left the arrow keys as the only way to move the right-hand
+menu. The wheel is therefore handled once, at the window (`web/src/lib/railWheel.ts`):
+anywhere over a column that can scroll, it scrolls that column, gliding over a
+few frames, and never zooms the camera. The arrow keys still work. The grey
+scrollbar is hidden unless `Config.ui.showScrollbar = true`.
 
 **Free zoom.** The mouse wheel zooms continuously, as an offset on top of
 whichever preset is selected — `Config.camera.zoom` sets the step per wheel
@@ -328,6 +356,9 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.headOverlays.<facialHair|eyebrows|chestHair>.followHairColor` (default `false`) — `true` hides that overlay's color palette and always uses the primary hair color. This replaces the old "Match hair colour" button, which is gone from the menu
 - `Config.interactDistance` (2.0) — kora_target zone range; the server accepts a shop session from inside the zone or within this distance plus one metre of it
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
+- `Config.camera.holdStill` (default `true`) — pause idle fidgets and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
+- `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
+- `Config.rotateMode` (default `'capture'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
 

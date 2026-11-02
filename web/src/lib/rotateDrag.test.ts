@@ -195,6 +195,64 @@ test("controls: a rejected start request falls back to the plain drag", async ()
     assert.deepEqual(log.rotated, [-3])
 })
 
+test("capture: Lua takes the drag, pointer moves (and its pulls) turn nothing, the release tells Lua", async () => {
+    const { drag, log } = setup("capture")
+    drag.down({ button: 0, clientX: 250, clientY: 150, width: W, height: H })
+    assert.deepEqual(log.starts, [[0, 0.25, 0.25]])
+    drag.move(sample(600, 350)) // the first pull lands before Lua's answer: not the hand
+    assert.deepEqual(log.rotated, [])
+    await tick()
+    assert.equal(drag.handedToLua, true)
+    drag.move(sample(510, 10))
+    drag.move(sample(500, -10))
+    assert.deepEqual(log.rotated, [], "Lua turns the camera, the NUI adds nothing")
+    drag.lost() // a lost capture or leave is not the release; Lua keeps the cursor in the window
+    assert.equal(drag.dragging, true)
+    drag.up()
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 1, "rotateEnd sent so Lua stops and puts the cursor back")
+})
+
+test("capture: a move that reports the button up ends it, so does a window blur", async () => {
+    const { drag, log } = setup("capture")
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    await tick()
+    drag.move(sample(500, 0, 0))
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 1)
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    await tick()
+    drag.lost(true)
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 2)
+})
+
+test("capture: a blur while Lua is answering ends the drag it then starts", async () => {
+    const { drag, log, answer } = setup("capture", {}, "never")
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    drag.lost(true)
+    assert.equal(drag.dragging, true)
+    answer(true)
+    await tick()
+    assert.equal(drag.dragging, false)
+    assert.equal(log.ends, 1)
+})
+
+test("capture: declined by Lua carries on by recentring near the edge", async () => {
+    const { drag, log } = setup("capture", {}, false)
+    drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })
+    await tick()
+    assert.equal(drag.handedToLua, false)
+    drag.move(sample(500))
+    drag.move(sample(980))
+    assert.deepEqual(log.rotated, [-240])
+    assert.equal(log.recenters, 1, "asked Lua to recentre near the edge")
+    drag.move(sample(500)) // the recentre jump
+    assert.deepEqual(log.rotated, [-240], "the jump is ignored")
+    drag.up()
+    assert.equal(log.ends, 1)
+})
+
 test("a refused pointer lock falls back to recentring near the edge and ignores the jump", () => {
     const { drag, log } = setup("pointer")
     drag.down({ button: 0, clientX: 500, clientY: 300, width: W, height: H })

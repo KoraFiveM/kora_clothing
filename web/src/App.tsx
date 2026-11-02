@@ -4,7 +4,7 @@ import { openDevHarness } from "@/lib/dev"
 import { listenForDragEnd } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
-import { scrollRailWithWheel } from "@/lib/railWheel"
+import { listenForRailWheel } from "@/lib/railWheel"
 import { resolveStrings } from "@/lib/strings"
 import type { Strings } from "@/lib/strings"
 import { resolveStepEdit } from "@/lib/stepper"
@@ -168,6 +168,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     drag.setOptions(options)
     const locked = useRef(false)
     const unlock = useCallback(() => {
+        document.documentElement.classList.remove("is-rotating")
         if (!locked.current) return
         locked.current = false
         releaseRotateLock(document)
@@ -232,6 +233,10 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
+            // Hidden for the whole drag, wherever the cursor is (capture mode pulls it to the centre).
+            document.documentElement.classList.add("is-rotating")
+            // Lua-owned drags turn the camera without a move ever counting here.
+            if (mode === "capture" || mode === "controls") onInteract()
             event.currentTarget.setPointerCapture(event.pointerId)
             if (mode === "pointer") {
                 locked.current = requestRotateLock(event.currentTarget, pointerLock)
@@ -240,8 +245,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         }}
         onLostPointerCapture={() => { if (dragGuard) { drag.lost(); unlock() } }}
         onWheel={(event) => {
-            // Over the right rail (its gaps are click-through) the wheel scrolls the menu.
-            if (scrollRailWithWheel(document.querySelector<HTMLElement>(".rail-right"), event)) return
+            // Wheels over a menu column never get here: listenForRailWheel scrolls the column.
             onZoom(Math.sign(event.deltaY)); onInteract()
         }}
         aria-hidden="true"
@@ -893,6 +897,9 @@ export default function App() {
     }, [hintOn, open])
     const dismissHint = useCallback(() => setHintDismissed(true), [])
 
+    // The menu columns scroll with the wheel from anywhere over them.
+    useEffect(() => listenForRailWheel(window, document), [])
+
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape" && open && !open.mandatory) cancel()
@@ -905,8 +912,8 @@ export default function App() {
 
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
-    return <main className="clothing-shell">
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "pointer"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} />
+    return <main className={open.showScrollbar === true ? "clothing-shell show-scrollbars" : "clothing-shell"}>
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "capture"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

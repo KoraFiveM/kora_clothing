@@ -124,19 +124,59 @@ local function measurePedBounds(ped)
         local right = GetPedBoneCoords(ped, R_FOOT_BONE, 0.0, 0.0, 0.0)
         if validBone(head) and validBone(left) and validBone(right) then
             local bounds = boneBounds(anchor.z, head.z, left.z, right.z)
-            if bounds then return applyBounds(bounds) end
+            if bounds then
+                applyBounds(bounds)
+                return true
+            end
         end
     end
 
     pedBounds.head, pedBounds.feet, pedBounds.margin = nil, nil, HEAD_MARGIN
-    if type(GetModelDimensions) ~= 'function' then return end
+    if type(GetModelDimensions) ~= 'function' then return false end
     local minimum, maximum = GetModelDimensions(GetEntityModel(ped))
-    if not minimum or not maximum then return end
+    if not minimum or not maximum then return false end
 
     local root = GetEntityCoords(ped)
     pedBounds.low = root.z + minimum.z - anchor.z
     pedBounds.high = root.z + maximum.z - anchor.z
     pedBounds.ground = pedBounds.low
+    -- With bone framing on, the box is only a stand-in while the skeleton streams in.
+    return Config.camera.frameToBones == false
+end
+
+-- Config.camera.holdStill: a frozen ped still plays its idle animation, so a
+-- camera re-aimed at its spine and head bones every frame sways with every
+-- breath and weight shift, and the ped looks like it is moving in place. Held
+-- still, the anchor and bounds are measured once per ped and model (retried for
+-- a few frames while the skeleton streams in) and the view stays put.
+local MEASURE_TRIES = 30
+local held = { ped = nil, model = nil, anchor = nil, settled = false, tries = 0 }
+
+local function frameAnchor(ped)
+    if Config.camera.holdStill == false then
+        measurePedBounds(ped)
+        return cameraAnchor(ped)
+    end
+    local model = GetEntityModel(ped)
+    if held.ped ~= ped or held.model ~= model then
+        held.ped, held.model, held.settled, held.tries = ped, model, false, 0
+    end
+    if not held.settled then
+        held.tries = held.tries + 1
+        held.settled = measurePedBounds(ped) == true or held.tries >= MEASURE_TRIES
+        held.anchor = cameraAnchor(ped)
+    end
+    return held.anchor
+end
+
+-- Idle fidget animations (looking around, shifting weight) are paused while a
+-- menu holds the ped still, and allowed again when it closes.
+local stilledPed
+
+local function setAmbientAnims(ped, enabled)
+    if not ped or (type(DoesEntityExist) == 'function' and not DoesEntityExist(ped)) then return end
+    if type(SetPedCanPlayAmbientAnims) == 'function' then SetPedCanPlayAmbientAnims(ped, enabled) end
+    if type(SetPedCanPlayAmbientBaseAnims) == 'function' then SetPedCanPlayAmbientBaseAnims(ped, enabled) end
 end
 
 -- Keeps a camera height at least `minAbove` metres above the floor
@@ -205,7 +245,7 @@ local function resolveOcclusion()
     if not (pedRef and DoesEntityExist(pedRef)) then return end
 
     local zoneCfg = Config.camera.zones[target.zone] or Config.camera.zones.full
-    local pedCoords = cameraAnchor(pedRef)
+    local pedCoords = frameAnchor(pedRef)
     local heading = GetEntityHeading(pedRef)
     local radius = goalRadius(zoneCfg)
     local targetOffset, height = zoneHeights(zoneCfg)
@@ -278,7 +318,12 @@ function Camera.start(ped)
     if cam then Camera.stop() end
     pedRef = ped
     active = true
-    measurePedBounds(ped)
+    held.ped = nil
+    frameAnchor(ped)
+    if Config.camera.holdStill ~= false then
+        setAmbientAnims(ped, false)
+        stilledPed = ped
+    end
 
     local zone = initialZone()
     local first = Config.camera.zones[zone]
@@ -324,10 +369,9 @@ function Camera.start(ped)
             state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))
 
             if pedRef and DoesEntityExist(pedRef) then
-                -- Every frame: the model (and so its height) can change while the
-                -- camera runs, for instance when the creator swaps gender.
-                measurePedBounds(pedRef)
-                local pedCoords = cameraAnchor(pedRef)
+                -- Re-measured when the model changes (a saved outfit on the other
+                -- freemode model), otherwise held still (Config.camera.holdStill).
+                local pedCoords = frameAnchor(pedRef)
                 local heading = GetEntityHeading(pedRef)
                 local targetHeight = pedCoords.z + targetOffset
                 local camPoint = candidatePoint(
@@ -411,6 +455,10 @@ end
 
 function Camera.stop()
     active = false
+    if stilledPed then
+        setAmbientAnims(stilledPed, true)
+        stilledPed = nil
+    end
     if cam then
         RenderScriptCams(false, true, 300, true, true)
         DestroyCam(cam, false)
@@ -454,5 +502,6 @@ if Config.testMode then
         initialAngle = initialAngle,
         initialZone = initialZone,
         setAngles = function(live, goal) state.angle, target.angle = live, goal end,
+        frameAnchor = frameAnchor,
     }
 end

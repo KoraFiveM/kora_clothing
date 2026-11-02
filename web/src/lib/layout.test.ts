@@ -49,6 +49,15 @@ test("the wheel zoom handler lives on the viewport, not on the rail panels", () 
     assert.match(css, /\.rail \{[^}]*pointer-events: none/)
 })
 
+test("the grey scrollbar is hidden unless Config.ui.showScrollbar is on, in old and new Chromium", () => {
+    assert.match(css, /\.clothing-shell:not\(\.show-scrollbars\) \.rail \{ scrollbar-width: none; \}/)
+    assert.match(css, /\.clothing-shell:not\(\.show-scrollbars\) \.rail::-webkit-scrollbar \{ display: none; width: 0; height: 0; \}/)
+})
+
+test("the cursor is hidden everywhere while a rotate drag runs", () => {
+    assert.match(css, /html\.is-rotating, html\.is-rotating \* \{ cursor: none !important; \}/)
+})
+
 test("UI text is not selectable but inputs stay editable", () => {
     assert.match(css, /#root \*[^}]*user-select: none/)
     assert.match(css, /-webkit-user-select: none/)

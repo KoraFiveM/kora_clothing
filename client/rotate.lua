@@ -1,6 +1,16 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
 -- Config.rotateMode:
+--   'capture'  (default) the NUI keeps its focus and cursor, so it always sees the
+--              button come up, and hands the drag to this file. Every frame the
+--              cursor is read (GetNuiCursorPosition), the camera turns by how far
+--              it moved, and once it strays a little from the screen centre it is
+--              pulled back (SetCursorLocation). The pull happens here, the same
+--              frame, not after a round trip from the NUI, so even a fast flick
+--              cannot carry the cursor to a screen edge or out of the window. The
+--              cursor is hidden while dragging and put back where the drag began.
+--              FiveM's NUI refuses browser pointer lock, which is why 'pointer'
+--              always ended up recentring from the NUI and could be outrun.
 --   'controls'  the NUI hands the drag to this file. NUI focus drops
 --              its cursor and passes input to the game (SetNuiFocusKeepInput +
 --              SetNuiFocus(true, false)); without the keep-input flag the game
@@ -13,9 +23,9 @@
 --              NUI focus + the cursor position are put back.
 --   'recenter' the NUI keeps the normal cursor drag and asks for the cursor to
 --              be put back at the screen centre when it nears an edge.
---   'pointer'  (default) the browser Pointer Lock request (Config.rotatePointerLock);
---              the NUI turns the camera from movementX and never toggles NUI focus.
---              If the lock is refused it falls back to recenter.
+--   'pointer'  the browser Pointer Lock request (Config.rotatePointerLock); the NUI
+--              turns the camera from movementX and never toggles NUI focus. FiveM's
+--              NUI refuses the lock, so in practice it falls back to recenter.
 --   'plain'    a normal press/move/release drag, no capture.
 
 RotateControl = {}
@@ -28,16 +38,22 @@ local CANCEL_CONTROLS = { 177, 200, 202 }      -- backspace, pause/esc, cancel
 local PRESS_GRACE_MS = 400
 local RECENTER_MIN_INTERVAL_MS = 40
 
-local MODES = { controls = true, recenter = true, pointer = true, plain = true }
+local MODES = { capture = true, controls = true, recenter = true, pointer = true, plain = true }
 
-local active -- the running drag: { control, startedAt, seen, movedAt, x, y }
+-- 'capture' mode. Degrees per pixel match the NUI's DRAG_ROTATION_DEG_PER_PIXEL
+-- (scaled by Config.rotateSensitivity), so a drag turns the same in every mode.
+local CAPTURE_DEG_PER_PIXEL = 0.15
+local CAPTURE_PULL = 0.08          -- pull the cursor back once it is this far (fraction of the screen) from the centre
+local CAPTURE_RETRY_FRAMES = 8     -- a pull still not seen after this many frames is sent again
+
+local active -- the running drag: { mode, control, startedAt, seen, movedAt, x, y, ... }
 
 ---The mode in effect. An unknown value falls back to the default; the older
 ---Config.rotatePointerLock = false still turns plain 'pointer' capture off.
 ---@return string
 function RotateControl.mode()
     local mode = Config.rotateMode
-    if not MODES[mode] then mode = 'pointer' end
+    if not MODES[mode] then mode = 'capture' end
     if mode == 'pointer' and Config.rotatePointerLock == false then return 'plain' end
     return mode
 end
@@ -88,6 +104,14 @@ function RotateControl.stop(reason)
     if not drag then return false end
     active = nil
     if Camera and Camera.rotateEnd then Camera.rotateEnd() end
+    if drag.mode == 'capture' then
+        -- NUI focus never changed; only the cursor goes back where the drag began.
+        if reason ~= 'close' then
+            SetCursorLocation(drag.x, drag.y)
+            SendNUIMessage({ action = 'qbclothing:nui:rotateStopped', data = { reason = reason } })
+        end
+        return true
+    end
     -- Input goes back to the NUI whatever the reason, so a closing menu never
     -- leaves the game receiving the mouse through a dead focus.
     SetNuiFocusKeepInput(false)
@@ -99,20 +123,98 @@ function RotateControl.stop(reason)
     return true
 end
 
----Starts a controls-mode drag. Returns false (the NUI then keeps its own drag)
----when the mode is not 'controls', a drag is already running, or the button is unknown.
+---One frame of a capture drag: returns the cursor's horizontal travel in pixels
+---since the last frame and pulls the cursor back to the centre once it strays.
+---A pull lands a frame or so later as a jump to the centre; that jump is not the
+---player's hand, so only what moved after it counts.
+---@param drag table the running capture drag
+---@param x number cursor position (GetNuiCursorPosition, game pixels)
+---@param y number
+---@param width number game resolution (GetActiveScreenResolution)
+---@param height number
+---@return number dx
+function RotateControl.captureStep(drag, x, y, width, height)
+    local cx, cy = width * 0.5, height * 0.5
+    local dx = 0
+    if drag.pulling then
+        if math.abs(x - cx) <= width * CAPTURE_PULL * 0.5 and math.abs(y - cy) <= height * CAPTURE_PULL * 0.5 then
+            dx = x - cx
+            drag.pulling = false
+        else
+            if drag.lastX then dx = x - drag.lastX end
+            drag.pullFrames = drag.pullFrames + 1
+            if drag.pullFrames > CAPTURE_RETRY_FRAMES then drag.pulling = false end
+        end
+    elseif drag.lastX then
+        dx = x - drag.lastX
+    end
+    drag.lastX, drag.lastY = x, y
+    if not drag.pulling and (math.abs(x - cx) > width * CAPTURE_PULL or math.abs(y - cy) > height * CAPTURE_PULL) then
+        SetCursorLocation(0.5, 0.5)
+        drag.pulling, drag.pullFrames = true, 0
+    end
+    return dx
+end
+
+local function captureAvailable()
+    return type(GetNuiCursorPosition) == 'function' and type(SetCursorLocation) == 'function'
+        and type(GetActiveScreenResolution) == 'function'
+end
+
+local function runCapture(drag)
+    CreateThread(function()
+        local width, height = GetActiveScreenResolution()
+        width, height = math.max(1, tonumber(width) or 1920), math.max(1, tonumber(height) or 1080)
+        local maxMs = number('rotateControlsMaxSeconds', 30.0) * 1000.0
+        local direction = Config.rotateInvert == true and -1.0 or 1.0
+        local degPerPixel = CAPTURE_DEG_PER_PIXEL * math.max(0.1, number('rotateSensitivity', 1.0)) * direction
+        while active == drag do
+            local x, y = GetNuiCursorPosition()
+            local dx = RotateControl.captureStep(drag, tonumber(x) or 0, tonumber(y) or 0, width, height)
+            -- Same direction as the cursor drag: moving right turns the view clockwise.
+            if dx ~= 0 and Camera then Camera.rotate(-dx * degPerPixel) end
+            if GetGameTimer() - drag.startedAt > maxMs then
+                RotateControl.stop('timeout')
+                break
+            end
+            Wait(0)
+        end
+    end)
+end
+
+---Starts a Lua-owned drag ('capture' or 'controls' mode). Returns false (the NUI
+---then keeps its own drag) in any other mode, when a drag is already running,
+---the button is unknown, or capture's natives are missing.
 ---@param button number 0 = left, 2 = right
 ---@param x number cursor position as a 0..1 fraction of the screen, put back afterwards
 ---@param y number
 ---@return boolean
 function RotateControl.start(button, x, y)
-    if RotateControl.mode() ~= 'controls' or active then return false end
+    local mode = RotateControl.mode()
+    if active or (mode ~= 'controls' and mode ~= 'capture') then return false end
     local control = BUTTON_CONTROL[tonumber(button) or 0]
     if not control then return false end
     if control == 25 and Config.rotateRightButton == false then return false end
 
     x, y = tonumber(x) or 0.5, tonumber(y) or 0.5
+    if mode == 'capture' then
+        if not captureAvailable() then return false end
+        local drag = {
+            mode = 'capture',
+            startedAt = GetGameTimer(),
+            x = math.max(0.0, math.min(1.0, x)),
+            y = math.max(0.0, math.min(1.0, y)),
+            -- The cursor starts where the button went down: pull it to the centre first.
+            pulling = true,
+            pullFrames = 0,
+        }
+        active = drag
+        SetCursorLocation(0.5, 0.5)
+        runCapture(drag)
+        return true
+    end
     local drag = {
+        mode = 'controls',
         control = control,
         startedAt = GetGameTimer(),
         seen = false,
@@ -165,11 +267,12 @@ function RotateControl.start(button, x, y)
 end
 
 local lastRecenter = -RECENTER_MIN_INTERVAL_MS
----Puts the cursor at the screen centre ('recenter' mode), throttled.
+---Puts the cursor at the screen centre ('recenter' mode, and the NUI's fallback
+---when 'pointer' or 'capture' could not start), throttled.
 ---@return boolean moved
 function RotateControl.recenter()
     local mode = RotateControl.mode()
-    if mode ~= 'recenter' and mode ~= 'pointer' then return false end
+    if mode ~= 'recenter' and mode ~= 'pointer' and mode ~= 'capture' then return false end
     local now = GetGameTimer()
     if now - lastRecenter < RECENTER_MIN_INTERVAL_MS then return false end
     lastRecenter = now

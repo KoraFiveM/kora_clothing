@@ -102,7 +102,7 @@ export interface OpenPayload {
     rotatePointerLock?: boolean
     rotateDragGuard?: boolean
     /** Config.rotateMode; absent (an older Lua side) means the pointer-lock drag. */
-    rotateMode?: "controls" | "recenter" | "pointer" | "plain"
+    rotateMode?: "capture" | "controls" | "recenter" | "pointer" | "plain"
     /** Config.rotateRightButton; absent means on. */
     rotateRightButton?: boolean
     /** Config.rotateInvert; absent means not inverted. */
@@ -113,6 +113,8 @@ export interface OpenPayload {
     rotateRecenterEdge?: number
     /** Config.ui.showControlsHint; absent means on. */
     showControlsHint?: boolean
+    /** Config.ui.showScrollbar; absent means hidden. */
+    showScrollbar?: boolean
     /** Config.ui.creatorOpensOnHair; absent means on. */
     creatorOpensOnHair?: boolean
     shopLabel?: string
