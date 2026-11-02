@@ -648,6 +648,8 @@ local function restoreTemporaryOverride(ped)
     end
 end
 
+local suppressPopulation -- defined with the first-character flow below
+
 local function startControlLock()
     disableControlsThread = true
     CreateThread(function()
@@ -688,6 +690,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     applyModel(payload.model, payload.skin)
     local ped = PlayerPedId()
     FreezeEntityPosition(ped, true)
+    if payload.mode == 'firstCharacter' then suppressPopulation(true) end
 
     activeSession = {
         mode = payload.mode,
@@ -742,6 +745,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateMode = RotateControl and RotateControl.mode() or 'capture',
             rotateRightButton = Config.rotateRightButton ~= false,
             rotateInvert = Config.rotateInvert == true,
+            rotateCursor = Config.rotateDragCursor == 'hidden' and 'hidden' or 'grabbing',
             rotateSensitivity = tonumber(Config.rotateSensitivity),
             rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,
@@ -786,6 +790,7 @@ end)
 -- and the live preview. `result` is what the server sent with closeSession.
 local function closeSessionLocally(result)
     stopRotate('close')
+    suppressPopulation(false)
     Camera.stop()
     stopControlLock()
     setTattooPedsFaded(false)
@@ -1295,6 +1300,26 @@ end)
 -- open waits for kora_multichar to say the spawn finished.
 local firstCharacterArmed = false
 
+-- Config.bucket.suppressClientPopulation. Budgets are set once on enter and put
+-- back once on leave; GTA's default for both is 3.
+local DEFAULT_POPULATION_BUDGET = 3
+local populationSuppressed = false
+
+suppressPopulation = function(on)
+    if on == populationSuppressed then return end
+    if on and Config.bucket.suppressClientPopulation == false then return end
+    if type(SetPedPopulationBudget) ~= 'function' then return end
+    populationSuppressed = on
+    local budget = on and 0 or DEFAULT_POPULATION_BUDGET
+    SetPedPopulationBudget(budget)
+    SetVehiclePopulationBudget(budget)
+    if on then
+        local c = GetEntityCoords(PlayerPedId())
+        ClearAreaOfPeds(c.x, c.y, c.z, 80.0, 1)
+        ClearAreaOfVehicles(c.x, c.y, c.z, 80.0, false, false, false, false, false)
+    end
+end
+
 -- Whether the multichar handling this login is our own, and so whether a
 -- completion event is coming at all. Asked at arm time, not at chunk load:
 -- kora_clothing and kora_multichar start in the same batch, so a chunk-load read can
@@ -1310,6 +1335,7 @@ end
 RegisterNetEvent('qb-multicharacter:client:closeNUIdefault', function()
     if hasSpawnCompleteSignal() then
         firstCharacterArmed = true
+        suppressPopulation(true)
         return
     end
 
@@ -1333,6 +1359,7 @@ end)
 AddEventHandler('qbmultichar:client:spawnComplete', function(isNew)
     if not firstCharacterArmed then return end
     firstCharacterArmed = false
+    if isNew ~= true then suppressPopulation(false) end
     if isNew ~= true then return end
     TriggerEvent('qb-clothing:client:CreateFirstCharacter')
 end)
@@ -1857,6 +1884,7 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     for index in pairs(tattooPeds) do removeTattooPed(index) end
+    suppressPopulation(false)
     if activeSession then
         restoreHudForSession(activeSession)
         restoreRadarForSession(activeSession)
@@ -1865,6 +1893,7 @@ AddEventHandler('onResourceStop', function(resource)
         stopControlLock()
         SetNuiFocus(false, false)
         FreezeEntityPosition(PlayerPedId(), false)
+        suppressPopulation(false)
         -- Put back anything the session bared (tattoo undress, barber hat).
         restoreTemporaryOverride(PlayerPedId())
     end

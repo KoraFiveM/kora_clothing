@@ -9,7 +9,7 @@ local cam
 local active = false
 local pedRef
 
-local state = { radius = 2.2, height = 0.3, fov = 45.0, angle = 0.0 }
+local state = { radius = 2.2, height = 0.3, fov = 45.0, angle = 0.0, look = 0.0 }
 local target = { zone = 'full', angle = 0.0, zoomOffset = 0.0 }
 
 -- What the occlusion resolve below decided: an orbit angle to swing around an
@@ -19,6 +19,10 @@ local target = { zone = 'full', angle = 0.0, zoomOffset = 0.0 }
 -- player can still drag-rotate and zoom without the resolve going stale.
 local occlusion = { angle = 0.0, lift = 0.0, radiusScale = 1.0 }
 local occlusionDirty = false
+
+-- The occlusion result as it is applied: eased towards `occlusion` like every
+-- other camera value, so a re-resolve never moves the camera in a single frame.
+local applied = { angle = 0.0, lift = 0.0, radiusScale = 1.0 }
 
 local function lerp(current, goal, rate)
     return current + (goal - current) * rate
@@ -34,6 +38,13 @@ local function lerpAngle(current, goal, rate)
 end
 
 local clamp = Kora.util.clamp
+
+-- Fraction of the remaining distance to cover this frame so a change is ~95%
+-- done after Config.camera.transitionMs, at any frame rate.
+local function settleRate(dt)
+    local seconds = math.max(0.05, (tonumber(Config.camera.transitionMs) or 500) / 1000.0)
+    return 1.0 - math.exp(-dt * 3.0 / seconds)
+end
 
 -- The selected zone's preset radius plus whatever the wheel has added, clamped
 -- to the configured absolute bounds. Deliberately returned as the LERP GOAL
@@ -105,7 +116,9 @@ local function boneBounds(anchorZ, headZ, leftFootZ, rightFootZ)
         ground = footZ - FOOT_SOLE - anchorZ,
         high = headZ + HEAD_TOP - anchorZ,
         head = headZ - anchorZ,
-        feet = footZ - anchorZ,
+        -- The shoes view is centred on the midpoint of both feet (the floor stays
+        -- under the lower one) so a stepped pose does not tilt the framing.
+        feet = (leftFootZ + rightFootZ) * 0.5 - anchorZ,
         margin = 0.0,
     }
 end
@@ -150,7 +163,25 @@ end
 -- still, the anchor and bounds are measured once per ped and model (retried for
 -- a few frames while the skeleton streams in) and the view stays put.
 local MEASURE_TRIES = 30
-local held = { ped = nil, model = nil, anchor = nil, settled = false, tries = 0 }
+local held = { ped = nil, model = nil, anchor = nil, root = nil, heading = nil, settled = false, tries = 0 }
+-- The anchor is a world position, so it is only valid while the ped stays where
+-- it was measured. A ped that lands, is snapped to the ground or is moved after
+-- the menu opened (character creation places it a moment before the session)
+-- leaves a stale anchor behind, and the tight face view (30 degrees at 0.65 m)
+-- is then aimed well above the head. Past this distance it is measured again.
+local MOVED_EPSILON = 0.05
+
+local function remeasure()
+    held.settled, held.tries = false, 0
+end
+
+local function movedFrom(root, ped)
+    if not root or type(GetEntityCoords) ~= 'function' then return false end
+    local now = GetEntityCoords(ped)
+    if not (now and now.x and now.y and now.z) then return false end
+    local dx, dy, dz = now.x - root.x, now.y - root.y, now.z - root.z
+    return dx * dx + dy * dy + dz * dz > MOVED_EPSILON * MOVED_EPSILON
+end
 
 local function frameAnchor(ped)
     if Config.camera.holdStill == false then
@@ -159,14 +190,27 @@ local function frameAnchor(ped)
     end
     local model = GetEntityModel(ped)
     if held.ped ~= ped or held.model ~= model then
-        held.ped, held.model, held.settled, held.tries = ped, model, false, 0
+        held.ped, held.model = ped, model
+        remeasure()
+    elseif held.settled and movedFrom(held.root, ped) then
+        remeasure()
     end
     if not held.settled then
         held.tries = held.tries + 1
         held.settled = measurePedBounds(ped) == true or held.tries >= MEASURE_TRIES
         held.anchor = cameraAnchor(ped)
+        held.root = type(GetEntityCoords) == 'function' and GetEntityCoords(ped) or nil
     end
     return held.anchor
+end
+
+-- Heading the orbit is measured from. Held still it is the heading the menu
+-- opened with, which the front-facing start angle was solved for, so the camera
+-- stays on the same side of the ped for the whole session whatever the ped's
+-- heading does afterwards.
+local function frameHeading(ped)
+    if Config.camera.holdStill ~= false and held.heading and held.ped == ped then return held.heading end
+    return GetEntityHeading(ped)
 end
 
 -- Idle fidget animations (looking around, shifting weight) are paused while a
@@ -246,25 +290,36 @@ local function resolveOcclusion()
 
     local zoneCfg = Config.camera.zones[target.zone] or Config.camera.zones.full
     local pedCoords = frameAnchor(pedRef)
-    local heading = GetEntityHeading(pedRef)
+    local heading = frameHeading(pedRef)
     local radius = goalRadius(zoneCfg)
     local targetOffset, height = zoneHeights(zoneCfg)
+    local maxSwing = tonumber(Config.camera.occlusionMaxSwing) or 55.0
+    -- A capsule that starts on the floor always reports a hit, which on the
+    -- shoes view (look-at a hand's width above the floor) blocked every front
+    -- angle and sent the camera round to the side or the back. Both ends of the
+    -- trace stay a capsule radius clear of the floor.
+    local clearZ = pedCoords.z + pedBounds.ground + CAMERA_TRACE_RADIUS + 0.05
 
     -- Traced from the point the camera is actually aimed at, not the ped's
     -- feet: a waist-high shop counter is not between a face-framed camera and
     -- the ped's head, and tracing from floor level would insist that it is.
-    local subject = vector3(pedCoords.x, pedCoords.y, pedCoords.z + targetOffset)
+    local subject = vector3(pedCoords.x, pedCoords.y, math.max(pedCoords.z + targetOffset, clearZ))
 
     local firstImpact
     for index, angle in ipairs(CAMERA_FAN_ANGLES) do
-        local lift = index > 5 and 0.65 or 0.0
-        local candidate = candidatePoint(pedCoords, heading, radius, height, target.angle + angle, lift)
-        local blocked, impact = traceCameraPath(subject, candidate)
-        if blocked == false then
-            occlusion.angle, occlusion.lift, occlusion.radiusScale = angle, lift, 1.0
-            return
+        -- Config.camera.occlusionMaxSwing keeps the camera in front of the ped:
+        -- angles further round than this (the side and rear candidates) are not tried.
+        if math.abs(angle) <= maxSwing then
+            local lift = index > 5 and 0.65 or 0.0
+            local candidate = candidatePoint(pedCoords, heading, radius, height, target.angle + angle, lift)
+            candidate = vector3(candidate.x, candidate.y, math.max(candidate.z, clearZ))
+            local blocked, impact = traceCameraPath(subject, candidate)
+            if blocked == false then
+                occlusion.angle, occlusion.lift, occlusion.radiusScale = angle, lift, 1.0
+                return
+            end
+            if blocked and not firstImpact then firstImpact = impact end
         end
-        if blocked and not firstImpact then firstImpact = impact end
     end
 
     if firstImpact then
@@ -327,9 +382,12 @@ function Camera.start(ped)
 
     local zone = initialZone()
     local first = Config.camera.zones[zone]
-    local _, firstHeight = zoneHeights(first)
-    local angle = initialAngle(GetEntityHeading(ped))
+    local firstLook, firstHeight = zoneHeights(first)
+    held.heading = GetEntityHeading(ped)
+    local angle = initialAngle(held.heading)
     state.radius, state.height, state.fov, state.angle = first.camOffset.y, firstHeight, first.fov, angle
+    state.look = firstLook
+    applied.angle, applied.lift, applied.radiusScale = 0.0, 0.0, 1.0
     target.zone, target.angle, target.zoomOffset = zone, angle, 0.0
     occlusion.angle, occlusion.lift, occlusion.radiusScale = 0.0, 0.0, 1.0
     occlusionDirty = false
@@ -361,23 +419,32 @@ function Camera.start(ped)
             last = now
 
             local zoneCfg = Config.camera.zones[target.zone] or Config.camera.zones.full
-            local zoomRate = math.min(1.0, dt * (1000.0 / math.max(50, Config.camera.transitionMs)))
+            -- Everything that makes up the view -- position, look-at height, fov and
+            -- the occlusion swing -- is eased with the same frame-rate independent
+            -- rate, which settles in about Config.camera.transitionMs. The look-at
+            -- height used to jump to the new category while the camera was still
+            -- travelling, and the occlusion swing was applied in a single frame.
+            local zoomRate = settleRate(dt)
             state.radius = lerp(state.radius, goalRadius(zoneCfg), zoomRate)
             local targetOffset, goalHeight = zoneHeights(zoneCfg)
             state.height = lerp(state.height, goalHeight, zoomRate)
+            state.look = lerp(state.look, targetOffset, zoomRate)
             state.fov = lerp(state.fov, zoneCfg.fov, zoomRate)
             state.angle = lerpAngle(state.angle, target.angle, math.min(1.0, dt * 6.0))
+            applied.angle = lerpAngle(applied.angle, occlusion.angle % 360.0, zoomRate)
+            applied.lift = lerp(applied.lift, occlusion.lift, zoomRate)
+            applied.radiusScale = lerp(applied.radiusScale, occlusion.radiusScale, zoomRate)
 
             if pedRef and DoesEntityExist(pedRef) then
                 -- Re-measured when the model changes (a saved outfit on the other
                 -- freemode model), otherwise held still (Config.camera.holdStill).
                 local pedCoords = frameAnchor(pedRef)
-                local heading = GetEntityHeading(pedRef)
-                local targetHeight = pedCoords.z + targetOffset
+                local heading = frameHeading(pedRef)
+                local targetHeight = pedCoords.z + state.look
                 local camPoint = candidatePoint(
                     pedCoords, heading,
-                    state.radius * occlusion.radiusScale, state.height,
-                    state.angle + occlusion.angle, occlusion.lift
+                    state.radius * applied.radiusScale, state.height,
+                    state.angle + applied.angle, applied.lift
                 )
 
                 local camZ = camPoint.z
@@ -399,6 +466,9 @@ end
 function Camera.setZone(zone)
     if not Config.camera.zones[zone] then return end
     target.zone = zone
+    -- The ped may have settled since the menu opened; frame the new view from
+    -- a fresh reading of its bones.
+    remeasure()
     -- A preset is a jump-TO, not a nudge: it has to land on its own authored
     -- framing, so it discards whatever the wheel had accumulated. Without this
     -- a player who had zoomed right in would press "Full body" and still be
@@ -503,5 +573,6 @@ if Config.testMode then
         initialZone = initialZone,
         setAngles = function(live, goal) state.angle, target.angle = live, goal end,
         frameAnchor = frameAnchor,
+        settleRate = settleRate,
     }
 end

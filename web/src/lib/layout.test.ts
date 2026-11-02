@@ -54,8 +54,13 @@ test("the grey scrollbar is hidden unless Config.ui.showScrollbar is on, in old 
     assert.match(css, /\.clothing-shell:not\(\.show-scrollbars\) \.rail::-webkit-scrollbar \{ display: none; width: 0; height: 0; \}/)
 })
 
-test("the cursor is hidden everywhere while a rotate drag runs", () => {
-    assert.match(css, /html\.is-rotating, html\.is-rotating \* \{ cursor: none !important; \}/)
+test("a full-screen overlay holds one cursor for the whole rotate drag", () => {
+    assert.match(rule(".drag-overlay"), /position: fixed; inset: 0/)
+    assert.match(rule(".drag-overlay"), /cursor: grabbing/)
+    assert.match(css, /html\.is-rotating \.drag-overlay \{ display: block; \}/)
+    assert.match(css, /html\.is-rotating, html\.is-rotating \* \{ cursor: grabbing !important; \}/)
+    assert.match(css, /data-drag-cursor="hidden"\][^{]*\{ cursor: none !important; \}/)
+    assert.doesNotMatch(css, /\.clothing-viewport:active/)
 })
 
 test("UI text is not selectable but inputs stay editable", () => {

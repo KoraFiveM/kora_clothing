@@ -39,7 +39,7 @@ for _, ped in ipairs({
     H.ok(height >= target and height <= headRel + 0.12 + 1e-9, ped.name .. ': face camera is at head height')
 
     target, height = runtime.zoneHeights(zones.shoes)
-    approx(target, footRel + zones.shoes.trackOffset, ped.name .. ': shoes look at the foot bones')
+    approx(target, footRel + 0.01 + zones.shoes.trackOffset, ped.name .. ': shoes look at the midpoint of the foot bones')
     H.ok(height >= footRel - 0.1 + Config.camera.minHeightAboveGround - 1e-9, ped.name .. ': shoes camera is above the floor')
 
     -- Torso and legs are untouched by tracking.
@@ -113,3 +113,18 @@ H.equal(#ambient, 4, 'holdStill off leaves the animations alone')
 Config.camera.holdStill = true
 
 H.finish()
+
+-- Transitions: the ease settles (~95%) in Config.camera.transitionMs at any frame rate.
+H.equal(Config.camera.transitionMs, 500, 'default transition is 500 ms')
+H.equal(Config.camera.occlusionMaxSwing, 55.0, 'occlusion may not swing past the front arc by default')
+local function settle(fps)
+    local remaining = 1.0
+    for _ = 1, math.floor(fps * Config.camera.transitionMs / 1000 + 0.5) do
+        remaining = remaining * (1.0 - runtime.settleRate(1 / fps))
+    end
+    return remaining
+end
+approx(settle(30), settle(144), 'settle time does not depend on frame rate')
+H.ok(settle(60) < 0.06 and settle(60) > 0.04, 'about 95% of a change is done after transitionMs')
+H.equal(Config.bucket.suppressClientPopulation, true, 'client population suppression is on by default')
+H.equal(Config.rotateDragCursor, 'grabbing', 'drag cursor defaults to grabbing')

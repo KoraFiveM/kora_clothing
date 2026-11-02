@@ -361,6 +361,10 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.rotateMode` (default `'capture'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
+- `Config.camera.transitionMs` (default `500`) — time a change of view takes to settle; position, look-at height and fov ease together, never snap.
+- `Config.camera.occlusionMaxSwing` (default `55`°) — furthest the camera may swing round an obstruction; keeps it in front of the character (`180` = old side/rear behaviour).
+- `Config.rotateDragCursor` (`'grabbing'` default, or `'hidden'`) — cursor held for the whole rotate drag.
+- `Config.bucket.suppressClientPopulation` (default `true`) — while a new character is created, also zero this client's ped/vehicle population budgets and clear nearby ones (restored on close). The personal routing bucket + `Config.bucket.disablePopulation` already isolate the player server-side.
 
 ## Menu text and languages
 

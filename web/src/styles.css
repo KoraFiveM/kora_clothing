@@ -22,9 +22,12 @@ html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; ba
    only exists to capture the drag-to-rotate gesture -- it must never paint a
    background of its own. */
 .clothing-viewport { position: absolute; inset: 0; z-index: 0; pointer-events: auto; cursor: grab; touch-action: none; }
-.clothing-viewport:active { cursor: none; } /* hidden while dragging: no blink when Lua takes over, nothing to watch recentre */
-/* The same for the whole page while a drag runs, whatever is under the cursor. */
-html.is-rotating, html.is-rotating * { cursor: none !important; }
+/* While a drag runs a full-screen overlay owns the cursor (grabbing, or none with
+   Config.rotateDragCursor = hidden), so it never flips as the pointer is pulled across panels. */
+.drag-overlay { display: none; position: fixed; inset: 0; z-index: 2147483647; pointer-events: auto; cursor: grabbing; touch-action: none; }
+html.is-rotating .drag-overlay { display: block; }
+html.is-rotating, html.is-rotating * { cursor: grabbing !important; }
+html.is-rotating[data-drag-cursor="hidden"], html.is-rotating[data-drag-cursor="hidden"] * { cursor: none !important; }
 
 .headline { position: absolute; top: 82px; left: 50%; z-index: 1; transform: translateX(-50%); text-align: center; pointer-events: none; }
 .headline h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 12px rgb(0 0 0 / .6); }

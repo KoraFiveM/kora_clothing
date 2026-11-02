@@ -145,7 +145,7 @@ function rotateSensitivity(value: number | undefined) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1
 }
 
-function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin }: {
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin, cursor }: {
     io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
@@ -159,6 +159,8 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     /** Config.rotateSensitivity: multiplier on the degrees turned per pixel. */
     sensitivity: number
     edgeMargin?: number
+    /** Config.rotateDragCursor: shown for the whole drag. */
+    cursor: "grabbing" | "hidden"
 }) {
     const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * sensitivity * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
     const dragRef = useRef<RotateDrag | null>(null)
@@ -168,11 +170,15 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     drag.setOptions(options)
     const locked = useRef(false)
     const unlock = useCallback(() => {
+        // A drag Lua still owns (capture mode) survives the blur / leave events the
+        // cursor pulls cause; dropping the cursor class on them made it flicker
+        // between the arrow and the grab hand mid-drag.
+        if (drag.dragging) return
         document.documentElement.classList.remove("is-rotating")
         if (!locked.current) return
         locked.current = false
         releaseRotateLock(document)
-    }, [])
+    }, [drag])
     // Escape and unmount end a drag unconditionally; blur, leaving the window and a
     // lost capture go through lost(), which Lua-owned (controls mode) drags ignore
     // because the focus switch itself blurs the page.
@@ -227,13 +233,17 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             unlock()
         }
     }, [drag, unlock, onInteract])
-    return <div
+    return <>
+    {/* Owns the cursor for the whole drag (shown by html.is-rotating), so nothing under the pointer can change it. */}
+    <div className="drag-overlay" aria-hidden="true" />
+    <div
         ref={viewport}
         className="clothing-viewport"
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
             // Hidden for the whole drag, wherever the cursor is (capture mode pulls it to the centre).
+            document.documentElement.dataset.dragCursor = cursor
             document.documentElement.classList.add("is-rotating")
             // Lua-owned drags turn the camera without a move ever counting here.
             if (mode === "capture" || mode === "controls") onInteract()
@@ -250,6 +260,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         }}
         aria-hidden="true"
     />
+    </>
 }
 
 /** Small, muted, click-through reminder that the character can be dragged and
@@ -913,7 +924,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className={open.showScrollbar === true ? "clothing-shell show-scrollbars" : "clothing-shell"}>
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "capture"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "capture"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

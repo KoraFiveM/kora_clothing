@@ -21,11 +21,24 @@ local config = Kora and Kora.config
 --                       bucket is affected, never the normal world. Shop,
 --                       barber and wardrobe sessions keep their population.
 --                       Read each time a fitting room is entered.
+--   suppressClientPopulation : also stop this client from spawning ambient peds
+--                       and vehicles (population budgets set to 0, nearby ones
+--                       cleared) from the moment a new character's creation
+--                       starts until the fitting room closes. The routing
+--                       bucket only removes population the server owns; a
+--                       client-owned crowd and the world the player spawned into
+--                       a moment earlier are still around without this. Done
+--                       once on enter and once on leave, nothing runs per frame.
 Config.bucket = {
     base = 1000000,
     disablePopulation = config and config.boolean(true, {
         label = 'Disable ambient population in the first-character fitting room',
         description = 'When enabled, ambient peds and vehicles (traffic, jet skis, pedestrians) are switched off inside the private routing bucket used for the one-time first-character fitting room, so they do not wander through the creation scene. Only that personal bucket is affected, never the normal world, and shop, barber and wardrobe sessions are unchanged. Applies the next time a first-character fitting room opens.',
+        live = true,
+    }) or true,
+    suppressClientPopulation = config and config.boolean(true, {
+        label = 'Hide ambient peds and vehicles during character creation',
+        description = 'While a new character is being created, this player stops seeing ambient pedestrians and traffic: population budgets are set to zero and nearby peds and vehicles are cleared, then the budgets are restored when the fitting room closes. Only the creating player is affected. Applies the next time a character is created.',
         live = true,
     }) or true,
 }
@@ -678,6 +691,19 @@ Config.rotateInvert = config and config.boolean(false, {
     live = true,
 }) or false
 
+-- Cursor shown while a rotate drag is held. 'grabbing' pins the closed-hand
+-- cursor for the whole drag (a full-screen overlay owns it, so nothing under the
+-- pointer can change it); 'hidden' hides it instead.
+Config.rotateDragCursor = config and config.enum('grabbing', {
+    label = 'Cursor while rotating',
+    description = 'Which cursor is shown while you hold click to rotate the character. Grabbing keeps a closed-hand cursor for the whole drag; Hidden hides the cursor until you let go.',
+    options = {
+        { value = 'grabbing', label = 'Grabbing hand' },
+        { value = 'hidden', label = 'Hidden' },
+    },
+    live = true,
+}) or 'grabbing'
+
 -- rotateMode = 'recenter' only. How close to a screen edge (fraction of the
 -- screen) the cursor must get before it is moved back to the centre.
 Config.rotateRecenterEdge = config and config.number(0.04, {
@@ -848,7 +874,7 @@ Config.camera = {
         face  = { boneOffset = vector3(0.0, 0.0, 0.5),   camOffset = vector3(0.0, 0.65, 0.0), fov = 30.0, track = 'head', trackOffset = 0.04 },
         torso = { boneOffset = vector3(0.0, 0.0, 0.1),   camOffset = vector3(0.0, 1.3, 0.05), fov = 35.0 },
         legs  = { boneOffset = vector3(0.0, 0.0, -0.55), camOffset = vector3(0.0, 1.4, 0.05), fov = 35.0 },
-        shoes = { boneOffset = vector3(0.0, 0.0, -1.05), camOffset = vector3(0.0, 1.0, 0.1),  fov = 35.0, track = 'feet', trackOffset = 0.12 },
+        shoes = { boneOffset = vector3(0.0, 0.0, -1.05), camOffset = vector3(0.0, 1.0, 0.1),  fov = 35.0, track = 'feet', trackOffset = 0.06 },
     },
     -- Free mouse-wheel zoom, applied as an OFFSET on top of whichever zone
     -- preset is selected (the presets stay jump-to shortcuts). `step` is
@@ -904,10 +930,29 @@ Config.camera = {
         description = 'Name of the camera preset used when a menu opens: full, face, torso, legs or shoes. Full shows the whole body face-on. An unknown name uses full.',
         live = true,
     }) or 'full',
-    -- Orbit rotation and zoom-transition speeds, tuned for the "smooth, not a
-    -- jump-cut" illenium-style feel called for by UX.
+    -- Orbit rotation speed, tuned for the "smooth, not a jump-cut" illenium-style
+    -- feel called for by UX.
     orbitDegPerSec = 90.0,
-    transitionMs = 350,
+    -- Time a change of view (position, look-at height, fov, occlusion swing)
+    -- takes to settle, in milliseconds. Eased, never a snap, at any frame rate.
+    transitionMs = config and config.number(500, {
+        min = 50, max = 3000,
+        label = 'Camera transition time (ms)',
+        description = 'How long the fitting-room camera takes to move when you pick Face, Torso, Legs, Shoes or Full body. Lower is snappier, higher is slower and smoother.',
+        live = true,
+    }) or 500,
+    -- When something (a wall, a counter, a prop) is between the camera and the
+    -- character, the camera tries a few angles around the front instead. This is
+    -- the furthest it may swing from the front, in degrees; the side and rear
+    -- candidates (up to 180) are only tried above 55. Past it, the camera
+    -- pulls in instead of going round, so choosing a category never ends up
+    -- looking at the back of the character.
+    occlusionMaxSwing = config and config.number(55.0, {
+        min = 0.0, max = 180.0,
+        label = 'Furthest the camera may swing round an obstruction',
+        description = 'Degrees the fitting-room camera may move away from the front of the character to avoid an obstruction. 55 keeps it in front; 180 allows the old behaviour of going round to the side or back.',
+        live = true,
+    }) or 55.0,
 }
 
 -- Quick clothing toggles: `/c vest`, `/c pants`, ... take ONE item off and
