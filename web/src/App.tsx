@@ -5,8 +5,12 @@ import { listenForDragEnd } from "@/lib/dragGuard"
 import { sendIntent } from "@/lib/nui"
 import { hintEnabled, hintVisible, startHintTimer } from "@/lib/hint"
 import { scrollRailWithWheel } from "@/lib/railWheel"
+import { resolveStrings } from "@/lib/strings"
+import type { Strings } from "@/lib/strings"
 import { resolveStepEdit } from "@/lib/stepper"
 import { countOf, duplicateTattoo, instanceLabel, instancePrice, removeTattooInstance, stackLimit, tattooTotal, toggleTattoo as toggleTattooId } from "@/lib/tattoos"
+import { toggleTop, topBare, topToggleVisible } from "@/lib/topToggle"
+import type { SetTopPayload, SetTopResponse } from "@/lib/topToggle"
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
@@ -278,6 +282,17 @@ function UndressToolbar({ parts, active, onToggle, onToggleAll }: {
     </div>
 }
 
+/** Barber / hairdresser preview: take the top off to see chest hair, put it back.
+ * The game bares and restores it on the local ped; nothing is saved. Same
+ * pill as the tattoo undress buttons. */
+function TopToggle({ bare, strings, onToggle }: { bare: boolean; strings: Strings; onToggle: () => void }) {
+    return <div className="undress-toolbar" role="group" aria-label={strings.topGroup}>
+        <button type="button" className="undress-all" title={strings.topHint} aria-pressed={bare} onClick={onToggle}>
+            <Shirt size={16} /><span>{bare ? strings.topOn : strings.topOff}</span>
+        </button>
+    </div>
+}
+
 function ZoneToolbar({ zone, onSelect }: { zone: Zone; onSelect: (zone: Zone) => void }) {
     return <div className="zone-toolbar">
         {ZONES.map(({ zone: z, label, icon: Icon }) => (
@@ -319,7 +334,6 @@ function VariationDetail({ item, onChange, onClear }: {
 }) {
     if (!item) return <div className="empty-panel"><User size={26} /><span>Pick an item from the list to adjust it.</span></div>
 
-    const isHair = item.kind === "component" && item.id === HAIR_COMPONENT_ID
     const removed = item.kind === "prop" && item.drawable < 0
     const clearable = item.kind === "prop" && item.clearable === true
     const canPrevDrawable = item.kind === "prop" && item.clearable ? item.drawable > -1 : item.drawable > 0
@@ -328,12 +342,8 @@ function VariationDetail({ item, onChange, onClear }: {
     const canNextTexture = !removed && item.texture < item.textureCount - 1
 
     return <div>
-        {isHair
-            ? <p className="section-title section-head">{item.label}</p>
-            : <>
-                <h3 className="detail-title">{item.label}</h3>
-                {item.kind === "prop" ? <p className="detail-sub">Accessory</p> : <div className="detail-gap" />}
-            </>}
+        <h3 className="detail-title">{item.label}</h3>
+        {item.kind === "prop" ? <p className="detail-sub">Accessory</p> : <div className="detail-gap" />}
 
         <Stepper
             label="Style"
@@ -367,17 +377,14 @@ function VariationDetail({ item, onChange, onClear }: {
  * that gives the look of a picker while every value posted back stays a legal
  * index. The colours come from the game at runtime, which is why these are
  * inline styles rather than classes. */
-function HairColorGrid({ label, palette, value, onSelect, onMatchHair }: {
+function HairColorGrid({ label, palette, value, onSelect }: {
     label: string
     palette: HairSwatch[]
     value: number
     onSelect: (index: number) => void
-    /** Offered by overlays that can fall back to the hair colour (value -1). */
-    onMatchHair?: () => void
 }) {
     return <div className="swatch-block">
         <p className="swatch-label">{label}</p>
-        {onMatchHair && <button type="button" className="match-hair" aria-pressed={value < 0} onClick={onMatchHair}>Match hair colour</button>}
         <div className="swatch-grid" role="radiogroup" aria-label={label}>
             {palette.map((swatch) => (
                 <button
@@ -395,16 +402,48 @@ function HairColorGrid({ label, palette, value, onSelect, onMatchHair }: {
     </div>
 }
 
-function HairColorPanel({ hair, onChange }: {
-    hair: HairPayload
-    onChange: (next: { color: number; highlight: number }) => void
-}) {
-    if (hair.palette.length === 0) return null
-    return <div className="panel panel-pad hair-panel">
-        <p className="section-title section-head">Hair Color</p>
-        <HairColorGrid label="Primary (Base)" palette={hair.palette} value={hair.color} onSelect={(index) => onChange({ color: index, highlight: hair.highlight })} />
-        <HairColorGrid label="Secondary (Highlights)" palette={hair.palette} value={hair.highlight} onSelect={(index) => onChange({ color: hair.color, highlight: index })} />
+/** The one box every hair section is drawn in -- Hair, Facial Hair, Eyebrows and
+ * Chest Hair: a title, then that section's style and color controls. */
+function SectionBox({ title, children }: { title: string; children: React.ReactNode }) {
+    return <div className="panel panel-pad head-panel">
+        <p className="section-title section-head">{title}</p>
+        {children}
     </div>
+}
+
+/** The Hair section: hairstyle and both hair colors in a single box, laid out
+ * like the overlay sections below. A variant stepper only appears for a hairstyle
+ * that has more than one texture. `hair` is null where the hair color cannot be
+ * edited, which leaves just the style. */
+function HairBox({ item, hair, strings, onChange, onColor }: {
+    item: ClothingCategoryItem
+    hair: HairPayload | null
+    strings: Strings
+    onChange: (next: { drawable: number; texture: number }) => void
+    onColor: (next: { color: number; highlight: number }) => void
+}) {
+    return <SectionBox title={strings.hair}>
+        <Stepper
+            label={strings.style}
+            text={`${item.drawable + 1} / ${item.drawableCount}`}
+            canPrev={item.drawable > 0} canNext={item.drawable < item.drawableCount - 1}
+            onPrev={() => onChange({ drawable: item.drawable - 1, texture: 0 })}
+            onNext={() => onChange({ drawable: item.drawable + 1, texture: 0 })}
+            typed={{ value: item.drawable + 1, min: 1, max: item.drawableCount, onCommit: (value) => onChange({ drawable: value - 1, texture: 0 }) }}
+        />
+        {item.textureCount > 1 && <Stepper
+            label={strings.variant}
+            text={`${item.texture + 1} / ${item.textureCount}`}
+            canPrev={item.texture > 0} canNext={item.texture < item.textureCount - 1}
+            onPrev={() => onChange({ drawable: item.drawable, texture: item.texture - 1 })}
+            onNext={() => onChange({ drawable: item.drawable, texture: item.texture + 1 })}
+            typed={{ value: item.texture + 1, min: 1, max: item.textureCount, onCommit: (value) => onChange({ drawable: item.drawable, texture: value - 1 }) }}
+        />}
+        {hair && hair.palette.length > 0 && <>
+            <HairColorGrid label={strings.primaryColor} palette={hair.palette} value={hair.color} onSelect={(index) => onColor({ color: index, highlight: hair.highlight })} />
+            <HairColorGrid label={strings.secondaryColor} palette={hair.palette} value={hair.highlight} onSelect={(index) => onColor({ color: hair.color, highlight: index })} />
+        </>}
+    </SectionBox>
 }
 
 /** The "n / max" readout. With `typed` the number is an input: click it, type a
@@ -488,54 +527,54 @@ function FaceSkinPanel({ head, onChange }: { head: HeadPayload; onChange: (next:
 
 const OPACITY_STEP = 0.1
 
-/** Style, opacity and colour for each overlay the server allows here, shown
- * with the Hair item beside the hair colour. Colour reuses the hair palette but
- * is its own choice per overlay; with none selected (or Match hair colour) the
- * overlay follows the hair colour. Eyebrows hide the palette when the server
- * locks them to the hair (Config.headOverlays.eyebrows.followHairColor). */
-function HeadOverlayPanel({ head, overlays, palette, onChange }: {
+/** Style, opacity and color for each overlay the server allows here, shown
+ * with the Hair item. Color reuses the hair palette but is its own choice per
+ * overlay; until one is picked the overlay follows the hair color. An overlay
+ * hides its palette when the server locks it to the hair
+ * (Config.headOverlays.<key>.followHairColor). */
+function HeadOverlayPanel({ head, overlays, palette, strings, onChange }: {
     head: HeadPayload
     overlays: ReturnType<typeof enabledOverlays>
     palette: HairSwatch[]
+    strings: Strings
     onChange: (next: HeadValues) => void
 }) {
     return <>
         {overlays.map((overlay) => {
             const style = head[overlay.style]
             const opacity = head[overlay.opacity]
-            return <div key={overlay.key} className="panel panel-pad head-panel">
-                <p className="section-title section-head">{overlay.label}</p>
+            return <SectionBox key={overlay.key} title={strings[overlay.key]}>
                 <Stepper
-                    label={`${overlay.label} style`} text={style < 0 ? "None" : `${style + 1} / ${overlay.maxStyle + 1}`}
+                    label={strings.style} text={style < 0 ? strings.none : `${style + 1} / ${overlay.maxStyle + 1}`}
                     typed={{ value: style + 1, min: 0, max: overlay.maxStyle + 1, onCommit: (value) => onChange({ ...head, [overlay.style]: value - 1 }) }}
                     canPrev={style > -1} canNext={style < overlay.maxStyle}
                     onPrev={() => onChange({ ...head, [overlay.style]: style - 1 })} onNext={() => onChange({ ...head, [overlay.style]: style + 1 })}
                 />
                 <Stepper
-                    label={`${overlay.label} opacity`} text={`${Math.round(opacity * 100)}%`}
+                    label={strings.opacity} text={`${Math.round(opacity * 100)}%`}
                     canPrev={opacity > 0} canNext={opacity < 1}
                     onPrev={() => onChange({ ...head, [overlay.opacity]: Math.max(0, Math.round((opacity - OPACITY_STEP) * 100) / 100) })}
                     onNext={() => onChange({ ...head, [overlay.opacity]: Math.min(1, Math.round((opacity + OPACITY_STEP) * 100) / 100) })}
                 />
                 {style >= 0 && palette.length > 0 && overlayColorEditable(head, overlay.key) && <HairColorGrid
-                    label={`${overlay.label} colour`} palette={palette} value={head[overlay.color]}
+                    label={strings.color} palette={palette} value={head[overlay.color]}
                     onSelect={(index) => onChange({ ...head, [overlay.color]: index })}
-                    onMatchHair={() => onChange({ ...head, [overlay.color]: -1 })}
                 />}
-            </div>
+            </SectionBox>
         })}
     </>
 }
 
 /** Hair, Facial Hair, Eyebrows and Chest Hair as selectable buttons; only the
  * chosen section controls are shown below. */
-function HairSectionPanel({ sections, active, onSelect }: {
+function HairSectionPanel({ sections, active, title, onSelect }: {
     sections: { key: HairSection; label: string }[]
     active: HairSection
+    title: string
     onSelect: (key: HairSection) => void
 }) {
     return <div className="panel panel-pad">
-        <p className="section-title">Style</p>
+        <p className="section-title">{title}</p>
         <div className="item-list">
             {sections.map((section) => (
                 <button key={section.key} type="button" className="item-row" aria-pressed={active === section.key} onClick={() => onSelect(section.key)}>
@@ -628,6 +667,7 @@ export default function App() {
     const [hairSection, setHairSection] = useState<HairSection>("hair")
     const [zone, setZone] = useState<Zone>("full")
     const [undressActive, setUndressActive] = useState<string[]>([])
+    const [topIsBare, setTopIsBare] = useState(false)
     const [error, setError] = useState<string>()
     const [saveName, setSaveName] = useState("")
     const [outfitsExpanded, setOutfitsExpanded] = useState(false)
@@ -640,7 +680,7 @@ export default function App() {
     const resetLocalState = useCallback(() => {
         setOpen(null); setCategories([]); setBaseline(new Map()); setSelectedTattoos([]); setBaselineTattoos([]); setOutfits([]); setActiveGroup("tops")
         setHair(null); setHead(null); setBaselineHair(null); setBaselineHead(null)
-        setSelectedKey(undefined); setZone("full"); setUndressActive([]); setError(undefined); setSaveName("")
+        setSelectedKey(undefined); setZone("full"); setUndressActive([]); setTopIsBare(false); setError(undefined); setSaveName("")
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false); setHintDismissed(false)
     }, [])
 
@@ -654,6 +694,7 @@ export default function App() {
         setHead(payload.head ?? null)
         setBaselineHead(payload.head ?? null)
         setUndressActive(activeParts(payload.undress?.active))
+        setTopIsBare(topBare(payload.topToggle))
         setBaselineHair(payload.hair ? { color: payload.hair.color, highlight: payload.hair.highlight } : null)
         setBaseline(new Map(payload.categories.map((item) => [itemKey(item), { drawable: item.drawable, texture: item.texture }])))
         setOutfits(payload.outfits ?? [])
@@ -669,8 +710,10 @@ export default function App() {
     const groupsPresent = useMemo(() => new Set(categories.map((item) => item.category)), [categories])
     const itemsInActiveGroup = useMemo(() => categories.filter((item) => item.category === activeGroup), [categories, activeGroup])
     const selectedItem = useMemo(() => categories.find((item) => itemKey(item) === selectedKey), [categories, selectedKey])
+    const strings = useMemo(() => resolveStrings(open?.strings), [open])
+    const isHairItem = selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID
     const allOverlays = enabledOverlays(selectedItem, head)
-    const sections = hairSections(allOverlays)
+    const sections = hairSections(allOverlays, strings)
     const activeSection = activeHairSection(sections, hairSection)
     // With sections, only the chosen one shows its controls; without, as before.
     const overlays = sections.length > 0 ? allOverlays.filter((overlay) => overlay.key === activeSection) : allOverlays
@@ -770,6 +813,12 @@ export default function App() {
         if (response.ok) setUndressActive(activeParts(response.active))
     }, [])
 
+    // Preview-only, like sendUndress: the game answers with whether the top is off now.
+    const sendTop = useCallback(async (request: SetTopPayload) => {
+        const response = await sendIntent<SetTopPayload, SetTopResponse>("qbclothing:nui:setTop", request)
+        if (response.ok) setTopIsBare(response.active === true)
+    }, [])
+
     const wearOutfit = useCallback(async (id: number) => {
         const response = await sendIntent<{ id: number }, LoadOutfitResponse>("qbclothing:nui:loadOutfit", { id })
         if (response.ok && response.categories) {
@@ -778,6 +827,7 @@ export default function App() {
             if (response.hair) setHair(response.hair)
             setHead(response.head ?? null)
             if (response.undress) setUndressActive(activeParts(response.undress.active))
+            if (response.topToggle) setTopIsBare(topBare(response.topToggle))
             setOwnedSnapshot(true) // exactly what's saved -- free to confirm as-is until edited
             const groups = new Set(response.categories.map((item) => item.category))
             const nextGroup = groups.has(activeGroup) ? activeGroup : (GROUP_ORDER.find((group) => groups.has(group)) ?? activeGroup)
@@ -857,6 +907,8 @@ export default function App() {
             onToggleAll={() => void sendUndress(toggleAll(open.undress!.parts, undressActive))}
         />}
 
+        {topToggleVisible(open.topToggle) && <TopToggle bare={topIsBare} strings={strings} onToggle={() => void sendTop(toggleTop(topIsBare))} />}
+
         <ControlsHint visible={hintVisible(hintOn, hintDismissed)} />
 
         {error && <div className="error-banner" role="alert">
@@ -893,25 +945,28 @@ export default function App() {
                 <p className="section-title">{GROUP_LABEL[activeGroup]}</p>
                 <ItemList items={itemsInActiveGroup} selectedKey={selectedKey} onSelect={(item) => setSelectedKey(itemKey(item))} />
             </div>}
-            {sections.length > 0 && <HairSectionPanel sections={sections} active={activeSection} onSelect={setHairSection} />}
-            {showDetail && <div className="panel panel-pad">
-                <VariationDetail
-                    item={selectedItem}
-                    onChange={(next) => selectedItem && void setVariation(selectedItem, next)}
-                    onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
+            {sections.length > 0 && <HairSectionPanel sections={sections} active={activeSection} title={strings.style} onSelect={setHairSection} />}
+            {/* Hair color is a property of the hair component, so the Hair item
+                is one box holding both its style and its colors, built like the
+                overlay boxes. `hair` itself is null for any service that cannot
+                edit component 2, so a clothing shop never renders the colors. */}
+            {showDetail && (isHairItem && selectedItem
+                ? <HairBox
+                    item={selectedItem} hair={hair} strings={strings}
+                    onChange={(next) => void setVariation(selectedItem, next)}
+                    onColor={(next) => void setHairColor(next)}
                 />
-            </div>}
-            {/* Hair colour is a property of the hair component, so it appears
-                with that component and nowhere else. `hair` itself is already
-                null for any service that cannot edit component 2, so a
-                clothing shop never renders these at all. */}
-            {showDetail && hair && selectedItem?.kind === "component" && selectedItem.id === HAIR_COMPONENT_ID && (
-                <HairColorPanel hair={hair} onChange={(next) => void setHairColor(next)} />
-            )}
+                : <div className="panel panel-pad">
+                    <VariationDetail
+                        item={selectedItem}
+                        onChange={(next) => selectedItem && void setVariation(selectedItem, next)}
+                        onClear={() => selectedItem && void setVariation(selectedItem, { drawable: -1, texture: 0 })}
+                    />
+                </div>)}
             {/* Each head panel belongs to one Style item (src/lib/panels.ts), not
                 to the whole Style group, so Mask no longer shows Face & Skin. */}
             {head && showFaceSkinPanel(selectedItem, head) && <FaceSkinPanel head={head} onChange={(next) => void setHeadAppearance(next)} />}
-            {head && <HeadOverlayPanel head={head} overlays={overlays} palette={hair?.palette ?? []} onChange={(next) => void setHeadAppearance(next)} />}
+            {head && <HeadOverlayPanel head={head} overlays={overlays} palette={hair?.palette ?? []} strings={strings} onChange={(next) => void setHeadAppearance(next)} />}
         </div>}
 
         <div className="bottom-bar">

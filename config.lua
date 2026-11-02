@@ -76,7 +76,7 @@ Config.headOverlays = {
         -- Off (default): eyebrows have their own colour palette, independent of the
         -- hair colour. Characters saved before that palette existed have no eyebrow
         -- colour of their own and keep matching their hair until a colour is picked
-        -- (or Match hair colour is chosen). On: the eyebrow palette is hidden and
+        -- (or a colour is picked). On: the eyebrow palette is hidden and
         -- eyebrows always take the primary hair colour, the old behaviour.
         followHairColor = config and config.boolean(false, {
             label = 'Eyebrows follow hair colour',
@@ -95,6 +95,14 @@ Config.headOverlays = {
             description = 'Lets players change facial hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide facial hair options there.',
             live = true,
         }) or true,
+        -- The menu has no "match hair colour" button; this is the server-side
+        -- version of it. On: no facial hair palette is shown and facial hair
+        -- always takes the primary hair colour.
+        followHairColor = config and config.boolean(false, {
+            label = 'Facial hair follows hair color',
+            description = 'Off (default): players pick a facial hair color of their own. On: no facial hair color palette is shown and facial hair always uses the primary hair color. Applies to character creation and barbers.',
+            live = true,
+        }) or false,
     },
     chestHair = {
         creator = config and config.boolean(true, {
@@ -107,6 +115,11 @@ Config.headOverlays = {
             description = 'Lets players change chest hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide chest hair options there.',
             live = true,
         }) or true,
+        followHairColor = config and config.boolean(false, {
+            label = 'Chest hair follows hair color',
+            description = 'Off (default): players pick a chest hair color of their own. On: no chest hair color palette is shown and chest hair always uses the primary hair color. Applies to character creation and barbers.',
+            live = true,
+        }) or false,
     },
 }
 
@@ -716,6 +729,18 @@ Config.ui = {
     creatorOpensOnHair = config and config.boolean(true, {
         label = 'Creator opens on hair and grooming',
         description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
+        live = true,
+    }) or true,
+    -- A button in the barber and hairdresser menu that takes the top off and
+    -- puts it back, so chest hair can be seen. Preview only: it lives on the
+    -- local ped, is never sent to the server or saved, and the original
+    -- clothing comes back when the button is pressed again and whenever the
+    -- menu closes (confirm, cancel, Esc, death, resource stop). The bare
+    -- drawables are the `top` part of Config.tattoo.undress.parts (components
+    -- 3, 8 and 11 for male and female freemode peds). Read each time a menu opens.
+    barberTopToggle = config and config.boolean(true, {
+        label = 'Barber shirt toggle',
+        description = 'Shows a button in the barber and hairdresser menu that takes the top off and puts it back so chest hair can be seen. Preview only: nothing is saved or charged and the original clothing is restored whenever the menu closes. The bare clothing comes from the top part of the tattoo studio undress parts. Turn off to hide the button.',
         live = true,
     }) or true,
 }

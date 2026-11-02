@@ -1,0 +1,19 @@
+{
+    "ui": {
+        "hair": "Hair",
+        "facialHair": "Facial Hair",
+        "eyebrows": "Eyebrows",
+        "chestHair": "Chest Hair",
+        "style": "Style",
+        "variant": "Variant",
+        "opacity": "Opacity",
+        "color": "Color",
+        "primaryColor": "Primary Color (Base)",
+        "secondaryColor": "Secondary Color (Highlights)",
+        "none": "None",
+        "topOff": "Take shirt off",
+        "topOn": "Put shirt on",
+        "topGroup": "Preview chest hair",
+        "topHint": "Preview only: your clothing is not changed or saved"
+    }
+}

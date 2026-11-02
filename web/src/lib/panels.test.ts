@@ -2,6 +2,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { activeHairSection, enabledOverlays, hairSections, initialSelection, overlayColorEditable, showFaceSkinPanel } from "./panels.ts"
+import { DEFAULT_STRINGS } from "./strings.ts"
 import type { HeadPayload } from "./types.ts"
 
 const head: HeadPayload = {
@@ -59,13 +60,15 @@ test("an eyebrow palette is offered unless the server locks eyebrows to the hair
 })
 
 test("the Hair item offers Hair plus each allowed overlay as sections", () => {
-    const sections = hairSections(enabledOverlays(hair, head))
+    const sections = hairSections(enabledOverlays(hair, head), DEFAULT_STRINGS)
     assert.deepEqual(sections.map((section) => section.label), ["Hair", "Facial Hair", "Eyebrows", "Chest Hair"])
-    assert.deepEqual(hairSections([]), [])
+    assert.deepEqual(hairSections([], DEFAULT_STRINGS), [])
+    const translated = hairSections(enabledOverlays(hair, head), { ...DEFAULT_STRINGS, chestHair: "Brusthaar" })
+    assert.equal(translated[3].label, "Brusthaar")
 })
 
 test("an unavailable section falls back to Hair", () => {
-    const sections = hairSections(enabledOverlays(hair, { ...head, overlays: { facialHair: true, eyebrows: false, chestHair: false } }))
+    const sections = hairSections(enabledOverlays(hair, { ...head, overlays: { facialHair: true, eyebrows: false, chestHair: false } }), DEFAULT_STRINGS)
     assert.equal(activeHairSection(sections, "facialHair"), "facialHair")
     assert.equal(activeHairSection(sections, "chestHair"), "hair")
 })

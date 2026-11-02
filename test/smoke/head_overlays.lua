@@ -155,4 +155,14 @@ H.equal(runtime.headPayload('creation').overlayColors.eyebrows, false, "NUI hide
 H.equal(Shared.mergeHead(Config.services.creation, {}, { eyebrows = 2, eyebrowsColor = 30 }).eyebrowsColor, -1, "no stale colour is stored")
 Config.headOverlays.eyebrows.followHairColor = false
 
+-- Every overlay can be locked to the hair colour from Config (the menu has no button for it).
+for _, key in ipairs({ 'facialHair', 'chestHair' }) do
+    H.equal(Config.headOverlays[key].followHairColor, false, key .. ' colour is independent by default')
+    Config.headOverlays[key].followHairColor = true
+    H.equal(Shared.overlayFollowsHair(key), true, key .. ' can follow the hair colour')
+    H.equal(runtime.headPayload('barber').overlayColors[key], false, key .. ' palette hidden when locked')
+    Config.headOverlays[key].followHairColor = false
+    H.equal(runtime.headPayload('barber').overlayColors[key], true)
+end
+
 H.finish()

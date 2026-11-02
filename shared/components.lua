@@ -174,15 +174,15 @@ function Shared.sanitiseHead(raw)
     return head
 end
 
----Whether an overlay is locked to the primary hair colour. Only eyebrows can
----be, via Config.headOverlays.eyebrows.followHairColor (default false: their
----colour is independent). Facial hair has its own palette, which falls back to
----the hair colour only while unset (-1).
+---Whether an overlay is locked to the primary hair colour, via
+---Config.headOverlays.<key>.followHairColor (default false for every overlay:
+---each has a palette of its own, which falls back to the hair colour only
+---while unset (-1)).
 ---@param key string facialHair | eyebrows | chestHair
 ---@return boolean
 function Shared.overlayFollowsHair(key)
     local entry = (Config.headOverlays or {})[key]
-    return key == 'eyebrows' and type(entry) == 'table' and entry.followHairColor == true
+    return type(entry) == 'table' and entry.followHairColor == true
 end
 
 ---Whether a service may edit one head overlay, read live from

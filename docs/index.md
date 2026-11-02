@@ -318,10 +318,16 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.tattoo.undress.autoUndressOnOpen` (default `{ 'top', 'legs', 'headwear' }`) — part ids bared when the studio opens; `{}` opens fully dressed
 - `Config.tattoo.undress.parts` — one button per part: the bare component drawables per freemode model (`male` / `female`) and the prop slots cleared
 - `Config.tattoo.peds.enabled` (default `false`) — a tattoo artist ped in each tattoo shop with a "Get tattooed" target; `alpha` (0), `scopeRadius` (40.0m), `model` (`u_m_y_tattoo_01`) and `scenario` (unset) tune it
+- `Config.ui.barberTopToggle` (default `true`) — a "Take shirt off / Put shirt on" button in the barber and hairdresser menu so chest hair can be seen. Preview only: the top is bared on the local ped (the `top` part of `Config.tattoo.undress.parts`, components 3, 8 and 11), never saved or charged, and put back on a second press, confirm, cancel, Esc, death and resource stop
+- `Config.headOverlays.<facialHair|eyebrows|chestHair>.followHairColor` (default `false`) — `true` hides that overlay's color palette and always uses the primary hair color. This replaces the old "Match hair colour" button, which is gone from the menu
 - `Config.interactDistance` (2.0) — server-enforced proximity for shop sessions and kora_target zone range
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds
+
+## Menu text and languages
+
+The hair, facial hair, eyebrows and chest hair boxes (and the barber shirt button) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `qb_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
 
 ## Quick clothing toggles (`/c <part>`)
 

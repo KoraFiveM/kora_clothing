@@ -308,6 +308,27 @@ local function hairPayload(service)
     return { palette = buildHairPalette(), color = previewHair.color, highlight = previewHair.highlight }
 end
 
+-- Menu text. locales/en.json holds the English defaults; kora_lib (Kora.lang,
+-- language from the qb_locale convar) swaps in a translation when the server
+-- has locales/<language>.json for a key. The NUI shows whatever it is sent, so
+-- wording lives in the locale files rather than in the UI bundle.
+local defaultStrings
+local function uiStrings()
+    if not defaultStrings then
+        defaultStrings = {}
+        local raw = type(LoadResourceFile) == 'function' and LoadResourceFile(GetCurrentResourceName(), 'locales/en.json')
+        local ok, decoded = pcall(function() return json.decode(raw) end)
+        if ok and type(decoded) == 'table' and type(decoded.ui) == 'table' then defaultStrings = decoded.ui end
+    end
+    local strings = {}
+    for key, fallback in pairs(defaultStrings) do
+        local path = 'ui.' .. key
+        local ok, text = pcall(function() return Kora.lang(path) end)
+        strings[key] = (ok and type(text) == 'string' and text ~= path) and text or fallback
+    end
+    return strings
+end
+
 -- The current head plus what this service may edit, so the NUI shows only
 -- those controls. Nil when the service can edit nothing about the head.
 local function headPayload(service)
@@ -494,6 +515,37 @@ local function reapplyUndress(ped, model, active)
     end
 end
 
+-- Barber / hairdresser "shirt off" preview, so chest hair can be seen. It rides
+-- on the same temporaryOverride as the tattoo undress buttons, so confirm,
+-- cancel, Esc, death and resource stop all put the original top back and the
+-- confirm snapshot never carries the bare one. The bare drawables are the `top`
+-- part of Config.tattoo.undress.parts (read whether or not the tattoo buttons
+-- are enabled), with the stock freemode values as a fallback.
+local BARE_TOP = {
+    id = 'top',
+    male = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+    female = { { id = 3, d = 15, t = 0 }, { id = 8, d = 15, t = 0 }, { id = 11, d = 15, t = 0 } },
+    props = {},
+}
+
+local function barberTopPart()
+    local cfg = Config.tattoo and Config.tattoo.undress
+    for _, part in ipairs(type(cfg) == 'table' and cfg.parts or {}) do
+        if part.id == 'top' then return part end
+    end
+    return BARE_TOP
+end
+
+local function topToggleAvailable(service)
+    return (service == 'barber' or service == 'hairdresser') and (Config.ui or {}).barberTopToggle ~= false
+end
+
+---What the NUI needs for the shirt button; nil when this session has none.
+local function topTogglePayload(service)
+    if not topToggleAvailable(service) then return nil end
+    return { active = undressActive.top == true }
+end
+
 ---@return table|false  -- { d, t } if a hat was worn, else false (nothing to restore)
 local function stripHat(ped)
     local drawable = GetPedPropIndex(ped, 0)
@@ -617,6 +669,9 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     Camera.start(ped)
     if activeSession.service == 'tattoo' then
         setTattooPedsFaded(true)
+    end
+    -- A bared tattoo studio or barber preview must never outlive a death.
+    if activeSession.service == 'tattoo' or topToggleAvailable(activeSession.service) then
         startUndressDeathWatch(activeSession)
     end
 
@@ -648,6 +703,8 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             hair = hairPayload(activeSession.service),
             head = head,
             undress = undressPayload(activeSession.service),
+            topToggle = topTogglePayload(activeSession.service),
+            strings = uiStrings(),
             tattoos = payload.tattoos or {},
             selectedTattoos = previewTattoos,
             tattooStacking = Shared.tattooStacking(),
@@ -839,6 +896,16 @@ RegisterNUICallback('qbclothing:nui:setUndress', function(data, cb)
     cb({ ok = true, active = activeUndressParts(cfg) })
 end)
 
+-- Preview-only shirt button in the barber and hairdresser menu (see barberTopPart).
+RegisterNUICallback('qbclothing:nui:setTop', function(data, cb)
+    if not activeSession or type(data) ~= 'table' or not topToggleAvailable(activeSession.service) then
+        cb({ ok = false }); return
+    end
+    local ped = PlayerPedId()
+    setPartUndressed(ped, currentModelName(ped), barberTopPart(), data.undressed == true)
+    cb({ ok = true, active = undressActive.top == true })
+end)
+
 RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     -- Same gate the server applies at confirm time, so the preview can never
@@ -925,10 +992,19 @@ RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
     local ped = PlayerPedId()
     -- The outfit replaced every component, so the recorded originals are stale:
     -- re-bare whatever was bared against the newly loaded look.
-    if activeSession.service == 'tattoo' then reapplyUndress(ped, currentModelName(ped), wasUndressed) end
+    if activeSession.service == 'tattoo' then
+        reapplyUndress(ped, currentModelName(ped), wasUndressed)
+    elseif undressActive.top and topToggleAvailable(activeSession.service) then
+        local part, model = barberTopPart(), currentModelName(ped)
+        for _, entry in ipairs(part[Shared.modelGender(model)] or {}) do
+            if temporaryOverride then temporaryOverride.components[entry.id] = nil end
+        end
+        setPartUndressed(ped, model, part, true)
+    end
     cb({
         ok = true,
         undress = undressPayload(activeSession.service),
+        topToggle = topTogglePayload(activeSession.service),
         model = currentModelName(ped),
         categories = buildCategoryPayload(ped, activeSession.service),
         hair = hairPayload(activeSession.service),

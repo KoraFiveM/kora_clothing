@@ -11,25 +11,24 @@ export type OverlayKey = "facialHair" | "eyebrows" | "chestHair"
 
 export const HEAD_OVERLAYS: {
     key: OverlayKey
-    label: string
     style: "beard" | "eyebrows" | "chestHair"
     opacity: "beardOpacity" | "eyebrowsOpacity" | "chestHairOpacity"
     color: "beardColor" | "eyebrowsColor" | "chestHairColor"
     maxStyle: number
 }[] = [
-    { key: "facialHair", label: "Facial Hair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28 },
-    { key: "eyebrows", label: "Eyebrows", style: "eyebrows", opacity: "eyebrowsOpacity", color: "eyebrowsColor", maxStyle: 33 },
-    { key: "chestHair", label: "Chest Hair", style: "chestHair", opacity: "chestHairOpacity", color: "chestHairColor", maxStyle: 15 },
+    { key: "facialHair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28 },
+    { key: "eyebrows", style: "eyebrows", opacity: "eyebrowsOpacity", color: "eyebrowsColor", maxStyle: 33 },
+    { key: "chestHair", style: "chestHair", opacity: "chestHairOpacity", color: "chestHairColor", maxStyle: 15 },
 ]
 
 export type HairSection = "hair" | OverlayKey
 
 /** Sections of the Hair item: Hair itself plus every overlay the server allows.
  * Empty when there is nothing to choose between (no overlays), so the menu
- * keeps its single-section layout. */
-export function hairSections(overlays: { key: OverlayKey; label: string }[]): { key: HairSection; label: string }[] {
+ * keeps its single-section layout. `labels` is the menu text (see strings.ts). */
+export function hairSections(overlays: { key: OverlayKey }[], labels: Record<HairSection, string>): { key: HairSection; label: string }[] {
     if (overlays.length === 0) return []
-    return [{ key: "hair", label: "Hair" }, ...overlays.map(({ key, label }) => ({ key, label }))]
+    return [{ key: "hair", label: labels.hair }, ...overlays.map(({ key }) => ({ key, label: labels[key] }))]
 }
 
 /** The chosen section, falling back to Hair when it is not offered (a toggled-off overlay). */
@@ -52,7 +51,7 @@ export function enabledOverlays(selected: Selected, head: HeadPayload | null) {
     return HEAD_OVERLAYS.filter((overlay) => head.overlays?.[overlay.key] === true)
 }
 
-/** Whether the overlay has its own colour palette; false when the server locks it to the hair colour. */
+/** Whether the overlay has its own color palette; false when the server locks it to the hair color (Config.headOverlays.<key>.followHairColor). */
 export function overlayColorEditable(head: HeadPayload, key: OverlayKey) {
     return head.overlayColors?.[key] !== false
 }

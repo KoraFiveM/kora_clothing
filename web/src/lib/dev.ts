@@ -46,6 +46,7 @@ const sample: OpenPayload = {
         chestHair: -1, chestHairOpacity: 1, chestHairColor: -1,
         skinToneEditable: false, overlays: { facialHair: true, eyebrows: true, chestHair: true },
     },
+    topToggle: { active: false },
     selectedTattoos: [],
     outfits: [
         { id: 1, outfitname: "Interview fit", model: "mp_m_freemode_01" },

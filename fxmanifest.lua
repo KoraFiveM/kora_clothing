@@ -50,6 +50,7 @@ client_scripts {
 ui_page 'web/build/index.html'
 
 files {
+    'locales/*.json',
     'sql/001_playerskins_outfits.sql',
     'web/build/index.html',
     'web/build/assets/**/*',
