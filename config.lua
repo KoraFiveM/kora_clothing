@@ -153,6 +153,43 @@ Config.loginColourReapply = {
     delays = { 750, 3000 },
 }
 
+-- Outfit a brand-new character starts in. A new character never inherits the
+-- clothes of the character the player used before: the ped is reset to this
+-- outfit when the character is created (before the first spawn) and the
+-- character creation fitting room opens on it. Every component not listed is
+-- reset to drawable 0, texture 0; props not listed are removed. Component and
+-- prop ids follow GTA's (3 torso, 4 legs, 6 shoes, 8 undershirt, 11 top ...).
+-- These are base-game freemode drawables; adjust per gender if a clothing pack
+-- on your server shifts what looks sensible. Turn `enabled` off to keep the
+-- previous behaviour (the ped's current clothes are carried over).
+Config.starterOutfit = {
+    enabled = config and config.boolean(true, {
+        label = 'New characters start in a starter outfit',
+        description = 'On (default): a newly created character is reset to the starter outfit below before spawning and before the character creation menu opens, so it never inherits the previous character\'s clothes. Off: the ped keeps whatever it was wearing.',
+        live = true,
+    }) or true,
+    male = {
+        components = {
+            [3]  = { d = 0,  t = 0 }, -- torso
+            [4]  = { d = 0,  t = 0 }, -- legs
+            [6]  = { d = 1,  t = 0 }, -- shoes
+            [8]  = { d = 15, t = 0 }, -- undershirt: none
+            [11] = { d = 0,  t = 0 }, -- top: plain t-shirt
+        },
+        props = {},
+    },
+    female = {
+        components = {
+            [3]  = { d = 0,  t = 0 },
+            [4]  = { d = 0,  t = 0 },
+            [6]  = { d = 1,  t = 0 },
+            [8]  = { d = 15, t = 0 },
+            [11] = { d = 0,  t = 0 },
+        },
+        props = {},
+    },
+}
+
 Config.wardrobe = {
     maxOutfits = 20,
 }

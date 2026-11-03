@@ -247,6 +247,20 @@ local function sanitiseSkin(rawSkin, model)
     return skin
 end
 
+-- Starter outfit for a character with no saved appearance (Config.starterOutfit).
+-- Every component is listed so nothing of the previous character's look survives
+-- on the ped; props not configured are removed by the client's applySkin.
+local function starterSkin(model)
+    local starter = Config.starterOutfit
+    if type(starter) ~= 'table' or starter.enabled == false then return nil end
+    local entry = starter[Shared.modelGender(model)] or {}
+    local raw = { components = {}, props = {} }
+    for id in pairs(Shared.components) do raw.components[tostring(id)] = { d = 0, t = 0 } end
+    for id, v in pairs(entry.components or {}) do raw.components[tostring(id)] = v end
+    for id, v in pairs(entry.props or {}) do raw.props[tostring(id)] = v end
+    return sanitiseSkin(raw, model)
+end
+
 local function serviceConfig(service)
     return Config.services[service] or Config.services.clothing
 end
@@ -622,6 +636,7 @@ local function requestSession(src, mode, extra, opening)
     end
 
     local skin = sanitiseSkin((saved and saved.skin) or {}, model)
+    if mode == 'firstCharacter' and not saved then skin = starterSkin(model) or skin end
     local moneyOk, money = pcall(function() return exports.kora_core:getPlayerData(src, { 'money' }) end)
     local outfits = dbListOutfits(citizenid)
     if openingSessions[src] ~= opening or citizenIdFor(src) ~= citizenid then return end
@@ -896,6 +911,21 @@ RegisterNetEvent('qb-clothes:loadPlayerSkin', function()
     end
     TriggerClientEvent('qb-clothes:loadSkin', src, false, saved.model, sanitiseSkin(saved.skin, saved.model))
 end)
+
+-- Fresh character's starting look, asked for by the client the moment the
+-- character is created (before the first spawn) so the ped never shows the
+-- previous character's clothes. Refused for a citizen who already has a saved
+-- appearance, so it cannot be used to read or reset an existing one.
+Kora.callback.register('qbclothing:server:getStarterAppearance', function(src)
+    local citizenid = citizenIdFor(src)
+    if not citizenid then return nil end
+    local ok, saved = pcall(dbGetSkin, citizenid)
+    if not ok or saved then return nil end
+    local model = defaultModelFor(src)
+    local skin = starterSkin(model)
+    if not skin then return nil end
+    return model, skin
+end, { replace = true, rateLimit = { max = 6, window = 10000 } })
 
 -- Overrides kora_core's own honest "no clothing module exists" stub
 -- (compat/server/qb-multicharacter.lua) now that one does. Kora.callback.register

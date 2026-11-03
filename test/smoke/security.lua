@@ -190,6 +190,13 @@ H.ok(client:find("local function hasSpawnCompleteSignal()", 1, true) and client:
     'asked at arm time, since a chunk-load read can catch qbmultichar still starting in the same batch')
 H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'the fallback path waits for the player to actually be spawned before opening')
 
+-- A new character starts in Config.starterOutfit, never the previous character's clothes.
+H.ok(server:find("if mode == 'firstCharacter' and not saved then skin = starterSkin(model) or skin end", 1, true),
+    'the first-character fitting room opens on the starter outfit, not the live ped')
+H.ok(server:find("Kora.callback.register('qbclothing:server:getStarterAppearance'", 1, true) and server:find('if not ok or saved then return nil end', 1, true),
+    'the starter appearance is only handed out to a citizen with no saved skin')
+H.ok(client:find("exports('applyStarterAppearance'", 1, true), 'kora_multichar can dress a new character before the first spawn')
+
 -- A saved outfit must reappear on every future login, not just persist
 -- silently in the database -- regression guard for that re-apply path. The
 -- callback trigger is a network round trip, so a fitting-room session can

@@ -1366,6 +1366,19 @@ AddEventHandler('qbmultichar:client:spawnComplete', function(isNew)
     TriggerEvent('qb-clothing:client:CreateFirstCharacter')
 end)
 
+-- Puts a just-created character into the starter outfit (Config.starterOutfit)
+-- and returns once the ped is dressed. kora_multichar calls this before the
+-- first spawn so the ped never shows the previous character's clothes, and the
+-- fitting room then opens on this look rather than on the live ped. Returns
+-- false when disabled, when the citizen already has a saved appearance, or when
+-- the server did not answer.
+exports('applyStarterAppearance', function()
+    if activeSession then return false end
+    local model, skin = Kora.callback.trigger('qbclothing:server:getStarterAppearance')
+    if type(model) ~= 'string' or type(skin) ~= 'table' then return false end
+    return applyModel(model, skin)
+end)
+
 RegisterNetEvent('qb-clothing:client:CreateFirstCharacter', function()
     openSession('firstCharacter')
 end)
