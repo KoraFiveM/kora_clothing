@@ -43,7 +43,7 @@ ensure kora_target
 ensure kora_clothing
 ```
 kora_clothing owns its schema (`playerskins`, `playeroutfits`) and applies
-`sql/001_playerskins_outfits.sql` itself via kora_sql's migration runner on first
+its declared tables (`server/schema.lua`) itself via kora_sql's schema handler on first
 boot — no manual SQL import needed. `fxmanifest.lua` also declares hard
 `dependency` edges on kora_lib/kora_sql/kora_core/qbtarget, so FXServer guarantees
 correct start order even if `ensure` lines are reshuffled.

@@ -300,9 +300,12 @@ H.ok(camera:find('function Camera.stop()', 1, true), 'camera exposes an explicit
 H.ok(camera:find('RenderScriptCams(false, true, 300, true, true)', 1, true), 'camera stop restores the gameplay cam')
 H.ok(client:find('stopControlLock()', 1, true), 'closing a session releases the control lock')
 
--- Migration follows kora_inventory's exact convention: kora_sql loads and
--- fingerprints the declared file, with the historical checksum retained.
-H.ok(persistence:find('Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)', 1, true), 'schema uses qbsql\'s file migrator')
-H.ok(persistence:find("{ version = 1, name = 'playerskins_outfits', file = 'sql/001_playerskins_outfits.sql' }", 1, true), 'migration list matches the shipped sql file')
+-- Schema is declared for kora_sql's declarative handler.
+local schema = read('server/schema.lua')
+H.ok(persistence:find('Kora.sql.ensureTables(QbClothingSchema)', 1, true), 'schema uses qbsql\'s ensureTables')
+H.ok(not persistence:find('migrateFiles', 1, true), 'no file migrator remains')
+H.ok(schema:find("name = 'playerskins'", 1, true) and schema:find("name = 'playeroutfits'", 1, true), 'schema declares both tables')
+H.ok(schema:find("primary = { 'citizenid' }", 1, true) and schema:find("idx_playeroutfits_citizenid", 1, true), 'schema keeps the key and outfit index')
+H.ok(read('fxmanifest.lua'):find("'server/schema.lua',\n    'server/persistence.lua'", 1, true), 'schema loads before persistence')
 
 H.finish()

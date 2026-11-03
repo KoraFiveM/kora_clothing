@@ -1,39 +1,15 @@
--- Schema bootstrap for playerskins/playeroutfits, following kora_inventory's
--- exact migration convention (server/persistence.lua): read the .sql file,
--- checksum it, hand both to kora_sql's Migrator via Kora.sql.migrate. kora_sql tracks
--- applied (resource, version) pairs itself -- no custom runner needed here.
+-- Schema bootstrap for playerskins/playeroutfits: the tables are declared in
+-- server/schema.lua and applied through kora_sql's declarative schema handler.
 
 QbClothing = QbClothing or {}
 local P = {}
 QbClothing.persistence = P
 
-local resource = GetCurrentResourceName()
 local state = { ready = false, lastError = nil }
 
 local function log(level, message)
     print(('^%s[qbclothing:persistence]^7 %s'):format(level, message))
 end
-
-local function fnv1a(str)
-    local hash, prime = 0xCBF29CE484222325, 0x100000001B3
-    for i = 1, #str do
-        hash = hash ~ string.byte(str, i)
-        hash = (hash * prime) & 0xFFFFFFFFFFFFFFFF
-    end
-    return hash
-end
-
--- Matches kora_inventory's checksum format exactly (two 64-bit FNV-1a hex
--- halves, zero-padded to kora_sql's expected 64 hex chars) -- kora_sql's Migrator
--- only cares that the same source always produces the same checksum.
-local function checksum(str)
-    local a, b = fnv1a(str), fnv1a(str:reverse())
-    return ('%016x%016x'):format(a, b) .. string.rep('0', 32)
-end
-
-local MIGRATIONS = {
-    { version = 1, name = 'playerskins_outfits', file = 'sql/001_playerskins_outfits.sql' },
-}
 
 function P.ready()
     return state.ready
@@ -47,11 +23,16 @@ local function bootstrap()
         return
     end
 
-    local _, migrationErr = Kora.sql.migrateFiles(resource, MIGRATIONS, checksum)
-    if migrationErr then
-        state.lastError = migrationErr
-        log('1', ('schema migration failed: %s'):format(migrationErr))
+    local reports, schemaErr = Kora.sql.ensureTables(QbClothingSchema)
+    if schemaErr then
+        state.lastError = schemaErr
+        log('1', ('schema setup failed: %s'):format(schemaErr))
         return
+    end
+    for _, report in ipairs(reports or {}) do
+        for _, warning in ipairs(report.warnings or {}) do
+            log('3', ('%s: %s'):format(tostring(report.table), tostring(warning)))
+        end
     end
 
     state.ready = true

@@ -35,6 +35,7 @@ shared_scripts {
 }
 
 server_scripts {
+    'server/schema.lua',
     'server/persistence.lua',
     'server/server.lua',
 }
@@ -51,7 +52,6 @@ ui_page 'web/build/index.html'
 
 files {
     'locales/*.json',
-    'sql/001_playerskins_outfits.sql',
     'web/build/index.html',
     'web/build/assets/**/*',
 }
