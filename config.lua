@@ -865,6 +865,21 @@ Config.rotateHideCursor = boolean(true, {
     live = true,
 })
 
+-- How the cursor is hidden for a rotate drag (Config.rotateHideCursor). 'blank'
+-- (default) swaps it for a fully transparent image cursor, falling back to
+-- CSS `cursor: none`; FiveM's browser does not always act on `none` alone, so the
+-- arrow stayed visible (and showed every jump back to the drag start). 'none' uses
+-- CSS `cursor: none` only. Read each time a menu opens.
+Config.rotateHideMethod = config and config.enum('blank', {
+    label = 'How the cursor is hidden while rotating',
+    description = 'Blank swaps the cursor for a transparent one while you hold click to rotate the character, which hides it reliably in the game. None uses the browser\'s own hidden-cursor setting, which some game builds ignore. Only used while Hide cursor while rotating is on.',
+    options = {
+        { value = 'blank', label = 'Transparent cursor' },
+        { value = 'none', label = 'Browser none' },
+    },
+    live = true,
+}) or 'blank'
+
 -- Cursor shown while a rotate drag is held (rotateMode = 'plain', and Config.rotateHideCursor off). 'grabbing' pins
 -- the closed-hand cursor for the whole drag (a full-screen overlay owns it, so
 -- nothing under the pointer can change it); 'hidden' hides it instead. Modes that

@@ -14,8 +14,8 @@ import type { ClothingToggle, ClothingToggleId, SetClothingTogglePayload, SetClo
 import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from "@/lib/undress"
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
-import { RotateDrag, dragCursor } from "@/lib/rotateDrag"
-import type { DragIO, DragOrigin, RotateMode } from "@/lib/rotateDrag"
+import { RotateDrag, dragCursor, hideMethod } from "@/lib/rotateDrag"
+import type { DragIO, DragOrigin, HideMethod, RotateMode } from "@/lib/rotateDrag"
 import type {
     CameraPayload,
     CategoryCameraPayload,
@@ -149,7 +149,7 @@ function rotateSensitivity(value: number | undefined) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1
 }
 
-function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin, cursor, hideCursor }: {
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin, cursor, hideCursor, hideWith }: {
     io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
@@ -167,6 +167,8 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     cursor: "grabbing" | "hidden"
     /** Config.rotateHideCursor: hide the cursor for the whole drag in every mode. */
     hideCursor: boolean
+    /** Config.rotateHideMethod: how a hidden cursor is hidden. */
+    hideWith: HideMethod
 }) {
     const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * sensitivity * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
     const dragRef = useRef<RotateDrag | null>(null)
@@ -186,6 +188,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             if (drag.dragging) return
             document.documentElement.classList.remove("is-rotating")
             delete document.documentElement.dataset.dragCursor
+            delete document.documentElement.dataset.hideMethod
         }
         // Shown once Lua has answered the end (the cursor is back where the drag began),
         // so it never appears at the drop point first; never later than the wait limit.
@@ -272,6 +275,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
             settling.current = null // this drag owns the cursor now
             // One cursor for the whole drag: the configured one for a plain drag, none when the cursor is moved by the game.
             document.documentElement.dataset.dragCursor = dragCursor(mode, cursor, hideCursor)
+            document.documentElement.dataset.hideMethod = hideWith
             document.documentElement.classList.add("is-rotating")
             // Lua-owned drags turn the camera without a move ever counting here.
             if (mode === "capture" || mode === "controls") onInteract()
@@ -952,7 +956,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className={open.showScrollbar === true ? "clothing-shell show-scrollbars" : "clothing-shell"}>
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "plain"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} hideCursor={open.rotateHideCursor !== false} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "plain"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} hideCursor={open.rotateHideCursor !== false} hideWith={hideMethod(open.rotateHideMethod)} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

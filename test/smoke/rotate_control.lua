@@ -131,6 +131,18 @@ H.equal(sent.rotateSensitivity, 1.0, 'payload carries the rotate sensitivity')
 H.equal(sent.rotateInvert, false, 'payload carries the invert option')
 H.ok(sent.rotateRecenterEdge < 0.1, 'payload carries a small recenter edge')
 H.equal(sent.rotateRightButton, true, 'payload carries the right-button option')
+H.equal(Config.rotateHideCursor, true, 'cursor hidden while rotating by default')
+H.equal(sent.rotateHideCursor, true, 'payload carries hide-cursor on')
+H.equal(Config.rotateHideMethod, 'blank', 'the cursor is hidden with a transparent cursor by default')
+H.equal(sent.rotateHideMethod, 'blank', 'payload carries the hide method')
+Config.rotateHideMethod = 'none'
+H.equal(open().rotateHideMethod, 'none', 'hide method read live on the next open')
+Config.rotateHideMethod = 'nonsense'
+H.equal(open().rotateHideMethod, 'blank', 'an unknown hide method falls back to the transparent cursor')
+Config.rotateHideMethod = 'blank'
+Config.rotateHideCursor = false
+H.equal(open().rotateHideCursor, false, 'hide-cursor off reaches the NUI')
+Config.rotateHideCursor = true
 Config.rotateMode = 'recenter'
 H.equal(open().rotateMode, 'recenter', 'mode is read live on the next open')
 Config.rotateMode = 'controls'

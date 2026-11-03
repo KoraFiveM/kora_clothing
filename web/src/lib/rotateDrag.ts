@@ -29,6 +29,14 @@ export function dragCursor(mode: RotateMode, configured: "grabbing" | "hidden", 
     return hide || mode !== "plain" ? "hidden" : configured
 }
 
+/** How a hidden drag cursor is hidden (Config.rotateHideMethod): a transparent image
+ * cursor (default; FiveM's browser does not always honour `cursor: none`) or plain
+ * `cursor: none`. Anything unrecognised means the transparent cursor. */
+export type HideMethod = "blank" | "none"
+export function hideMethod(value: unknown): HideMethod {
+    return value === "none" ? "none" : "blank"
+}
+
 /** Where a drag began, as a 0..1 fraction of the screen. */
 export interface DragOrigin {
     x: number

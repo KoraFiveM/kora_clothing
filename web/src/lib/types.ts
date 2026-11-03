@@ -111,6 +111,8 @@ export interface OpenPayload {
     rotateCursor?: "grabbing" | "hidden"
     /** Config.rotateHideCursor; absent means hidden while rotating. */
     rotateHideCursor?: boolean
+    /** Config.rotateHideMethod; absent means the transparent cursor. */
+    rotateHideMethod?: "blank" | "none"
     /** Config.rotateSensitivity (pointer, recenter, plain); absent means 1. */
     rotateSensitivity?: number
     /** Config.rotateRecenterEdge (recenter mode); absent means the built-in default. */

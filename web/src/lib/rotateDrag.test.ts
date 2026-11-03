@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RotateDrag, dragCursor, type DragOptions, type RotateMode } from "./rotateDrag.ts"
+import { readFileSync } from "node:fs"
+import { RotateDrag, dragCursor, hideMethod, type DragOptions, type RotateMode } from "./rotateDrag.ts"
 
 const W = 1000
 const H = 600
@@ -310,4 +311,20 @@ test("plain: a long drag sends only movementX turns, never a recentre or a Lua s
     assert.equal(log.rotated.length, 49)
     drag.up()
     assert.equal(log.ends, 1)
+})
+
+test("the hide method is the transparent cursor unless 'none' is chosen", () => {
+    assert.equal(hideMethod(undefined), "blank")
+    assert.equal(hideMethod("blank"), "blank")
+    assert.equal(hideMethod("nonsense"), "blank")
+    assert.equal(hideMethod("none"), "none")
+})
+
+test("a hidden drag cursor is a transparent image with none as the fallback, cleared with the drag", () => {
+    const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8")
+    assert.match(css, /html\.is-rotating\[data-drag-cursor="hidden"\] \* \{ cursor: none !important; \}/, "none stays for method none")
+    assert.match(css, /\[data-hide-method="blank"\] \* \{ cursor: url\("data:image\/gif;base64,[^"]+"\) 0 0, none !important; \}/)
+    const app = readFileSync(new URL("../App.tsx", import.meta.url), "utf8")
+    assert.match(app, /dataset\.hideMethod = hideWith/, "set when the drag starts")
+    assert.match(app, /delete document\.documentElement\.dataset\.hideMethod/, "cleared with the drag cursor")
 })
