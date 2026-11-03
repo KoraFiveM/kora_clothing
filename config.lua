@@ -798,6 +798,18 @@ Config.rotateModeByService = {
     creation = rotateModeFor(nil, 'Rotate drag mode: character creation', 'character creation and admin sessions'),
 }
 
+-- rotateMode = 'capture' only. Capture used to orbit the camera around the ped, and
+-- its centre pulls swung the camera through walls and the floor. With this on the
+-- drag turns the ped's heading instead and the camera stays where the menu framed it.
+Config.captureRotatesPed = true
+if config then
+    Config.captureRotatesPed = config.boolean(true, {
+        label = 'Capture mode turns the character',
+        description = 'In capture rotate mode, dragging turns the character itself and the camera stays fixed inside the shop, so it cannot clip through walls or the floor. The character returns to its original facing when the menu closes. Turn off to orbit the camera around the character instead. Other drag modes always orbit the camera.',
+        live = true,
+    })
+end
+
 -- Rotation speed for the plain, capture, pointer and recenter modes (controls mode
 -- has its own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
 Config.rotateSensitivity = config and config.number(1.0, {

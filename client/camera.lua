@@ -220,6 +220,7 @@ end
 -- at the camera, so while the orbit swings round it the ped keeps turning and
 -- seems to move in place. Freezing the ped does not stop that.
 local stilledPed
+local pedTurned = false -- Camera.rotatePed changed the heading since the camera started
 
 local function exists(ped)
     return ped and (type(DoesEntityExist) ~= 'function' or DoesEntityExist(ped))
@@ -513,6 +514,18 @@ function Camera.rotate(deltaDeg)
     target.angle = (target.angle + (tonumber(deltaDeg) or 0.0)) % 360.0
 end
 
+---Turns the ped itself (capture rotate mode) instead of orbiting the camera: the
+---camera is held still (Config.camera.holdStill), so it never leaves the spot the
+---menu framed. Positive turns the ped the way a rightward drag on its front would.
+---The heading the menu opened with is put back when the camera stops.
+---@param deltaDeg number
+function Camera.rotatePed(deltaDeg)
+    deltaDeg = tonumber(deltaDeg)
+    if not deltaDeg or deltaDeg ~= deltaDeg or not exists(pedRef) then return end
+    SetEntityHeading(pedRef, (GetEntityHeading(pedRef) + deltaDeg) % 360.0)
+    pedTurned = true
+end
+
 ---Drag finished: stop the orbit at the angle it has reached instead of easing
 ---on towards a target the player is no longer pulling.
 function Camera.rotateEnd()
@@ -556,6 +569,8 @@ end
 
 function Camera.stop()
     active = false
+    if pedTurned and held.heading and exists(pedRef) then SetEntityHeading(pedRef, held.heading) end
+    pedTurned = false
     releasePed()
     if cam then
         RenderScriptCams(false, true, 300, true, true)
