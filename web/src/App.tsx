@@ -952,7 +952,7 @@ export default function App() {
             <button type="button" aria-label="Dismiss error" onClick={() => setError(undefined)}><X size={14} /></button>
         </div>}
 
-        <div className="rail rail-left">
+        <div className={outfitsExpanded ? "rail rail-left rail-scroll" : "rail rail-left"}>
             {groupsPresent.size > 0 && <div className="panel panel-pad">
                 <p className="section-title">Categories</p>
                 <CategoryTabs active={activeGroup} groups={groupsPresent} onSelect={selectGroup} />

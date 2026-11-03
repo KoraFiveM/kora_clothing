@@ -105,6 +105,10 @@ html.is-rotating[data-drag-cursor="hidden"], html.is-rotating[data-drag-cursor="
 /* Inner side of each rail (towards the screen centre) gets the full shadow room; the outer side is the edge inset, which keeps the right rail's scrollbar on screen. */
 .rail-left { --shadow-gutter-l: var(--edge-inset); --shadow-gutter-r: var(--shadow-gutter-in); }
 .rail > * { flex-shrink: 0; }
+/* The left rail shows both panels in full (Categories, Tattoos) and does not scroll.
+   Only while My Outfits is expanded does it become a scroll container, fixed to the
+   space between the top and bottom bars (class set in App.tsx). */
+.rail-left:not(.rail-scroll) { bottom: auto; overflow: visible; }
 
 .panel { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); box-shadow: 0 var(--panel-shadow-y) var(--panel-shadow-blur) rgb(0 0 0 / .4); }
 .panel-pad { padding: 12px; }
