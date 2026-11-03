@@ -376,25 +376,25 @@ H.equal(reply.moved, true, 'the recenter fallback is allowed in capture mode')
 handlers['qbclothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'controls'
 
--- Per-menu modes (Config.rotateModeByService): barbers and hairdressers capture so the
--- cursor cannot leave the window; character creation and the other menus keep
--- Config.rotateMode ('plain'), whose untouched cursor fixed the creation flicker.
+-- Per-menu modes (Config.rotateModeByService): none by default, so every menu follows
+-- Config.rotateMode ('plain'); a server can still opt a menu into capture.
 reset()
 Config.rotateMode = 'plain'
-H.equal(Config.rotateModeByService.barber, 'capture', 'barbers default to capture')
-H.equal(Config.rotateModeByService.hairdresser, 'capture', 'hairdressers default to capture')
+H.equal(Config.rotateModeByService.barber, nil, 'barbers have no override by default')
+H.equal(Config.rotateModeByService.hairdresser, nil, 'hairdressers have no override by default')
 H.equal(Config.rotateModeByService.creation, nil, 'creation has no override by default')
 H.equal(Config.rotateModeByService.clothing, nil, 'clothing shops have no override by default')
 H.equal(Config.rotateModeByService.tattoo, nil, 'tattoo studios have no override by default')
 H.equal(RotateControl.mode('creation'), 'plain', 'creation resolves plain')
-H.equal(RotateControl.mode('barber'), 'capture', 'barber resolves capture')
-H.equal(RotateControl.mode('hairdresser'), 'capture', 'hairdresser resolves capture')
+H.equal(RotateControl.mode('barber'), 'plain', 'barber resolves plain')
+H.equal(RotateControl.mode('hairdresser'), 'plain', 'hairdresser resolves plain')
 H.equal(RotateControl.mode('clothing'), 'plain', 'clothing resolves plain')
 H.equal(RotateControl.mode('tattoo'), 'plain', 'tattoo resolves plain')
 H.equal(RotateControl.mode(), 'plain', 'no menu: Config.rotateMode')
 Config.rotateModeByService.barber = 'nonsense'
 H.equal(RotateControl.mode('barber'), 'plain', 'an unknown override falls back to Config.rotateMode')
 Config.rotateModeByService.barber = 'capture'
+H.equal(RotateControl.mode('barber'), 'capture', 'a barber can opt into capture')
 Config.rotateMode = 'recenter'
 H.equal(RotateControl.mode('creation'), 'recenter', 'an unset menu follows Config.rotateMode')
 Config.rotateMode = 'plain'
@@ -431,7 +431,7 @@ for _, service in ipairs({ 'clothing', 'tattoo' }) do
     close()
 end
 
--- Barber: capture, but nothing runs until the button goes down; the thread starts on
+-- Barber opted into capture: nothing runs until the button goes down; the thread starts on
 -- the press and ends on the very frame the button comes up.
 reset()
 nuiCursor, pendingPull, pulls = { 960, 540 }, false, 0
@@ -455,7 +455,10 @@ H.ok(#rotated > 0, 'barber: the drag turned the camera')
 H.equal(cursor[1], 0.4, 'barber: cursor back where the drag began')
 local pullsAfter = pulls
 onFrame = function() end
-H.equal(#threads, threadsBefore, 'barber: no thread left after release')
+H.equal(#threads, threadsBefore + 1, 'barber: only the one-frame cursor restore is left after release')
+threads[#threads]()
+H.equal(cursor[1], 0.4, 'barber: cursor still where the drag began after the restore frame')
+threads = {}
 H.equal(pulls, pullsAfter, 'barber: no pull after release')
 
 -- Closing the barber mid-drag stops the thread at once, without a final pull.
@@ -488,6 +491,7 @@ H.equal(frame, 0, 'barber: a drag closed before its first frame never runs')
 -- The hairdresser (female characters at the same shops) captures too; the mode
 -- follows the service, so the stub's model does not matter here.
 reset()
+Config.rotateModeByService.hairdresser = 'capture'
 H.equal(openAs('shop', 'hairdresser').rotateMode, 'capture', 'the hairdresser opens in capture')
 close()
 

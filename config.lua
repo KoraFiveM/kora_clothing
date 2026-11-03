@@ -739,10 +739,11 @@ Config.rotateMode = config and config.enum('plain', {
 -- (clothing shops and wardrobes), barber and hairdresser (barber and hairdresser
 -- shops; which of the two opens follows the character's model), tattoo, and creation
 -- (character creation and admin sessions). Unset follows Config.rotateMode.
--- Barbers and hairdressers default to 'capture': in 'plain' a fast drag can carry the
--- cursor out of a windowed game onto a second monitor. Capture's thread only runs
--- while the mouse button is held in that menu and stops on release or close.
--- Character creation and the other menus stay on Config.rotateMode ('plain').
+-- Every menu defaults to 'plain' (the cursor is hidden for the drag and never moved,
+-- so it comes back exactly where it was). 'capture' is opt-in per menu: it holds the
+-- cursor at the centre so a drag never stops at a screen edge, but the pulls can
+-- jolt the camera, so it is not the default. Its thread only runs while the mouse
+-- button is held in that menu and stops on release or close.
 -- Read each time a menu opens.
 local ROTATE_MODES = { 'plain', 'capture', 'pointer', 'controls', 'recenter' }
 local function rotateModeFor(default, label, menu)
@@ -754,8 +755,8 @@ local function rotateModeFor(default, label, menu)
 end
 Config.rotateModeByService = {
     clothing = rotateModeFor(nil, 'Rotate drag mode: clothing shops', 'clothing shops and wardrobes'),
-    barber = rotateModeFor('capture', 'Rotate drag mode: barber', 'barbers and hairdressers (male characters)'),
-    hairdresser = rotateModeFor('capture', 'Rotate drag mode: hairdresser', 'barbers and hairdressers (female characters)'),
+    barber = rotateModeFor(nil, 'Rotate drag mode: barber', 'barbers and hairdressers (male characters)'),
+    hairdresser = rotateModeFor(nil, 'Rotate drag mode: hairdresser', 'barbers and hairdressers (female characters)'),
     tattoo = rotateModeFor(nil, 'Rotate drag mode: tattoo studio', 'tattoo studios'),
     creation = rotateModeFor(nil, 'Rotate drag mode: character creation', 'character creation and admin sessions'),
 }

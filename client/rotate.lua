@@ -1,8 +1,7 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
 -- Config.rotateMode, or the menu's own Config.rotateModeByService entry when set
--- (barbers and hairdressers default to 'capture'; every other menu, character
--- creation included, follows Config.rotateMode):
+-- (none set by default: every menu follows Config.rotateMode, 'plain'):
 --   'plain'    (default) a normal press/move/release drag in the NUI. Nothing happens
 --              here: no thread, no cursor move, no focus change. The NUI turns the
 --              camera from its own mouse movement (one message per frame), so the
@@ -120,6 +119,12 @@ function RotateControl.stop(reason)
         if reason ~= 'close' then
             SetCursorLocation(drag.x, drag.y)
             SendNUIMessage({ action = 'qbclothing:nui:rotateStopped', data = { reason = reason } })
+            -- A centre pull still in flight lands after the line above and would leave
+            -- the cursor in the middle of the screen; put it back once more next frame.
+            CreateThread(function()
+                Wait(0)
+                if not active then SetCursorLocation(drag.x, drag.y) end
+            end)
         end
         return true
     end
