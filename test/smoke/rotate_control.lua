@@ -272,7 +272,6 @@ Config.rotateMode = 'controls'
 -- of the window. NUI focus is never touched.
 reset()
 Config.rotateMode = 'capture'
-Config.captureRotatesPed = false -- the camera-orbit path; the ped-turning default is tested below
 local nuiCursor = { 480, 810 }   -- where the button went down (0.25, 0.75 of 1920x1080)
 local pendingPull, pulls, furthest = false, 0, 0
 _G.GetActiveScreenResolution = function() return 1920, 1080 end
@@ -320,25 +319,16 @@ H.ok(furthest < 1920 * 0.08 + 26, 'held near the centre going left too')
 Config.rotateInvert, Config.rotateSensitivity = false, 1.0
 hand = 40
 
--- Default: capture turns the ped's heading and never touches the camera orbit.
-Config.captureRotatesPed = true
+-- Capture hands every turn to Camera.rotate, which turns the ped
+-- (Config.rotateTurnsPed) or orbits the camera; it never picks one itself.
 reset()
 nuiCursor, pendingPull, pulls, furthest = { 960, 540 }, false, 0, 0
 RotateControl.start(0, 0.5, 0.5)
 fastDrag(30)
 runThread()
-H.equal(#rotated, 0, 'capture: the camera orbit is never turned')
-H.equal(#pedTurns, 29, 'capture: the ped turns every frame the hand moved')
-H.equal(pedTurns[1], 40 * 0.15, 'capture: moving right turns the ped by +dx * deg per pixel')
-Config.captureRotatesPed = false
-reset()
-nuiCursor, pendingPull, pulls, furthest = { 960, 540 }, false, 0, 0
-RotateControl.start(0, 0.5, 0.5)
-fastDrag(5)
-runThread()
-H.equal(#pedTurns, 0, 'captureRotatesPed off: the ped is left alone')
-H.ok(#rotated > 0, 'captureRotatesPed off: the camera orbits as before')
-Config.captureRotatesPed = true
+H.equal(#pedTurns, 0, 'capture: no direct ped turn, Camera.rotate decides')
+H.equal(#rotated, 29, 'capture: every frame the hand moved goes to Camera.rotate')
+H.equal(rotated[1], -40 * 0.15, 'capture: the same sign as the NUI drag')
 
 -- The safety limit ends a drag whose release was never seen, and tells the NUI.
 reset()
@@ -474,7 +464,7 @@ onFrame = function(n) drive(n); if n == 12 then releasedAt = n; release() end en
 runLast()
 H.equal(RotateControl.isActive(), false, 'barber: released')
 H.equal(frame, releasedAt, 'barber: the thread stops on the frame the button comes up')
-H.ok(#pedTurns > 0 and #rotated == 0, 'barber: the capture drag turned the ped, not the camera')
+H.ok(#rotated > 0 and #pedTurns == 0, 'barber: the capture drag goes through Camera.rotate (which turns the ped)')
 H.equal(cursor[1], 0.4, 'barber: cursor back where the drag began')
 local pullsAfter = pulls
 onFrame = function() end

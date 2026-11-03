@@ -14,9 +14,6 @@
 --              frame, not after a round trip from the NUI, so even a fast flick
 --              cannot carry the cursor to a screen edge or out of the window. The
 --              cursor is hidden while dragging and put back where the drag began.
---              The drag turns the PED (its heading), never the camera, unless
---              Config.captureRotatesPed is off: the camera stays where the menu put
---              it, so it cannot swing through walls or the floor.
 --              FiveM's NUI refuses browser pointer lock, which is why 'pointer'
 --              always ended up recentring from the NUI and could be outrun.
 --   'controls'  the NUI hands the drag to this file. NUI focus drops
@@ -34,6 +31,10 @@
 --   'pointer'  the browser Pointer Lock request (Config.rotatePointerLock); the NUI
 --              turns the camera from movementX and never toggles NUI focus. FiveM's
 --              NUI refuses the lock, so in practice it falls back to recenter.
+--
+-- In every mode the drag turns the PED (its heading), not the camera, unless
+-- Config.rotateTurnsPed is off (Camera.rotate decides): the camera stays where the
+-- menu put it, so it cannot swing through walls or the floor.
 
 RotateControl = {}
 
@@ -186,19 +187,13 @@ local function runCapture(drag)
         width, height = math.max(1, tonumber(width) or 1920), math.max(1, tonumber(height) or 1080)
         local maxMs = number('rotateControlsMaxSeconds', 30.0) * 1000.0
         local direction = Config.rotateInvert == true and -1.0 or 1.0
-        local turnPed = Config.captureRotatesPed ~= false and Camera and Camera.rotatePed ~= nil
         local degPerPixel = CAPTURE_DEG_PER_PIXEL * math.max(0.1, number('rotateSensitivity', 1.0)) * direction
         while active == drag do
             local x, y = GetNuiCursorPosition()
             local dx = RotateControl.captureStep(drag, tonumber(x) or 0, tonumber(y) or 0, width, height)
             if dx ~= 0 and Camera then
-                if turnPed then
-                    -- The camera stays put; the ped turns the way the drag moved its front.
-                    Camera.rotatePed(dx * degPerPixel)
-                else
-                    -- Same direction as the cursor drag: moving right turns the view clockwise.
-                    Camera.rotate(-dx * degPerPixel)
-                end
+                -- Same sign as the NUI drag; Camera.rotate turns the ped (or orbits).
+                Camera.rotate(-dx * degPerPixel)
             end
             if GetGameTimer() - drag.startedAt > maxMs then
                 RotateControl.stop('timeout')

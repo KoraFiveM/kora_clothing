@@ -192,15 +192,24 @@ like character creation, clothing shops and tattoo studios, use `Config.rotateMo
 (`'plain'`). Set `barber` / `hairdresser` to `'capture'` if a fast drag there should
 never carry the cursor out of the window onto a second monitor.
 
+In every mode the drag turns the character, not the camera
+(`Config.rotateTurnsPed`, default `true`): the camera stays where the menu framed
+it, clear of walls, so rotating can never swing it through a wall or the floor of
+a small shop. The character faces its original direction again when the menu
+closes. `false` orbits the camera around the character instead, and nothing then
+stops the camera passing through a wall behind the character.
+
 The cursor is hidden while a rotate drag is held, in every mode
-(`Config.rotateHideCursor`, default `true`), and shown again on release. In the
-modes Lua drives (`'capture'`, `'controls'`) release also puts the cursor back where
-the drag started, so it never ends up at the screen centre or edge.
+(`Config.rotateHideCursor`, default `true`), and on release it reappears where
+the drag started, never where the hidden cursor drifted to or at the screen
+centre. The modes Lua drives (`'capture'`, `'controls'`) always do this; the
+others do it with `Config.rotateRestoreCursor` (default `true`), and the NUI keeps
+the cursor hidden until Lua has moved it back (at most 250 ms).
 `Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
 the plain, capture, pointer and recenter modes:
 
 - `'plain'` (default) — a normal press/move/release drag. The NUI turns the
-  camera from the mouse movement it sees (`movementX`), one
+  character from the mouse movement it sees (`movementX`), one
   `qbclothing:nui:rotate` message per animation frame, and the cursor is never
   touched: no Lua thread, no `SetCursorLocation`, no NUI focus change. A full-screen
   overlay owns the cursor for the whole drag: hidden by default
@@ -213,10 +222,8 @@ the plain, capture, pointer and recenter modes:
   `Config.rotateDragCursor` say.
 - `'capture'` — the NUI hands the drag to `client/rotate.lua` but keeps
   its focus and cursor, so it always sees the button come up. Every frame Lua
-  reads the cursor (`GetNuiCursorPosition`) and turns the ped's heading by how
-  far it moved; the camera stays where the menu put it, so it cannot swing
-  through a wall or the floor (`Config.captureRotatesPed`, default `true`;
-  `false` orbits the camera instead). Once it is more than 8% of the screen from the centre pulls it
+  reads the cursor (`GetNuiCursorPosition`) and turns the character by how
+  far it moved (`Config.rotateTurnsPed`, above). Once it is more than 8% of the screen from the centre pulls it
   back (`SetCursorLocation(0.5, 0.5)`), ignoring the jump the pull causes. The
   pull happens in the same frame rather than after a round trip from the NUI,
   so even a fast flick cannot carry the cursor to a screen edge or out of the
@@ -391,8 +398,10 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
 - `Config.rotateMode` (default `'plain'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
 - `Config.rotateModeByService` (all of `clothing`, `barber`, `hairdresser`, `tattoo` and `creation` unset by default, so every menu, barber and hairdresser included, uses `'plain'`) — per-menu `rotateMode` override; unset entries follow `Config.rotateMode`
-- `Config.captureRotatesPed` (default `true`) — in `'capture'` mode the drag turns the ped and the camera stays fixed; `false` orbits the camera instead
-- `Config.rotateHideCursor` (default `true`) — hide the cursor while a rotate drag is held, in every mode; release shows it again (and in `'capture'` / `'controls'` puts it back where the drag started)
+- `Config.rotateTurnsPed` (default `true`) — in every rotate mode the drag turns the character and the camera stays where the menu framed it, so it cannot clip through walls or the floor; the opening heading is restored on close. `false` orbits the camera instead (replaces the capture-only `Config.captureRotatesPed`)
+- `Config.rotateHideCursor` (default `true`) — hide the cursor while a rotate drag is held, in every mode; release shows it again
+- `Config.rotateRestoreCursor` (default `true`) — on release the hidden cursor reappears where the drag started (`'capture'` / `'controls'` always do this)
+- `Config.starterOutfit` — the outfit a new character starts in, so it never inherits the previous character's clothes: `enabled` (default `true`), and per freemode model (`male` / `female`) `components` and `props` maps of `{ d, t }`. Unlisted components start on drawable 0, unlisted props are removed, and the face, skin tone, beard and other head overlays start on their defaults with no tattoos. Defaults: plain t-shirt (11/0, arms 3/0), no undershirt (8/15), legs 4/0, shoes 6/1
 - `Config.rotateRightButton` (default `true`) — the right mouse button rotates as well as the left
 - `Config.camera.zoom` — `{ min, max, step }` bounds for free mouse-wheel zoom (metres of camera radius; `step` is per wheel notch)
 - `Config.camera.orbitDegPerSec` / `Config.camera.transitionMs` — orbit and zoom-transition speeds

@@ -1017,11 +1017,24 @@ RegisterNUICallback('qbclothing:nui:rotate', function(data, cb)
     cb({})
 end)
 
+-- Config.rotateRestoreCursor: puts the cursor back where a rotate drag began
+-- (`origin` x/y, 0..1 of the screen, from the NUI). Only while the cursor was
+-- hidden for the drag; a visible one would be seen to jump.
+local function restoreDragCursor(origin)
+    if Config.rotateRestoreCursor == false or not activeSession or type(origin) ~= 'table' then return end
+    local x, y = tonumber(origin.x), tonumber(origin.y)
+    if not x or not y or x ~= x or y ~= y or type(SetCursorLocation) ~= 'function' then return end
+    local plain = not RotateControl or RotateControl.mode(activeSession.service) == 'plain'
+    if plain and Config.rotateHideCursor == false and Config.rotateDragCursor ~= 'hidden' then return end
+    SetCursorLocation(math.max(0.0, math.min(1.0, x)), math.max(0.0, math.min(1.0, y)))
+end
+
 -- The NUI says the drag is over (button up, cursor left the window, focus
--- lost): settle the orbit where it is so nothing keeps rotating.
-RegisterNUICallback('qbclothing:nui:rotateEnd', function(_, cb)
+-- lost): settle the orbit where it is so nothing keeps rotating. A capture or
+-- controls drag puts the cursor back itself; any other drag does it here.
+RegisterNUICallback('qbclothing:nui:rotateEnd', function(data, cb)
     Camera.rotateEnd()
-    stopRotate('nui')
+    if not stopRotate('nui') then restoreDragCursor(data) end
     cb({})
 end)
 

@@ -15,7 +15,7 @@ import { activeParts, allUndressed, toggleAll, togglePart, undressVisible } from
 import type { SetUndressPayload, SetUndressResponse, UndressPart } from "@/lib/undress"
 import { listenForLockChange, releaseRotateLock, requestRotateLock } from "@/lib/pointerLock"
 import { RotateDrag, dragCursor } from "@/lib/rotateDrag"
-import type { DragIO, RotateMode } from "@/lib/rotateDrag"
+import type { DragIO, DragOrigin, RotateMode } from "@/lib/rotateDrag"
 import type {
     CameraPayload,
     CategoryCameraPayload,
@@ -34,6 +34,7 @@ import type {
     LoadOutfitResponse,
     OpenPayload,
     OutfitSummary,
+    RotateEndPayload,
     RotatePayload,
     SetHairColorPayload,
     SetHairColorResponse,
@@ -84,6 +85,8 @@ function confirmLabel(mode: ClothingMode, total: number) {
 }
 
 const DRAG_ROTATION_DEG_PER_PIXEL = 0.15
+/** Longest the cursor stays hidden after a drag while Lua puts it back. */
+const CURSOR_RESTORE_WAIT_MS = 250
 
 /** Drag-to-rotate needs to feel continuous but must not spam the NUI
  * callback on every pointermove -- coalesce into at most one call per frame. */
@@ -102,11 +105,12 @@ function useRotate(): DragIO {
         if (frame.current === null) frame.current = requestAnimationFrame(flush)
     }, [flush])
     // Drag over: drop whatever has not been sent so nothing lands after the
-    // end, then tell Lua to settle the camera where it is.
-    const end = useCallback(() => {
+    // end, then tell Lua to settle the camera where it is and put the hidden
+    // cursor back where the drag began (Config.rotateRestoreCursor).
+    const end = useCallback((origin?: DragOrigin) => {
         pending.current = 0
         if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
-        void sendIntent<object, object>("qbclothing:nui:rotateEnd", {})
+        return sendIntent<RotateEndPayload, object>("qbclothing:nui:rotateEnd", origin ? { x: origin.x, y: origin.y } : {})
     }, [])
     // Config.rotateMode = "controls": Lua takes over the mouse until the button is released.
     const start = useCallback(async (button: number, x: number, y: number) => {
@@ -171,13 +175,33 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     // Checked on every render so a changed setting applies on the next drag.
     drag.setOptions(options)
     const locked = useRef(false)
+    // Set while the cursor stays hidden until Lua has put it back where the drag began.
+    const settling = useRef<object | null>(null)
     const unlock = useCallback(() => {
         // A drag Lua still owns (capture mode) survives the blur / leave events the
         // cursor pulls cause; dropping the cursor class on them made it flicker
         // between the arrow and the grab hand mid-drag.
         if (drag.dragging) return
-        document.documentElement.classList.remove("is-rotating")
-        delete document.documentElement.dataset.dragCursor
+        const show = () => {
+            if (drag.dragging) return
+            document.documentElement.classList.remove("is-rotating")
+            delete document.documentElement.dataset.dragCursor
+        }
+        // Shown once Lua has answered the end (the cursor is back where the drag began),
+        // so it never appears at the drop point first; never later than the wait limit.
+        const ending = drag.takeEnding()
+        if (ending instanceof Promise) {
+            const mark = {}
+            settling.current = mark
+            const waited = new Promise((resolve) => setTimeout(resolve, CURSOR_RESTORE_WAIT_MS))
+            void Promise.race([ending.catch(() => undefined), waited]).then(() => {
+                if (settling.current !== mark) return
+                settling.current = null
+                show()
+            })
+        } else if (!settling.current) {
+            show()
+        }
         if (!locked.current) return
         locked.current = false
         releaseRotateLock(document)
@@ -245,6 +269,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
+            settling.current = null // this drag owns the cursor now
             // One cursor for the whole drag: the configured one for a plain drag, none when the cursor is moved by the game.
             document.documentElement.dataset.dragCursor = dragCursor(mode, cursor, hideCursor)
             document.documentElement.classList.add("is-rotating")

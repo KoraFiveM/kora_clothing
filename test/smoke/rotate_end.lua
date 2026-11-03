@@ -87,6 +87,32 @@ callbacks['qbclothing:nui:rotateEnd']({}, function(value) replied = value end)
 H.equal(ended, 1, 'rotateEnd callback settles the camera')
 H.ok(type(replied) == 'table', 'rotateEnd callback replies')
 
+-- Config.rotateRestoreCursor (default on): the cursor hidden for a plain drag goes
+-- back where the drag began. A visible cursor is never moved.
+local cursorAt
+_G.SetCursorLocation = function(x, y) cursorAt = { x, y } end
+local function release(origin) callbacks['qbclothing:nui:rotateEnd'](origin, function() end) end
+release({ x = 0.25, y = 0.75 })
+H.equal(cursorAt, nil, 'no menu open, no move')
+handlers['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+release({ x = 0.25, y = 0.75 })
+H.ok(cursorAt and cursorAt[1] == 0.25 and cursorAt[2] == 0.75, 'the hidden cursor goes back where the drag began')
+cursorAt = nil
+release({})
+H.equal(cursorAt, nil, 'no origin, no move')
+release({ x = 4, y = -1 })
+H.ok(cursorAt and cursorAt[1] == 1.0 and cursorAt[2] == 0.0, 'an origin off screen is clamped')
+cursorAt = nil
+Config.rotateRestoreCursor = false
+release({ x = 0.25, y = 0.75 })
+H.equal(cursorAt, nil, 'rotateRestoreCursor off leaves the cursor where it is')
+Config.rotateRestoreCursor = true
+Config.rotateHideCursor = false
+release({ x = 0.25, y = 0.75 })
+H.equal(cursorAt, nil, 'a cursor left visible for a plain drag is never moved')
+Config.rotateHideCursor = true
+handlers['qbclothing:client:closeSession']({ ok = true })
+
 -- Camera side: the orbit stops at the live angle, not at the old goal.
 _G.Kora.util = { clamp = function(v, lo, hi) return math.max(lo, math.min(hi, v)) end }
 Config.testMode = true

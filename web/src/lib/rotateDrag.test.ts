@@ -35,6 +35,21 @@ test("plain drag rotates by movementX and ends once on release", () => {
     assert.equal(drag.dragging, false)
 })
 
+test("the end carries where the drag began, and its reply is handed out once", () => {
+    const ends: unknown[] = []
+    const reply = Promise.resolve({})
+    const drag = new RotateDrag({
+        rotate: () => {}, recenter: () => {}, start: () => Promise.resolve(false),
+        end: (origin) => { ends.push(origin); return reply },
+    }, { mode: "plain", degPerPixel: 0.5, guard: true, rightButton: true })
+    drag.down({ button: 0, clientX: 250, clientY: 450, width: W, height: H })
+    drag.move(sample(400, 150))
+    drag.up()
+    assert.deepEqual(ends, [{ x: 0.25, y: 0.75 }])
+    assert.equal(drag.takeEnding(), reply)
+    assert.equal(drag.takeEnding(), undefined)
+})
+
 test("only the left button, and the right one when enabled, start a drag", () => {
     const a = setup("plain")
     assert.equal(a.drag.down({ button: 1, clientX: 1, clientY: 1, width: W, height: H }), false)

@@ -29,11 +29,18 @@ export function dragCursor(mode: RotateMode, configured: "grabbing" | "hidden", 
     return hide || mode !== "plain" ? "hidden" : configured
 }
 
+/** Where a drag began, as a 0..1 fraction of the screen. */
+export interface DragOrigin {
+    x: number
+    y: number
+}
+
 export interface DragIO {
     /** Degrees to add to the orbit (already scaled). */
     rotate(deltaDeg: number): void
-    /** The drag is over; Lua settles the camera and gives focus back. */
-    end(): void
+    /** The drag is over; Lua settles the camera, gives focus back and puts a hidden
+     * cursor back at `origin`. May return the pending reply (see takeEnding). */
+    end(origin?: DragOrigin): unknown
     /** controls mode: ask Lua to take the drag. Resolves true when it did. */
     start(button: number, x: number, y: number): Promise<boolean>
     /** recenter mode: ask Lua to put the cursor back at the screen centre. */
@@ -80,6 +87,8 @@ export class RotateDrag {
     private waited = 0
     private recenterFallback = false
     private resync = false
+    private origin: DragOrigin = { x: 0.5, y: 0.5 }
+    private ending: unknown = undefined
 
     private readonly io: DragIO
     private opts: DragOptions
@@ -93,6 +102,13 @@ export class RotateDrag {
     get dragging() { return this.active }
     /** Lua is reading the mouse; no pointer events are expected until it stops. */
     get handedToLua() { return this.active && this.luaOwned }
+    /** What end() returned for the drag that just finished (the reply Lua sends once
+     * the cursor is back), handed out once. */
+    takeEnding(): unknown {
+        const ending = this.ending
+        this.ending = undefined
+        return ending
+    }
 
     /** Returns true when a drag began. */
     down(sample: PointerSample): boolean {
@@ -109,6 +125,8 @@ export class RotateDrag {
         this.resync = false
         this.lastX = sample.clientX
         this.lastY = sample.clientY
+        this.origin = { x: sample.clientX / Math.max(1, sample.width), y: sample.clientY / Math.max(1, sample.height) }
+        this.ending = undefined
         const token = ++this.token
         if (this.opts.mode === "controls" || this.opts.mode === "capture") {
             this.pending = true
@@ -230,6 +248,6 @@ export class RotateDrag {
         this.pending = false
         this.awaitingCenter = false
         this.token++
-        if (wasActive && (this.opts.guard || wasLua)) this.io.end()
+        if (wasActive && (this.opts.guard || wasLua)) this.ending = this.io.end({ ...this.origin })
     }
 }

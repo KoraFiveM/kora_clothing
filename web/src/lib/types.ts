@@ -195,6 +195,12 @@ export interface RotatePayload {
     deltaDeg: number
 }
 
+/** Where the drag began (0..1 of the screen); absent when nothing should move the cursor. */
+export interface RotateEndPayload {
+    x?: number
+    y?: number
+}
+
 export interface LoadOutfitResponse {
     ok: boolean
     model?: string

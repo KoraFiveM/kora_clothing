@@ -133,12 +133,47 @@ dead = true
 Camera.stop()
 H.equal(#tasks, 3, 'a ped that went down keeps the death animation (tasks not cleared)')
 dead = false
+-- kora_ambulance publishes emsDown 'laststand' / 'dead' while down and false
+-- (never true) for a living player.
+for _, down in ipairs({ 'laststand', 'dead' }) do
+    tasks = {}
+    _G.LocalPlayer = { state = { emsDown = down } }
+    Camera.start(9)
+    Camera.stop()
+    H.equal(#tasks, 3, 'nor while kora_ambulance reports the player down: ' .. down)
+end
 tasks = {}
-_G.LocalPlayer = { state = { emsDown = true } }
+_G.LocalPlayer = { state = { emsDown = false } }
 Camera.start(9)
 Camera.stop()
-H.equal(#tasks, 3, 'nor while kora_ambulance reports the player down')
+H.equal(#tasks, 4, 'emsDown false is a living player: the stand-still task is cleared')
 _G.LocalPlayer = nil
+
+-- Config.rotateTurnsPed (default on): a drag turns the ped the way the cursor
+-- moved its front and leaves the camera orbit alone; the opening heading comes
+-- back on close. Off, the camera orbits as before.
+H.equal(Config.rotateTurnsPed, true, 'rotating turns the ped by default')
+H.equal(Config.rotateRestoreCursor, true, 'the cursor goes back after a drag by default')
+local heading = 30.0
+_G.GetEntityHeading = function() return heading end
+_G.SetEntityHeading = function(_, value) heading = value end
+Camera.start(9)
+local orbit = runtime.targetAngle()
+Camera.rotate(-6.0) -- what the NUI sends for a 40 px drag to the right
+approx(heading, 36.0, 'a rightward drag turns the ped by +6 degrees')
+H.equal(runtime.targetAngle(), orbit, 'the camera orbit never moves')
+Camera.stop()
+approx(heading, 30.0, 'the opening heading is put back on close')
+Config.rotateTurnsPed = false
+Camera.start(9)
+orbit = runtime.targetAngle()
+Camera.rotate(-6.0)
+approx(heading, 30.0, 'rotateTurnsPed off: the ped is left alone')
+approx(runtime.targetAngle(), (orbit - 6.0) % 360.0, 'rotateTurnsPed off: the camera orbits')
+Camera.stop()
+Config.rotateTurnsPed = true
+_G.GetEntityHeading = function() return 0.0 end
+_G.SetEntityHeading = nil
 
 Config.camera.holdStill = false
 tasks, ambient = {}, {}

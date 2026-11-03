@@ -169,7 +169,9 @@ Config.loginColourReapply = {
 -- prop ids follow GTA's (3 torso, 4 legs, 6 shoes, 8 undershirt, 11 top ...).
 -- These are base-game freemode drawables; adjust per gender if a clothing pack
 -- on your server shifts what looks sensible. Turn `enabled` off to keep the
--- previous behaviour (the ped's current clothes are carried over).
+-- previous behaviour (the ped's current clothes are carried over). The face,
+-- skin tone, hair colour and head overlays (beard, eyebrows, chest hair) start
+-- on their defaults (skin tone 0, no overlays) and no tattoos are applied.
 Config.starterOutfit = {
     enabled = boolean(true, {
         label = 'New characters start in a starter outfit',
@@ -806,17 +808,28 @@ Config.rotateModeByService = {
     creation = rotateModeFor(nil, 'Rotate drag mode: character creation', 'character creation and admin sessions'),
 }
 
--- rotateMode = 'capture' only. Capture used to orbit the camera around the ped, and
--- its centre pulls swung the camera through walls and the floor. With this on the
--- drag turns the ped's heading instead and the camera stays where the menu framed it.
-Config.captureRotatesPed = true
-if config then
-    Config.captureRotatesPed = config.boolean(true, {
-        label = 'Capture mode turns the character',
-        description = 'In capture rotate mode, dragging turns the character itself and the camera stays fixed inside the shop, so it cannot clip through walls or the floor. The character returns to its original facing when the menu closes. Turn off to orbit the camera around the character instead. Other drag modes always orbit the camera.',
-        live = true,
-    })
-end
+-- Every rotateMode. A drag turns the ped's heading and the camera stays where the
+-- menu framed it (clear of walls: the occlusion check places that framing), so
+-- rotating can never swing the camera through a wall or the floor of a small
+-- shop. The heading the menu opened with is put back when it closes. Off: the
+-- camera orbits the ped instead, and nothing stops it passing through a wall
+-- behind the ped. Read on every drag.
+Config.rotateTurnsPed = boolean(true, {
+    label = 'Rotating turns the character',
+    description = 'Dragging to rotate turns the character while the camera stays where the menu placed it, so the camera never swings through walls or the floor in small shops. The character faces its original direction again when the menu closes. Turn off to orbit the camera around the character instead (the camera can then pass through walls behind the character).',
+    live = true,
+})
+
+-- Puts the cursor back where a rotate drag began when the button is released,
+-- while the cursor is hidden for the drag (rotateHideCursor, the non-plain modes,
+-- or rotateDragCursor = 'hidden'), so it reappears exactly where it vanished
+-- instead of wherever the hidden cursor drifted. 'capture' and 'controls' always
+-- do this; the option covers 'plain', 'recenter' and 'pointer'. Read on every release.
+Config.rotateRestoreCursor = boolean(true, {
+    label = 'Return the cursor after rotating',
+    description = 'When you let go after dragging to rotate the character, the hidden cursor reappears where you pressed the button instead of where the drag moved it. Turn off to show it wherever the drag left it.',
+    live = true,
+})
 
 -- Rotation speed for the plain, capture, pointer and recenter modes (controls mode
 -- has its own rotateControlsSensitivity). Multiplies the built-in 0.15 degrees per pixel.
@@ -1323,6 +1336,21 @@ if Kora and Kora.config and Kora.config.adopt then
         label = 'Female tattoo preview clothing',
         description = 'Maps GTA clothing component IDs to temporary drawable (d) and texture (t) variations used while a female freemode character previews tattoos. Add only valid non-negative component, drawable, and texture IDs; the original outfit is restored when the tattoo session closes.',
     })
+    for _, gender in ipairs({ 'male', 'female' }) do
+        local starter = Config.starterOutfit[gender]
+        starter.components = Kora.config.map(starter.components, tattooStripItem, {
+            keyType = 'integer',
+            live = true,
+            label = ('Starter outfit clothing (%s)'):format(gender),
+            description = ('Maps GTA clothing component IDs to the drawable (d) and texture (t) a new %s character starts in. Components not listed start on drawable 0. Add only valid non-negative component, drawable and texture IDs.'):format(gender),
+        })
+        starter.props = Kora.config.map(starter.props, tattooStripItem, {
+            keyType = 'integer',
+            live = true,
+            label = ('Starter outfit props (%s)'):format(gender),
+            description = ('Maps GTA prop slot IDs (0 hat, 1 glasses, 2 ears, 6 watch, 7 bracelet) to the drawable (d) and texture (t) a new %s character starts with. Slots not listed start empty.'):format(gender),
+        })
+    end
     local visorPair = Kora.config.integer(0, { min = 0 })
     for _, gender in ipairs({ 'male', 'female' }) do
         Config.quickToggle.visor[gender] = Kora.config.map(Config.quickToggle.visor[gender], visorPair, {

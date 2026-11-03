@@ -204,12 +204,18 @@ local function frameAnchor(ped)
     return held.anchor
 end
 
--- Heading the orbit is measured from. Held still it is the heading the menu
--- opened with, which the front-facing start angle was solved for, so the camera
--- stays on the same side of the ped for the whole session whatever the ped's
--- heading does afterwards.
+-- Config.rotateTurnsPed (default on): a rotate drag turns the ped and the camera
+-- stays where the menu framed it, in every rotate mode.
+local function turnsPed()
+    return Config.rotateTurnsPed ~= false
+end
+
+-- Heading the orbit is measured from. Held still, or while drags turn the ped, it
+-- is the heading the menu opened with, which the front-facing start angle was
+-- solved for, so the camera stays on the same side of the ped for the whole
+-- session whatever the ped's heading does afterwards.
 local function frameHeading(ped)
-    if Config.camera.holdStill ~= false and held.heading and held.ped == ped then return held.heading end
+    if held.heading and (Config.camera.holdStill ~= false and held.ped == ped or turnsPed()) then return held.heading end
     return GetEntityHeading(ped)
 end
 
@@ -241,12 +247,14 @@ local function holdPed(ped)
 end
 
 -- A ped that went down meanwhile is left to the death handling, which plays its
--- own animation: clearing tasks would stand it up for a moment.
+-- own animation: clearing tasks would stand it up for a moment. kora_ambulance's
+-- emsDown bag is 'laststand' or 'dead' while down and false (never true) alive.
 local function pedDown(ped)
     if type(IsPedDeadOrDying) == 'function' and IsPedDeadOrDying(ped, true) then return true end
     if type(IsPedRagdoll) == 'function' and IsPedRagdoll(ped) then return true end
     local state = LocalPlayer and LocalPlayer.state
-    return state ~= nil and state.emsDown == true
+    local down = state and state.emsDown
+    return down ~= nil and down ~= false and down ~= 'alive'
 end
 
 local function releasePed()
@@ -509,19 +517,23 @@ function Camera.setZone(zone)
     occlusionDirty = true
 end
 
+---A rotate drag. With Config.rotateTurnsPed (default) the ped turns and the camera
+---stays put, so its front follows the cursor; off, the camera orbits instead.
 ---@param deltaDeg number added to the current orbit angle (positive = clockwise)
 function Camera.rotate(deltaDeg)
-    target.angle = (target.angle + (tonumber(deltaDeg) or 0.0)) % 360.0
+    deltaDeg = tonumber(deltaDeg) or 0.0
+    if turnsPed() then return Camera.rotatePed(-deltaDeg) end
+    target.angle = (target.angle + deltaDeg) % 360.0
 end
 
----Turns the ped itself (capture rotate mode) instead of orbiting the camera: the
----camera is held still (Config.camera.holdStill), so it never leaves the spot the
----menu framed. Positive turns the ped the way a rightward drag on its front would.
+---Turns the ped itself instead of orbiting the camera: the orbit is measured from
+---the heading the menu opened with, so the camera never leaves the spot the menu
+---framed. Positive turns the ped the way a rightward drag on its front would.
 ---The heading the menu opened with is put back when the camera stops.
 ---@param deltaDeg number
 function Camera.rotatePed(deltaDeg)
     deltaDeg = tonumber(deltaDeg)
-    if not deltaDeg or deltaDeg ~= deltaDeg or not exists(pedRef) then return end
+    if not deltaDeg or deltaDeg ~= deltaDeg or not exists(pedRef) or type(SetEntityHeading) ~= 'function' then return end
     SetEntityHeading(pedRef, (GetEntityHeading(pedRef) + deltaDeg) % 360.0)
     pedTurned = true
 end
