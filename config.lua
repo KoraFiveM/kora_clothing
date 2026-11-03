@@ -784,7 +784,17 @@ Config.rotateInvert = config and config.boolean(false, {
     live = true,
 }) or false
 
--- Cursor shown while a rotate drag is held (rotateMode = 'plain'). 'grabbing' pins
+-- Hides the mouse cursor for as long as a rotate drag is held, in every
+-- rotateMode (capture recentres the cursor many times a second, which showed as an
+-- arrow jumping to the middle of the screen). The cursor comes back on release,
+-- blur, Escape and menu close. Turn off to use rotateDragCursor in plain mode.
+Config.rotateHideCursor = config and config.boolean(true, {
+    label = 'Hide cursor while rotating',
+    description = 'Hides the mouse cursor while you hold click to rotate the character, in every rotate drag mode, and shows it again when you let go. Turn off to keep the cursor chosen by Cursor while rotating (plain drag mode only).',
+    live = true,
+}) or true
+
+-- Cursor shown while a rotate drag is held (rotateMode = 'plain', and Config.rotateHideCursor off). 'grabbing' pins
 -- the closed-hand cursor for the whole drag (a full-screen overlay owns it, so
 -- nothing under the pointer can change it); 'hidden' hides it instead. Modes that
 -- move the cursor themselves always hide it, whatever this says.

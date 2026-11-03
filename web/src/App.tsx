@@ -145,7 +145,7 @@ function rotateSensitivity(value: number | undefined) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1
 }
 
-function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin, cursor }: {
+function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightButton, invert, sensitivity, edgeMargin, cursor, hideCursor }: {
     io: DragIO
     onZoom: (notches: number) => void
     /** First real rotate or zoom: the player has found the controls. */
@@ -161,6 +161,8 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
     edgeMargin?: number
     /** Config.rotateDragCursor: shown for the whole drag of a plain drag (see dragCursor). */
     cursor: "grabbing" | "hidden"
+    /** Config.rotateHideCursor: hide the cursor for the whole drag in every mode. */
+    hideCursor: boolean
 }) {
     const options = { mode, degPerPixel: DRAG_ROTATION_DEG_PER_PIXEL * sensitivity * (invert ? -1 : 1), guard: dragGuard, rightButton, edgeMargin }
     const dragRef = useRef<RotateDrag | null>(null)
@@ -175,6 +177,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         // between the arrow and the grab hand mid-drag.
         if (drag.dragging) return
         document.documentElement.classList.remove("is-rotating")
+        delete document.documentElement.dataset.dragCursor
         if (!locked.current) return
         locked.current = false
         releaseRotateLock(document)
@@ -243,7 +246,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         onPointerDown={(event) => {
             if (!drag.down(sample(event.nativeEvent))) return
             // One cursor for the whole drag: the configured one for a plain drag, none when the cursor is moved by the game.
-            document.documentElement.dataset.dragCursor = dragCursor(mode, cursor)
+            document.documentElement.dataset.dragCursor = dragCursor(mode, cursor, hideCursor)
             document.documentElement.classList.add("is-rotating")
             // Lua-owned drags turn the camera without a move ever counting here.
             if (mode === "capture" || mode === "controls") onInteract()
@@ -924,7 +927,7 @@ export default function App() {
     const copy = headlineCopy(open.mode, open.shopLabel, open.service)
 
     return <main className={open.showScrollbar === true ? "clothing-shell show-scrollbars" : "clothing-shell"}>
-        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "plain"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} />
+        <Viewport io={rotateIO} onZoom={zoom} onInteract={dismissHint} mode={open.rotateMode ?? "plain"} pointerLock={open.rotatePointerLock === true} dragGuard={open.rotateDragGuard !== false} rightButton={open.rotateRightButton !== false} invert={open.rotateInvert === true} sensitivity={rotateSensitivity(open.rotateSensitivity)} edgeMargin={open.rotateRecenterEdge} cursor={open.rotateCursor === "hidden" ? "hidden" : "grabbing"} hideCursor={open.rotateHideCursor !== false} />
 
         <div className="headline">
             {copy.badge && <span className="shop-badge">{copy.badge}</span>}

@@ -746,6 +746,7 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
             rotateRightButton = Config.rotateRightButton ~= false,
             rotateInvert = Config.rotateInvert == true,
             rotateCursor = Config.rotateDragCursor == 'hidden' and 'hidden' or 'grabbing',
+            rotateHideCursor = Config.rotateHideCursor ~= false,
             rotateSensitivity = tonumber(Config.rotateSensitivity),
             rotateRecenterEdge = tonumber(Config.rotateRecenterEdge),
             showControlsHint = (Config.ui or {}).showControlsHint ~= false,

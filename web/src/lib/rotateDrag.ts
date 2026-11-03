@@ -21,11 +21,12 @@
 
 export type RotateMode = "capture" | "controls" | "recenter" | "pointer" | "plain"
 
-/** The cursor a drag shows. Only a plain drag leaves the cursor alone, so only it can
- * honour Config.rotateDragCursor; every other mode moves the cursor itself (or hands
- * the mouse to the game), and a visible cursor that gets moved flickers. */
-export function dragCursor(mode: RotateMode, configured: "grabbing" | "hidden"): "grabbing" | "hidden" {
-    return mode === "plain" ? configured : "hidden"
+/** The cursor a drag shows. With Config.rotateHideCursor (default on) it is hidden in
+ * every mode. Off, only a plain drag leaves the cursor alone, so only it can honour
+ * Config.rotateDragCursor; every other mode moves the cursor itself (or hands the
+ * mouse to the game), and a visible cursor that gets moved flickers. */
+export function dragCursor(mode: RotateMode, configured: "grabbing" | "hidden", hide = true): "grabbing" | "hidden" {
+    return hide || mode !== "plain" ? "hidden" : configured
 }
 
 export interface DragIO {

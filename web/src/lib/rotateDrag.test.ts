@@ -277,8 +277,9 @@ test("useRecenter does nothing without a running drag", () => {
 })
 
 test("only a plain drag may show the cursor; every mode that moves it hides it", () => {
-    assert.equal(dragCursor("plain", "grabbing"), "grabbing")
-    assert.equal(dragCursor("plain", "hidden"), "hidden")
+    assert.equal(dragCursor("plain", "grabbing"), "hidden", "hidden by default")
+    assert.equal(dragCursor("plain", "grabbing", false), "grabbing")
+    assert.equal(dragCursor("plain", "hidden", false), "hidden")
     for (const mode of ["capture", "recenter", "pointer", "controls"] as const) {
         assert.equal(dragCursor(mode, "grabbing"), "hidden", mode)
     }

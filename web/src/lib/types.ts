@@ -109,6 +109,8 @@ export interface OpenPayload {
     rotateInvert?: boolean
     /** Config.rotateDragCursor; absent means the grabbing hand. */
     rotateCursor?: "grabbing" | "hidden"
+    /** Config.rotateHideCursor; absent means hidden while rotating. */
+    rotateHideCursor?: boolean
     /** Config.rotateSensitivity (pointer, recenter, plain); absent means 1. */
     rotateSensitivity?: number
     /** Config.rotateRecenterEdge (recenter mode); absent means the built-in default. */
