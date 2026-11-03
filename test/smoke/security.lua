@@ -114,7 +114,7 @@ H.ok(server:find("elseif groomingService and modelGender then", 1, true),
     'every grooming target routes to the policy matching the player model')
 H.ok(server:find("service = modelGender == 'female' and 'hairdresser' or 'barber'", 1, true),
     'female and male models resolve to their matching hair policy before validation')
-H.ok(config:find('Config.genderLockedSalons = config and config.boolean(false', 1, true) and config:find('live = true', config:find('Config.genderLockedSalons', 1, true), true),
+H.ok(config:find('Config.genderLockedSalons = boolean(false', 1, true) and config:find('live = true', config:find('Config.genderLockedSalons', 1, true), true),
     'gender-locked salons are an in-game live option defaulting to off')
 H.ok(server:find("Config.genderLockedSalons == true and mode == 'shop'", 1, true),
     'the gender lock is read live, enforced server-side and limited to shop visits')

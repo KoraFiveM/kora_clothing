@@ -10,6 +10,14 @@ Config = {}
 -- Without kora_lib's config module the plain defaults after `or` are used.
 local config = Kora and Kora.config
 
+-- Boolean setting: a config-workspace descriptor when kora_lib's config module is
+-- loaded, otherwise the plain default. Avoid `config.boolean(...) or true`: with
+-- the module missing it turns a default edited to false back into true.
+local function boolean(default, options)
+    if config then return config.boolean(default, options) end
+    return default
+end
+
 -- Every fitting-room bucket is `Config.bucket.base + source`. `source` is a
 -- small per-connection integer (FiveM reuses low slot numbers), so this stays
 -- far below any world/instance bucket another resource might use starting
@@ -31,16 +39,16 @@ local config = Kora and Kora.config
 --                       once on enter and once on leave, nothing runs per frame.
 Config.bucket = {
     base = 1000000,
-    disablePopulation = config and config.boolean(true, {
+    disablePopulation = boolean(true, {
         label = 'Disable ambient population in the first-character fitting room',
         description = 'When enabled, ambient peds and vehicles (traffic, jet skis, pedestrians) are switched off inside the private routing bucket used for the one-time first-character fitting room, so they do not wander through the creation scene. Only that personal bucket is affected, never the normal world, and shop, barber and wardrobe sessions are unchanged. Applies the next time a first-character fitting room opens.',
         live = true,
-    }) or true,
-    suppressClientPopulation = config and config.boolean(true, {
+    }),
+    suppressClientPopulation = boolean(true, {
         label = 'Hide ambient peds and vehicles during character creation',
         description = 'While a new character is being created, this player stops seeing ambient pedestrians and traffic: population budgets are set to zero and nearby peds and vehicles are cleared, then the budgets are restored when the fitting room closes. Only the creating player is affected. Applies the next time a character is created.',
         live = true,
-    }) or true,
+    }),
 }
 
 -- Currency is shared by every paid service. Prices live beside the service
@@ -76,63 +84,63 @@ Config.services = {
 -- the server. Skin tone stays creation-only and is not configurable here.
 Config.headOverlays = {
     eyebrows = {
-        creator = config and config.boolean(true, {
+        creator = boolean(true, {
             label = 'Eyebrows in character creation',
             description = 'Lets players choose eyebrow style, opacity and colour while creating a character. Turn off to hide eyebrow options from creation.',
             live = true,
-        }) or true,
-        barber = config and config.boolean(true, {
+        }),
+        barber = boolean(true, {
             label = 'Eyebrows at the barber',
             description = 'Lets players change eyebrow style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide eyebrow options there.',
             live = true,
-        }) or true,
+        }),
         -- Off (default): eyebrows have their own colour palette, independent of the
         -- hair colour. Characters saved before that palette existed have no eyebrow
         -- colour of their own and keep matching their hair until a colour is picked
         -- (or a colour is picked). On: the eyebrow palette is hidden and
         -- eyebrows always take the primary hair colour, the old behaviour.
-        followHairColor = config and config.boolean(false, {
+        followHairColor = boolean(false, {
             label = 'Eyebrows follow hair colour',
             description = 'Off (default): players pick an eyebrow colour of their own, separate from hair colour. On: no eyebrow colour palette is shown and eyebrows always use the primary hair colour. Applies to character creation and barbers.',
             live = true,
-        }) or false,
+        }),
     },
     facialHair = {
-        creator = config and config.boolean(true, {
+        creator = boolean(true, {
             label = 'Facial hair in character creation',
             description = 'Lets players choose facial hair style, opacity and colour while creating a character. Turn off to hide facial hair options from creation.',
             live = true,
-        }) or true,
-        barber = config and config.boolean(true, {
+        }),
+        barber = boolean(true, {
             label = 'Facial hair at the barber',
             description = 'Lets players change facial hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide facial hair options there.',
             live = true,
-        }) or true,
+        }),
         -- The menu has no "match hair colour" button; this is the server-side
         -- version of it. On: no facial hair palette is shown and facial hair
         -- always takes the primary hair colour.
-        followHairColor = config and config.boolean(false, {
+        followHairColor = boolean(false, {
             label = 'Facial hair follows hair color',
             description = 'Off (default): players pick a facial hair color of their own. On: no facial hair color palette is shown and facial hair always uses the primary hair color. Applies to character creation and barbers.',
             live = true,
-        }) or false,
+        }),
     },
     chestHair = {
-        creator = config and config.boolean(true, {
+        creator = boolean(true, {
             label = 'Chest hair in character creation',
             description = 'Lets players choose chest hair style, opacity and colour while creating a character. Turn off to hide chest hair options from creation.',
             live = true,
-        }) or true,
-        barber = config and config.boolean(true, {
+        }),
+        barber = boolean(true, {
             label = 'Chest hair at the barber',
             description = 'Lets players change chest hair style, opacity and colour at barbers and hairdressers, charged at the hair price. Turn off to hide chest hair options there.',
             live = true,
-        }) or true,
-        followHairColor = config and config.boolean(false, {
+        }),
+        followHairColor = boolean(false, {
             label = 'Chest hair follows hair color',
             description = 'Off (default): players pick a chest hair color of their own. On: no chest hair color palette is shown and chest hair always uses the primary hair color. Applies to character creation and barbers.',
             live = true,
-        }) or false,
+        }),
     },
 }
 
@@ -145,11 +153,11 @@ Config.headOverlays = {
 -- if the player opens a fitting room or the model changes. Turn off to apply
 -- the skin once only.
 Config.loginColourReapply = {
-    enabled = config and config.boolean(true, {
+    enabled = boolean(true, {
         label = 'Re-apply hair colour after login',
         description = 'Re-applies the saved hair colour, highlight and eyebrow/facial hair colours shortly after login, because the spawn sequence can reset them to default. Turn off to apply the saved look only once.',
         live = true,
-    }) or true,
+    }),
     delays = { 750, 3000 },
 }
 
@@ -163,11 +171,11 @@ Config.loginColourReapply = {
 -- on your server shifts what looks sensible. Turn `enabled` off to keep the
 -- previous behaviour (the ped's current clothes are carried over).
 Config.starterOutfit = {
-    enabled = config and config.boolean(true, {
+    enabled = boolean(true, {
         label = 'New characters start in a starter outfit',
         description = 'On (default): a newly created character is reset to the starter outfit below before spawning and before the character creation menu opens, so it never inherits the previous character\'s clothes. Off: the ped keeps whatever it was wearing.',
         live = true,
-    }) or true,
+    }),
     male = {
         components = {
             [3]  = { d = 0,  t = 0 }, -- torso
@@ -524,11 +532,11 @@ Config.tattoo = {
     -- Duplicate button in the studio list. Off keeps one instance per tattoo
     -- (extra instances are dropped server-side). Read each time a skin is
     -- sanitised or the studio opens.
-    allowStacking = config and config.boolean(true, {
+    allowStacking = boolean(true, {
         label = 'Allow stacking tattoos',
         description = 'Lets players apply the same tattoo more than once (a copy button appears on applied tattoos) so it renders darker. Turn off to allow one instance of each tattoo; extra instances in saved skins are dropped.',
         live = true,
-    }) or true,
+    }),
     -- Most instances of ONE tattoo on a player. Three is visibly darker without
     -- turning the body solid black; clamped to 1-10.
     maxStack = config and config.integer(3, {
@@ -548,22 +556,22 @@ Config.tattoo = {
         -- Off falls back to the old behaviour: the studio always strips to
         -- Config.tattooStrip on open and offers no buttons. Read each time the
         -- studio opens.
-        enabled = config and config.boolean(true, {
+        enabled = boolean(true, {
             label = 'Tattoo studio undress buttons',
             description = 'Shows clothing buttons (top, legs, shoes, headwear, undress all) in the tattoo studio so players can see tattoos under their clothes. Preview only: nothing is saved or charged and the original clothing is restored when the menu closes. Turn off to use the fixed strip in Config.tattooStrip with no buttons.',
             live = true,
-        }) or true,
+        }),
         -- Character creation (and the admin session) also offers tattoos, but
         -- clothing there hides them. When on, choosing a tattoo there bares the
         -- clothing over its area for the preview (Head -> headwear, Torso/Arms/
         -- Back -> top, Legs -> legs, using the `parts` below). Preview only: the
         -- outfit that is saved is unchanged, and choosing an item in the menu for
         -- a bared slot dresses it again. Read each time a tattoo is chosen.
-        previewInCreator = config and config.boolean(true, {
+        previewInCreator = boolean(true, {
             label = 'Show tattoos through clothing in character creation',
             description = 'In character creation, picking a tattoo temporarily takes off the clothing covering that body area so the tattoo is visible. Preview only: the saved outfit is not changed. Turn off to leave clothing on.',
             live = true,
-        }) or true,
+        }),
         -- Parts (ids from `parts` below) already removed when the studio opens.
         -- The default matches what the studio always did before the buttons
         -- existed (top, legs and head cover off, shoes left on), so tattoos on
@@ -642,11 +650,11 @@ Config.tattoo = {
         -- Config.ShopClerks, Ammu-Nation): every shop with service = 'tattoo'
         -- gets one (see below). Turn off on a map or MLO that already has its own
         -- artist. Applied live: the artists are rebuilt when this changes.
-        enabled = config and config.boolean(true, {
+        enabled = boolean(true, {
             label = 'Tattoo artist peds',
             description = 'Spawns a frozen tattoo artist ped in each tattoo shop (client side, only while you are nearby). Targeting the artist with "Get tattooed" opens the tattoo studio, and the shop zone prompt is hidden while the artist is there. The artist is faded out while you are in the studio so they do not block the view. Turn off if your map or MLO already has its own artist; the shop zone is then used as before. The decorative shop clerk for these shops is not spawned while this is on, to avoid two peds in one spot.',
             live = true,
-        }) or true,
+        }),
         -- Opacity (0 invisible .. 255 fully visible) of the artist while the
         -- studio menu is open. Local to the player in the studio.
         alpha = config and config.integer(0, {
@@ -693,11 +701,11 @@ Config.interactDistance = 2.0
 -- Hides the minimap while any clothing menu (shop, barber, tattoo, creator,
 -- wardrobe) is open and restores it afterwards. Only used when kora_hud is not
 -- running; kora_hud hides the radar itself.
-Config.hideRadarInMenu = config and config.boolean(true, {
+Config.hideRadarInMenu = boolean(true, {
     label = 'Hide radar in menus',
     description = 'Hides the minimap while a clothing, barber, tattoo or character creation menu is open, then shows it again. Only applies when kora_hud is not running, because kora_hud already hides the radar itself.',
     live = true,
-}) or true
+})
 
 -- Off (default): barbers and hairdressers both serve everyone, and the server
 -- gives each player the menu matching their freemode model. On: a barber only
@@ -705,11 +713,11 @@ Config.hideRadarInMenu = config and config.boolean(true, {
 -- gender is told to try the other shop. Shop visits only -- admin sessions,
 -- character creation and other services are unaffected. Read on every shop
 -- visit, so changes apply to the next session without a restart.
-Config.genderLockedSalons = config and config.boolean(false, {
+Config.genderLockedSalons = boolean(false, {
     label = 'Gender-locked salons',
     description = 'When enabled, barbers only serve male characters and hairdressers only female characters, and anyone else is told to try the other shop. When disabled, both shops serve everyone and show the menu matching the character. Admin sessions and character creation are not affected. Applies to the next shop visit.',
     live = true,
-}) or false
+})
 
 -- How players open a shop. 'target' uses a kora_target zone option; 'textui'
 -- shows "[E] Open <shop>" through kora_lib's TextUI while inside the shop zone
@@ -734,21 +742,21 @@ Config.showTargetHints = config and config.optional(nil, config.boolean(true), {
 -- Captures the mouse while dragging to rotate the ped so the cursor cannot leave
 -- the screen. Read each time the menu opens; the NUI falls back to a plain drag
 -- if the game refuses the lock.
-Config.rotatePointerLock = config and config.boolean(true, {
+Config.rotatePointerLock = boolean(true, {
     label = 'Capture mouse while rotating',
     description = 'Locks the mouse while you hold click to rotate the character in clothing, barber, tattoo and creation menus, so rotation continues without lifting the button. Turn off to use a plain drag.',
     live = true,
-}) or true
+})
 
 -- Ends a rotate drag whenever the mouse button release cannot be seen: the cursor
 -- left the game window, focus was lost, or a move arrives with the button up.
 -- Without it the camera keeps spinning until the player clicks again. Read each
 -- time the menu opens.
-Config.rotateDragGuard = config and config.boolean(true, {
+Config.rotateDragGuard = boolean(true, {
     label = 'End rotate drag when the mouse is lost',
     description = 'Stops rotating the character when the cursor leaves the game window, the window loses focus, or the mouse button is released out of sight. Turn off to use the plain press/release drag.',
     live = true,
-}) or true
+})
 
 -- How drag-to-rotate is read.
 -- 'plain' (default): the NUI turns the character from the mouse movement it sees
@@ -820,29 +828,29 @@ Config.rotateSensitivity = config and config.number(1.0, {
 }) or 1.0
 
 -- Also lets the right mouse button rotate the character, in every rotateMode.
-Config.rotateRightButton = config and config.boolean(true, {
+Config.rotateRightButton = boolean(true, {
     label = 'Right mouse button rotates',
     description = 'Holding the right mouse button over the character rotates it, like the left button. Turn off to rotate with the left button only.',
     live = true,
-}) or true
+})
 
 -- Reverses the drag direction in every rotateMode (default: dragging right turns
 -- the character clockwise, like grabbing its front).
-Config.rotateInvert = config and config.boolean(false, {
+Config.rotateInvert = boolean(false, {
     label = 'Invert rotate direction',
     description = 'Reverses which way the character turns when you drag the mouse left or right.',
     live = true,
-}) or false
+})
 
 -- Hides the mouse cursor for as long as a rotate drag is held, in every
 -- rotateMode (capture recentres the cursor many times a second, which showed as an
 -- arrow jumping to the middle of the screen). The cursor comes back on release,
 -- blur, Escape and menu close. Turn off to use rotateDragCursor in plain mode.
-Config.rotateHideCursor = config and config.boolean(true, {
+Config.rotateHideCursor = boolean(true, {
     label = 'Hide cursor while rotating',
     description = 'Hides the mouse cursor while you hold click to rotate the character, in every rotate drag mode, and shows it again when you let go. Turn off to keep the cursor chosen by Cursor while rotating (plain drag mode only).',
     live = true,
-}) or true
+})
 
 -- Cursor shown while a rotate drag is held (rotateMode = 'plain', and Config.rotateHideCursor off). 'grabbing' pins
 -- the closed-hand cursor for the whole drag (a full-screen overlay owns it, so
@@ -901,11 +909,11 @@ Config.ui = {
     -- the screen when a clothing, barber, tattoo or creator menu opens. It does
     -- not take mouse input or cover any panel, and fades after the first rotate
     -- drag or wheel zoom, or after about 8 seconds. Read each time a menu opens.
-    showControlsHint = config and config.boolean(true, {
+    showControlsHint = boolean(true, {
         label = 'Show camera controls hint',
         description = 'Shows a short Drag to rotate / Scroll to zoom reminder when a clothing, barber, tattoo or creator menu opens. It fades after the first rotate or zoom, or after about 8 seconds. Turn off to never show it.',
         live = true,
-    }) or true,
+    }),
     -- Character creation (and admin sessions) open on the Style tab with Hair
     -- selected, so hair, hair colour, facial hair and eyebrows are visible at
     -- once instead of behind Style > Hair. Which of those parts are offered is
@@ -914,16 +922,16 @@ Config.ui = {
     -- keys and touchpads either way; this only decides whether the grey
     -- scrollbar is drawn at their edge. Off (default) hides it. Read each time a
     -- menu opens.
-    showScrollbar = config and config.boolean(false, {
+    showScrollbar = boolean(false, {
         label = 'Show menu scrollbars',
         description = 'Draws a scrollbar at the edge of the menu columns when they are longer than the screen. Off by default: the columns still scroll with the mouse wheel anywhere over them and with the arrow keys.',
         live = true,
-    }) or false,
-    creatorOpensOnHair = config and config.boolean(true, {
+    }),
+    creatorOpensOnHair = boolean(true, {
         label = 'Creator opens on hair and grooming',
         description = 'Character creation opens on the Style tab with Hair selected, so hair, hair colour, facial hair and eyebrows are shown straight away. Turn off to open on the first clothing tab instead; the hair options are then under Style > Hair. Barbers and clothing shops are unaffected.',
         live = true,
-    }) or true,
+    }),
     -- Preview clothing switches stacked on the left of the menu, under My
     -- Outfits: Hat, Shirt, Pants and Shoes. Each takes that item off and puts
     -- it back, so chest hair or a new cut can be seen. Preview only: the change
@@ -940,37 +948,37 @@ Config.ui = {
     --   items    : each switch on or off.
     -- (Replaces Config.ui.barberTopToggle; setting that to false still hides the Shirt switch.)
     clothingToggles = {
-        enabled = config and config.boolean(true, {
+        enabled = boolean(true, {
             label = 'Preview clothing switches',
             description = 'Shows Hat, Shirt, Pants and Shoes switches on the left of the menu, under My Outfits, that take that item off and put it back so hair, chest hair or a style can be seen. Preview only: nothing is saved or charged and the real clothing comes back when the menu closes. Choose the menus and the switches below.',
             live = true,
-        }) or true,
+        }),
         services = config and config.list({ 'barber', 'hairdresser' }, config.string('barber'), {
             label = 'Menus with clothing switches',
             description = 'Menus that show the preview clothing switches: barber, hairdresser, clothing, creation. Barbers and hairdressers by default.',
             live = true,
         }) or { 'barber', 'hairdresser' },
         items = {
-            hat = config and config.boolean(true, {
+            hat = boolean(true, {
                 label = 'Hat switch',
                 description = 'Shows the Hat switch (takes the hat off and puts it back).',
                 live = true,
-            }) or true,
-            shirt = config and config.boolean(true, {
+            }),
+            shirt = boolean(true, {
                 label = 'Shirt switch',
                 description = 'Shows the Shirt switch (takes the top, undershirt and gloves off and puts them back), for example to see chest hair.',
                 live = true,
-            }) or true,
-            pants = config and config.boolean(true, {
+            }),
+            pants = boolean(true, {
                 label = 'Pants switch',
                 description = 'Shows the Pants switch (takes the pants off and puts them back).',
                 live = true,
-            }) or true,
-            shoes = config and config.boolean(true, {
+            }),
+            shoes = boolean(true, {
                 label = 'Shoes switch',
                 description = 'Shows the Shoes switch (takes the shoes off and puts them back).',
                 live = true,
-            }) or true,
+            }),
         },
     },
 }
@@ -1001,21 +1009,21 @@ Config.camera = {
     -- Following the breathing / idle animation made the whole view sway, so the
     -- ped looked like it was moving in place, most of all while rotating. Off
     -- keeps the old per-frame tracking. Read when a menu opens.
-    holdStill = config and config.boolean(true, {
+    holdStill = boolean(true, {
         label = 'Hold the character still in menus',
         description = 'Pauses the idle fidget animations, stops the character turning its head and body to look at the camera, and keeps the camera fixed on where the character stands while a clothing, barber, tattoo or creator menu is open, so the character does not sway or appear to move in place while you rotate. Turn off to let the camera follow the idle animation and leave its tasks alone, as before.',
         live = true,
-    }) or true,
+    }),
     -- Frame the face and shoes zones on the ped's head and foot bones, and size
     -- the camera limits from them, instead of from the model bounding box. Fixes
     -- the face view stopping at the shoulders and the shoes view dropping under
     -- the map on female / differently sized peds. Turn off for the old
     -- spine-offset framing. Read while the camera runs.
-    frameToBones = config and config.boolean(true, {
+    frameToBones = boolean(true, {
         label = 'Frame head and feet on their bones',
         description = "Centres the face and shoes camera views on the character's head and foot bones so they work for every ped model and height. Turn off to use the fixed offsets from the spine instead.",
         live = true,
-    }) or true,
+    }),
     -- The fitting-room camera is never lower than this many metres above the
     -- floor under the ped's feet, so the shoes view cannot go under the map.
     -- 0 turns the floor clamp off.
@@ -1057,11 +1065,11 @@ Config.camera = {
     -- buttons at the top; the player already has full camera control, so a
     -- forced move on every tab click is more irritating than helpful. Read
     -- each time a category is chosen.
-    resetOnCategoryChange = config and config.boolean(false, {
+    resetOnCategoryChange = boolean(false, {
         label = 'Move camera when changing category',
         description = 'Moves the fitting-room camera to the framing for each clothing or tattoo category when it is selected, and clears any mouse-wheel zoom. Off by default so the camera stays where the player put it; the camera buttons at the top always work.',
         live = true,
-    }) or false,
+    }),
     -- Where the camera starts when a clothing, barber, tattoo or creator menu
     -- opens. 'front' places it in front of the ped, looking at the face, so
     -- the player sees the character face-on. 'current' keeps the older
@@ -1143,49 +1151,49 @@ Config.camera = {
 --                  out-of-range drawable is skipped. `reset` / `all` (and `/c` with
 --                  `resetWords`) put everything back.
 Config.quickToggle = {
-    enabled = config and config.boolean(true, {
+    enabled = boolean(true, {
         label = 'Quick clothing toggles (/c <part>)',
         description = 'Adds a chat command (default /c) with a part argument (vest, shirt, pants, shoes, hat, mask, visor, glasses, ...) that takes that clothing item off and, on a second use, puts it back. Temporary: nothing is saved. Turn off to remove the command and its chat suggestion (applies on the next resource start).',
-    }) or true,
+    }),
     command = config and config.string('c', {
         label = 'Quick toggle command name',
         description = 'Chat command name without the slash. Change it if another resource already uses /c. Applies on the next resource start.',
     }) or 'c',
-    chatSuggestion = config and config.boolean(true, {
+    chatSuggestion = boolean(true, {
         label = 'Quick toggle chat suggestion',
         description = 'Shows the command and its valid parts in the chat suggestions.',
-    }) or true,
+    }),
     cooldownMs = config and config.integer(1500, {
         min = 0, max = 60000,
         label = 'Quick toggle cooldown (ms)',
         description = 'Minimum time between two uses of the command by one player. 0 disables the cooldown.',
         live = true,
     }) or 1500,
-    allowDead = config and config.boolean(false, {
+    allowDead = boolean(false, {
         label = 'Quick toggles while dead',
         description = 'Allow the command while the player is dead or downed.',
         live = true,
-    }) or false,
-    allowCuffed = config and config.boolean(false, {
+    }),
+    allowCuffed = boolean(false, {
         label = 'Quick toggles while cuffed',
         description = 'Allow the command while handcuffed (needs kora_police; ignored if it is not running).',
         live = true,
-    }) or false,
-    allowInVehicle = config and config.boolean(true, {
+    }),
+    allowInVehicle = boolean(true, {
         label = 'Quick toggles in a vehicle',
         description = 'Allow the command while sitting in a vehicle.',
         live = true,
-    }) or true,
-    animations = config and config.boolean(true, {
+    }),
+    animations = boolean(true, {
         label = 'Quick toggle animations',
         description = 'Plays a short clothing animation when an item is taken off or put back. Turn off for instant changes.',
         live = true,
-    }) or true,
-    animationsInVehicle = config and config.boolean(false, {
+    }),
+    animationsInVehicle = boolean(false, {
         label = 'Quick toggle animations in a vehicle',
         description = 'Also play the animation while in a vehicle. Off by default: the change is instant there.',
         live = true,
-    }) or false,
+    }),
     resetWords = config and config.list({ 'reset', 'all' }, config.string('reset'), {
         label = 'Quick toggle reset arguments',
         description = 'Arguments that put every removed item back on.',
@@ -1280,16 +1288,16 @@ Config.quickToggle = {
 --                     while a menu is open (minimum 50). Otherwise the kora_lib cache's
 --                     isDead change and the state bag close the menu with no polling.
 Config.closeWhenDowned = {
-    enabled = config and config.boolean(true, {
+    enabled = boolean(true, {
         label = 'Close appearance menus when the player goes down',
         description = 'When enabled, any open clothing, barber, surgeon, tattoo or outfit menu is cancelled (preview changes reverted) as soon as the player enters last stand, bleed-out or dies. The mandatory first-character creation is never cancelled.',
         live = true,
-    }) or true,
-    blockOpen = config and config.boolean(true, {
+    }),
+    blockOpen = boolean(true, {
         label = 'Block opening appearance menus while downed',
         description = 'When enabled, menus cannot be opened while the player is in last stand or dead. Only applies while "Close appearance menus when the player goes down" is on.',
         live = true,
-    }) or true,
+    }),
     checkIntervalMs = config and config.integer(250, {
         label = 'Downed watchdog interval (ms)',
         description = 'Only used when kora_lib has no cache module: how often, while a menu is open, the downed / dead state is polled. With the cache, menus close on its death event and the state bag without polling.',

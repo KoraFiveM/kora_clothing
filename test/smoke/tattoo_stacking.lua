@@ -54,7 +54,7 @@ H.ok(server:find('Shared.tattooPriceDiff(model, previousSkin.tattoos, newSkin.ta
 H.ok(server:find('Shared.tattooCounts(tattoosA)', 1, true), 'skin equality compares tattoo counts, so a stacked look is not treated as an owned one')
 H.ok(client:find('return Shared.sanitiseTattoos(model, tattoos)', 1, true), 'the client applies every instance')
 H.ok(client:find('tattooStacking = Shared.tattooStacking()', 1, true), 'the studio is told the stack limits')
-H.ok(read('config.lua'):find('allowStacking = config and config.boolean(true', 1, true), 'allowStacking has a descriptor')
+H.ok(read('config.lua'):find('allowStacking = boolean(true', 1, true), 'allowStacking has a descriptor')
 
 -- Persistence: playerskins stores the skin JSON as sanitised, so repeats persist.
 local function encode(list) return table.concat(list, '|') end
