@@ -190,8 +190,9 @@ drag survives the cursor reaching the screen edge (read each time a menu opens).
 (`clothing`, `barber`, `hairdresser`, `tattoo`, `creation`); an unset entry follows
 `Config.rotateMode`. Every entry is unset by default, so barbers and hairdressers,
 like character creation, clothing shops and tattoo studios, use `Config.rotateMode`
-(`'plain'`). Set `barber` / `hairdresser` to `'capture'` if a fast drag there should
-never carry the cursor out of the window onto a second monitor.
+(`'capture'`: the cursor is hidden for the drag and held inside the game window, so it
+can never reach a second monitor). Set a menu to `'plain'` to leave the cursor alone
+there; it is then hidden but free to leave a windowed game.
 
 In every mode the drag turns the character, not the camera
 (`Config.rotateTurnsPed`, default `true`): the camera stays where the menu framed
@@ -209,14 +210,15 @@ the cursor hidden until Lua has moved it back (at most 250 ms).
 `Config.rotateSensitivity` (default `1.0`) scales the degrees turned per pixel in
 the plain, capture, pointer and recenter modes:
 
-- `'plain'` (default) — a normal press/move/release drag. The NUI turns the
+- `'plain'` — a normal press/move/release drag. The NUI turns the
   character from the mouse movement it sees (`movementX`), one
   `qbclothing:nui:rotate` message per animation frame, and the cursor is never
   touched: no Lua thread, no `SetCursorLocation`, no NUI focus change. A full-screen
   overlay owns the cursor for the whole drag: hidden by default
   (`Config.rotateHideCursor`), or with that off the cursor set by
   `Config.rotateDragCursor` (`'grabbing'` or `'hidden'`). The cursor stops at the screen edge, so a very long
-  drag the same way needs a second click.
+  drag the same way needs a second click, and nothing keeps it inside a windowed game
+  (it can reach a second monitor), which is why `'capture'` is the default.
 - Every mode below moves the cursor itself to keep rotating at the edge. A visible
   cursor that is moved flickers (arrow / hand), so in these modes the cursor is
   always hidden for the drag, whatever `Config.rotateHideCursor` and
@@ -397,8 +399,8 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.camera.zones` — per-zone (`full`/`face`/`torso`/`legs`/`shoes`) framing presets for the fitting-room camera
 - `Config.camera.holdStill` (default `true`) — pause idle fidgets, stop the ped turning to look at the camera, and keep the camera fixed on where the ped stands while a menu is open (see [The fitting-room camera](#the-fitting-room-camera))
 - `Config.ui.showScrollbar` (default `false`) — draw the scrollbar on the menu columns; they scroll with the wheel and arrow keys either way
-- `Config.rotateMode` (default `'plain'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
-- `Config.rotateModeByService` (all of `clothing`, `barber`, `hairdresser`, `tattoo` and `creation` unset by default, so every menu, barber and hairdresser included, uses `'plain'`) — per-menu `rotateMode` override; unset entries follow `Config.rotateMode`
+- `Config.rotateMode` (default `'capture'`) — how drag-to-rotate keeps the cursor from the screen edge; see [The fitting-room camera](#the-fitting-room-camera)
+- `Config.rotateModeByService` (all of `clothing`, `barber`, `hairdresser`, `tattoo` and `creation` unset by default, so every menu, barber and hairdresser included, uses `Config.rotateMode`, `'capture'`) — per-menu `rotateMode` override; unset entries follow `Config.rotateMode`
 - `Config.rotateTurnsPed` (default `true`) — in every rotate mode the drag turns the character and the camera stays where the menu framed it, so it cannot clip through walls or the floor; the opening heading is restored on close. `false` orbits the camera instead (replaces the capture-only `Config.captureRotatesPed`)
 - `Config.rotateHideCursor` (default `true`) — hide the cursor while a rotate drag is held, in every mode; release shows it again
 - `Config.rotateHideMethod` (`'blank'` default, or `'none'`) — how the cursor is hidden for the drag. `'blank'` swaps it for a transparent image cursor (falling back to CSS `cursor: none`), because FiveM's browser does not always act on `cursor: none` alone and the arrow stayed visible; `'none'` uses `cursor: none` only. Only used while `Config.rotateHideCursor` is on

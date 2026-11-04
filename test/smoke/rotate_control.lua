@@ -113,12 +113,12 @@ local function lastFocus() local f = focus[#focus]; return f and f[1], f and f[2
 local function runThread() local fn = table.remove(threads, 1); fn() end
 local function lastMessage() return messages[#messages] end
 
-H.equal(Config.rotateMode, 'plain', 'plain (no cursor moves) is the default mode')
+H.equal(Config.rotateMode, 'capture', 'capture (hidden cursor held inside the window) is the default mode')
 H.equal(Config.rotateSensitivity, 1.0, 'rotate sensitivity defaults to 1')
 H.equal(Config.rotateRightButton, true, 'right button rotates by default')
-H.equal(RotateControl.mode(), 'plain', 'mode resolves to plain')
+H.equal(RotateControl.mode(), 'capture', 'mode resolves to capture')
 Config.rotateMode = 'nonsense'
-H.equal(RotateControl.mode(), 'plain', 'unknown mode falls back to plain')
+H.equal(RotateControl.mode(), 'capture', 'unknown mode falls back to capture')
 Config.rotateMode = 'pointer'
 H.equal(RotateControl.mode(), 'pointer', 'pointer mode')
 Config.rotatePointerLock = false
@@ -402,22 +402,22 @@ handlers['qbclothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'controls'
 
 -- Per-menu modes (Config.rotateModeByService): none by default, so every menu follows
--- Config.rotateMode ('plain'); a server can still opt a menu into capture.
+-- Config.rotateMode ('capture'); a server can still opt a menu into plain.
 reset()
-Config.rotateMode = 'plain'
+Config.rotateMode = 'capture'
 H.equal(Config.rotateModeByService.barber, nil, 'barbers have no override by default')
 H.equal(Config.rotateModeByService.hairdresser, nil, 'hairdressers have no override by default')
 H.equal(Config.rotateModeByService.creation, nil, 'creation has no override by default')
 H.equal(Config.rotateModeByService.clothing, nil, 'clothing shops have no override by default')
 H.equal(Config.rotateModeByService.tattoo, nil, 'tattoo studios have no override by default')
-H.equal(RotateControl.mode('creation'), 'plain', 'creation resolves plain')
-H.equal(RotateControl.mode('barber'), 'plain', 'barber resolves plain')
-H.equal(RotateControl.mode('hairdresser'), 'plain', 'hairdresser resolves plain')
-H.equal(RotateControl.mode('clothing'), 'plain', 'clothing resolves plain')
-H.equal(RotateControl.mode('tattoo'), 'plain', 'tattoo resolves plain')
-H.equal(RotateControl.mode(), 'plain', 'no menu: Config.rotateMode')
+H.equal(RotateControl.mode('creation'), 'capture', 'creation resolves capture')
+H.equal(RotateControl.mode('barber'), 'capture', 'barber resolves capture')
+H.equal(RotateControl.mode('hairdresser'), 'capture', 'hairdresser resolves capture')
+H.equal(RotateControl.mode('clothing'), 'capture', 'clothing resolves capture')
+H.equal(RotateControl.mode('tattoo'), 'capture', 'tattoo resolves capture')
+H.equal(RotateControl.mode(), 'capture', 'no menu: Config.rotateMode')
 Config.rotateModeByService.barber = 'nonsense'
-H.equal(RotateControl.mode('barber'), 'plain', 'an unknown override falls back to Config.rotateMode')
+H.equal(RotateControl.mode('barber'), 'capture', 'an unknown override falls back to Config.rotateMode')
 Config.rotateModeByService.barber = 'capture'
 H.equal(RotateControl.mode('barber'), 'capture', 'a barber can opt into capture')
 Config.rotateMode = 'recenter'

@@ -761,42 +761,48 @@ Config.rotateDragGuard = boolean(true, {
 })
 
 -- How drag-to-rotate is read.
--- 'plain' (default): the NUI turns the character from the mouse movement it sees
+-- 'capture' (default): the cursor is hidden for the drag and held near the screen
+-- centre, so it can never reach the edge of the window or carry over onto a second
+-- monitor, and a drag never stops at an edge. Lua reads the cursor only while the
+-- button is held (one thread that exists between press and release), turns the
+-- character from how far it moved, and pulls it back to the centre the same frame;
+-- on release it is put back where the drag began.
+-- 'plain': the NUI turns the character from the mouse movement it sees
 -- (movementX, batched to one message per frame) and never touches the cursor: the
 -- game script runs no per-frame loop, never calls SetCursorLocation and never
 -- changes NUI focus, so the one cursor the NUI draws (see rotateDragCursor) stays
--- steady for the whole drag. The trade-off is that the cursor stops at the screen
--- edge, so a very long drag in one direction needs a second click.
+-- steady for the whole drag. The trade-off is that the cursor is free to leave the
+-- game window (onto another monitor in windowed mode) and stops at the screen edge.
 -- The other modes keep rotating at the edge by moving the cursor themselves, which
 -- makes a visible cursor jump and flicker between arrow and hand, so while one of
 -- them is active the cursor is always hidden for the drag (rotateDragCursor is
--- ignored). 'capture': Lua reads the cursor every frame and pulls it back to the
--- centre. 'recenter': the NUI asks Lua to put it back at the centre near an edge.
+-- ignored). 'recenter': the NUI asks Lua to put it back at the centre near an edge.
 -- 'pointer' asks the browser for pointer lock, which FiveM refuses, so it falls
 -- back to recenter. 'controls' hides the cursor and reads the mouse as a game
 -- control (it toggles NUI focus). Read each time the menu opens.
-Config.rotateMode = config and config.enum('plain', {
+Config.rotateMode = config and config.enum('capture', {
     options = { 'plain', 'capture', 'pointer', 'controls', 'recenter' },
     label = 'Rotate drag mode',
-    description = "How rotating the character with the mouse is read. plain (default): the cursor is never moved, so it stays one steady icon for the whole drag, but it stops at the screen edge. capture: the cursor is hidden and held at the centre while you drag, so rotation never stops at an edge. pointer: browser pointer lock, which FiveM refuses, so it recentres near the edge instead. controls: the cursor is hidden and the game reads the mouse (switches NUI focus). recenter: the cursor is hidden and moved back to the centre near the edge. Every mode except plain hides the cursor while dragging.",
+    description = "How rotating the character with the mouse is read. capture (default): the cursor is hidden and held at the centre while you drag, so it cannot leave the game window and rotation never stops at an edge. plain: the cursor is never moved, so it stays one steady icon for the whole drag, but it can leave the window and stops at the screen edge. pointer: browser pointer lock, which FiveM refuses, so it recentres near the edge instead. controls: the cursor is hidden and the game reads the mouse (switches NUI focus). recenter: the cursor is hidden and moved back to the centre near the edge. Every mode except plain hides the cursor while dragging.",
     live = true,
-}) or 'plain'
+}) or 'capture'
 
 -- Per-menu override of Config.rotateMode, keyed by the menu's service: clothing
 -- (clothing shops and wardrobes), barber and hairdresser (barber and hairdresser
 -- shops; which of the two opens follows the character's model), tattoo, and creation
 -- (character creation and admin sessions). Unset follows Config.rotateMode.
--- Every menu defaults to 'plain' (the cursor is hidden for the drag and never moved,
--- so it comes back exactly where it was). 'capture' is opt-in per menu: it holds the
--- cursor at the centre so a drag never stops at a screen edge, but the pulls can
--- jolt the camera, so it is not the default. Its thread only runs while the mouse
--- button is held in that menu and stops on release or close.
+-- Every menu follows Config.rotateMode, 'capture' by default: the hidden cursor is held
+-- at the centre so a drag never stops at a screen edge or leaves the game window. The
+-- drag turns the ped, not the camera (rotateTurnsPed), so the centre pulls cannot jolt
+-- the camera. Set a menu to 'plain' to leave the cursor alone there (it can then leave a
+-- windowed game). Capture's thread only runs while the mouse button is held in that
+-- menu and stops on release or close.
 -- Read each time a menu opens.
 local ROTATE_MODES = { 'plain', 'capture', 'pointer', 'controls', 'recenter' }
 local function rotateModeFor(default, label, menu)
     return config and config.optional(default, config.enum(default or 'plain', { options = ROTATE_MODES }), {
         label = label,
-        description = ('Rotate drag mode used in %s, overriding Rotate drag mode. Leave unset to use Rotate drag mode. capture holds the hidden cursor at the screen centre while you drag, so it cannot leave the window; plain never moves the cursor.'):format(menu),
+        description = ('Rotate drag mode used in %s, overriding Rotate drag mode. Leave unset to use Rotate drag mode. capture holds the hidden cursor at the screen centre while you drag, so it cannot leave the window; plain never moves the cursor, so it can.'):format(menu),
         live = true,
     }) or default
 end

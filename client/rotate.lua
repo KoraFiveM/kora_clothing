@@ -1,12 +1,13 @@
 -- Drag-to-rotate input that does not depend on the cursor staying on screen.
 --
 -- Config.rotateMode, or the menu's own Config.rotateModeByService entry when set
--- (none set by default: every menu follows Config.rotateMode, 'plain'):
---   'plain'    (default) a normal press/move/release drag in the NUI. Nothing happens
+-- (none set by default: every menu follows Config.rotateMode, 'capture'):
+--   'plain'    a normal press/move/release drag in the NUI. Nothing happens
 --              here: no thread, no cursor move, no focus change. The NUI turns the
 --              camera from its own mouse movement (one message per frame), so the
---              cursor it draws is never disturbed.
---   'capture'  the NUI keeps its focus and cursor, so it always sees the
+--              cursor it draws is never disturbed. Nothing keeps it inside the game
+--              window either, so in windowed mode a drag can carry it to another monitor.
+--   'capture'  (default) the NUI keeps its focus and cursor, so it always sees the
 --              button come up, and hands the drag to this file. Every frame the
 --              cursor is read (GetNuiCursorPosition), the camera turns by how far
 --              it moved, and once it strays a little from the screen centre it is
@@ -47,6 +48,9 @@ local PRESS_GRACE_MS = 400
 local RECENTER_MIN_INTERVAL_MS = 40
 
 local MODES = { capture = true, controls = true, recenter = true, pointer = true, plain = true }
+-- Used when neither the menu nor Config.rotateMode names a known mode. 'capture' keeps the
+-- hidden cursor inside the game window.
+local DEFAULT_MODE = 'capture'
 
 -- 'capture' mode. Degrees per pixel match the NUI's DRAG_ROTATION_DEG_PER_PIXEL
 -- (scaled by Config.rotateSensitivity), so a drag turns the same in every mode.
@@ -59,7 +63,7 @@ local active -- the running drag: { mode, control, startedAt, seen, movedAt, x, 
 ---The mode in effect for a menu. `service` is the session's service ('clothing',
 ---'barber', 'hairdresser', 'tattoo', 'creation'): its Config.rotateModeByService
 ---entry wins when set, otherwise Config.rotateMode applies. An unknown value falls
----back to the default ('plain'); the older Config.rotatePointerLock = false still
+---back to the default ('capture'); the older Config.rotatePointerLock = false still
 ---turns plain 'pointer' capture off.
 ---@param service string|nil
 ---@return string
@@ -67,7 +71,7 @@ function RotateControl.mode(service)
     local overrides = Config.rotateModeByService
     local mode = service ~= nil and type(overrides) == 'table' and overrides[service] or nil
     if not MODES[mode] then mode = Config.rotateMode end
-    if not MODES[mode] then mode = 'plain' end
+    if not MODES[mode] then mode = DEFAULT_MODE end
     if mode == 'pointer' and Config.rotatePointerLock == false then return 'plain' end
     return mode
 end
