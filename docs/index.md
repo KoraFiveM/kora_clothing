@@ -10,8 +10,9 @@ so nobody else can see or interact with them mid-session, with a live-orbit
 camera that free-zooms on the mouse wheel and traces its own path so a wall or
 counter never lands in shot. Outfits are saved per citizen
 (`playerskins` for the current look, `playeroutfits` for up to
-`Config.wardrobe.maxOutfits` named presets) via
-[qbsql](https://qbcore2.github.io/kora_sql/)'s migration runner. Purchases are
+`Config.wardrobe.maxOutfits` named presets) created
+at startup through
+[qbsql](https://qbcore2.github.io/kora_sql/)'s `Kora.sql.ensureTables`. Purchases are
 priced per touched category (clothing/hair/tattoos) and charged through
 [qbcore](https://qbcore2.github.io/kora_core/) money, with an optional
 "clothing-as-item" mode that boxes a purchase as a physical, reusable
