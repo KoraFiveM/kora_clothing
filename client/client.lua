@@ -78,8 +78,10 @@ local function applyHeadOverlays(ped)
         SetPedHeadOverlay(ped, overlay.overlay, style, previewHead[overlay.opacity])
         if style >= 0 and type(SetPedHeadOverlayColor) == 'function' then
             local color = previewHead[overlay.color]
-            color = (color >= 0 and not Shared.overlayFollowsHair(overlay.key)) and color or previewHair.color
-            SetPedHeadOverlayColor(ped, overlay.overlay, 1, color, color)
+            -- Make-up has its own palette and never follows the hair colour.
+            local fallback = overlay.palette == 'makeup' and 0 or previewHair.color
+            color = (color >= 0 and not Shared.overlayFollowsHair(overlay.key)) and color or fallback
+            SetPedHeadOverlayColor(ped, overlay.overlay, overlay.colorType or 1, color, color)
         end
     end
 end
@@ -98,10 +100,15 @@ local function applyHead(ped, head)
     if type(SetPedHeadBlendData) ~= 'function' or type(SetPedHeadOverlay) ~= 'function' then return end
     previewHead = Shared.sanitiseHead(head)
     local shape = faceShapeFromDrawable(ped)
-    -- Both shape parents use the selected face, and both skin parents use the
-    -- selected skin-palette entry, so each control gives a predictable,
-    -- full-strength result.
-    SetPedHeadBlendData(ped, shape, shape, 0, previewHead.skinTone, previewHead.skinTone, 0, 0.0, 0.0, 0.0, false)
+    -- A parent left on auto (-1) is the selected face (shape) or the selected
+    -- skin-palette entry (skin), so a character with no heritage gets both parents the
+    -- same and each control gives a predictable, full-strength result. Picked parents
+    -- (Config.heritage) are blended by the saved mixes.
+    local h = previewHead
+    SetPedHeadBlendData(ped,
+        h.shapeFirst >= 0 and h.shapeFirst or shape, h.shapeSecond >= 0 and h.shapeSecond or shape, 0,
+        h.skinFirst >= 0 and h.skinFirst or h.skinTone, h.skinSecond >= 0 and h.skinSecond or h.skinTone, 0,
+        h.shapeMix, h.skinMix, 0.0, false)
     applyHeadOverlays(ped)
 end
 
@@ -330,6 +337,27 @@ local function uiStrings()
     return strings
 end
 
+-- The make-up palette the NUI renders: GetNumMakeupColors entries, each painted with
+-- GetPedMakeupRgbColor, like the hair palette. Empty where either native is missing
+-- (the overlay is then offered without a colour choice). Built per call; it is only
+-- asked for when a menu opens or an outfit loads.
+local function buildMakeupPalette()
+    local palette = {}
+    if type(GetNumMakeupColors) ~= 'function' or type(GetPedMakeupRgbColor) ~= 'function' then return palette end
+    local count = tonumber(GetNumMakeupColors()) or 0
+    count = math.min(count, Shared.maxHairColorIndex + 1)
+    for index = 0, count - 1 do
+        local r, g, b = GetPedMakeupRgbColor(index)
+        palette[#palette + 1] = {
+            index = index,
+            r = math.floor(tonumber(r) or 0),
+            g = math.floor(tonumber(g) or 0),
+            b = math.floor(tonumber(b) or 0),
+        }
+    end
+    return palette
+end
+
 -- The current head plus what this service may edit, so the NUI shows only
 -- those controls. Nil when the service can edit nothing about the head.
 local function headPayload(service)
@@ -337,12 +365,16 @@ local function headPayload(service)
     if not Shared.headEditable(policy) then return nil end
     local payload = Shared.sanitiseHead(previewHead)
     payload.skinToneEditable = policy.all == true
+    payload.heritageEditable = Shared.heritageEnabled(policy)
     payload.overlays = {}
     payload.overlayColors = {}
+    local needsMakeupPalette = false
     for _, overlay in ipairs(Shared.headOverlays) do
         payload.overlays[overlay.key] = Shared.headOverlayEnabled(policy, overlay.key)
         payload.overlayColors[overlay.key] = not Shared.overlayFollowsHair(overlay.key)
+        if payload.overlays[overlay.key] and overlay.palette == 'makeup' then needsMakeupPalette = true end
     end
+    if needsMakeupPalette then payload.makeupPalette = buildMakeupPalette() end
     return payload
 end
 

@@ -47,7 +47,7 @@ import type {
     TattooStacking,
     ZoomPayload,
 } from "@/lib/types"
-import { activeHairSection, enabledOverlays, HAIR_COMPONENT_ID, hairSections, HEAD_OVERLAYS, initialSelection, mergeHeadValues, overlayColorEditable, showFaceSkinPanel } from "@/lib/panels"
+import { activeHairSection, enabledOverlays, HAIR_COMPONENT_ID, hairSections, HEAD_OVERLAYS, initialSelection, mergeHeadValues, overlayColorEditable, showFaceSkinPanel, showHeritagePanel } from "@/lib/panels"
 import type { HairSection } from "@/lib/panels"
 import { useNuiEvent } from "@/lib/useNuiEvent"
 
@@ -590,6 +590,42 @@ function FaceSkinPanel({ head, onChange }: { head: HeadPayload; onChange: (next:
 
 const OPACITY_STEP = 0.1
 
+type ParentKey = "shapeFirst" | "shapeSecond" | "skinFirst" | "skinSecond"
+type MixKey = "shapeMix" | "skinMix"
+
+/** Mother and father, shown with the Face item in character creation: the shape
+ * and skin parents (Auto follows the face style / skin tone) and how far the face
+ * and the skin lean towards the mother. */
+function HeritagePanel({ head, strings, onChange }: { head: HeadPayload; strings: Strings; onChange: (next: HeadValues) => void }) {
+    const parent = (label: string, key: ParentKey) => {
+        const value = head[key]
+        return <Stepper
+            label={label} text={value < 0 ? strings.auto : `${value + 1} / 46`}
+            typed={{ value: value + 1, min: 0, max: 46, onCommit: (next) => onChange({ ...head, [key]: next - 1 }) }}
+            canPrev={value > -1} canNext={value < 45}
+            onPrev={() => onChange({ ...head, [key]: value - 1 })} onNext={() => onChange({ ...head, [key]: value + 1 })}
+        />
+    }
+    const mix = (label: string, key: MixKey) => {
+        const value = head[key]
+        return <Stepper
+            label={label} text={`${Math.round(value * 100)}%`}
+            canPrev={value > 0} canNext={value < 1}
+            onPrev={() => onChange({ ...head, [key]: Math.max(0, Math.round((value - OPACITY_STEP) * 100) / 100) })}
+            onNext={() => onChange({ ...head, [key]: Math.min(1, Math.round((value + OPACITY_STEP) * 100) / 100) })}
+        />
+    }
+    return <SectionBox title={strings.heritage}>
+        {parent(strings.father, "shapeFirst")}
+        {parent(strings.mother, "shapeSecond")}
+        {mix(strings.faceMix, "shapeMix")}
+        {parent(strings.skinFather, "skinFirst")}
+        {parent(strings.skinMother, "skinSecond")}
+        {mix(strings.skinMix, "skinMix")}
+        <p className="swatch-label">{strings.heritageHint}</p>
+    </SectionBox>
+}
+
 /** Style, opacity and color for each overlay the server allows here, shown
  * with the Hair item. Color reuses the hair palette but is its own choice per
  * overlay; until one is picked the overlay follows the hair color. An overlay
@@ -606,6 +642,10 @@ function HeadOverlayPanel({ head, overlays, palette, strings, onChange }: {
         {overlays.map((overlay) => {
             const style = head[overlay.style]
             const opacity = head[overlay.opacity]
+            // Make-up has its own palette; an unset colour is its first entry.
+            const makeup = overlay.palette === "makeup"
+            const swatches = makeup ? (head.makeupPalette ?? []) : palette
+            const color = makeup && head[overlay.color] < 0 ? 0 : head[overlay.color]
             return <SectionBox key={overlay.key} title={strings[overlay.key]}>
                 <Stepper
                     label={strings.style} text={style < 0 ? strings.none : `${style + 1} / ${overlay.maxStyle + 1}`}
@@ -619,8 +659,8 @@ function HeadOverlayPanel({ head, overlays, palette, strings, onChange }: {
                     onPrev={() => onChange({ ...head, [overlay.opacity]: Math.max(0, Math.round((opacity - OPACITY_STEP) * 100) / 100) })}
                     onNext={() => onChange({ ...head, [overlay.opacity]: Math.min(1, Math.round((opacity + OPACITY_STEP) * 100) / 100) })}
                 />
-                {style >= 0 && palette.length > 0 && overlayColorEditable(head, overlay.key) && <HairColorGrid
-                    label={strings.color} palette={palette} value={head[overlay.color]}
+                {style >= 0 && swatches.length > 0 && overlayColorEditable(head, overlay.key) && <HairColorGrid
+                    label={strings.color} palette={swatches} value={color}
                     onSelect={(index) => onChange({ ...head, [overlay.color]: index })}
                 />}
             </SectionBox>
@@ -1031,6 +1071,7 @@ export default function App() {
             {/* Each head panel belongs to one Style item (src/lib/panels.ts), not
                 to the whole Style group, so Mask no longer shows Face & Skin. */}
             {head && showFaceSkinPanel(selectedItem, head) && <FaceSkinPanel head={head} onChange={(next) => void setHeadAppearance(next)} />}
+            {head && showHeritagePanel(selectedItem, head) && <HeritagePanel head={head} strings={strings} onChange={(next) => void setHeadAppearance(next)} />}
             {head && <HeadOverlayPanel head={head} overlays={overlays} palette={hair?.palette ?? []} strings={strings} onChange={(next) => void setHeadAppearance(next)} />}
         </div>}
 

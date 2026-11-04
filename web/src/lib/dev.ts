@@ -44,7 +44,10 @@ const sample: OpenPayload = {
     head: {
         skinTone: 0, beard: -1, beardOpacity: 1, beardColor: -1, eyebrows: -1, eyebrowsOpacity: 1, eyebrowsColor: -1,
         chestHair: -1, chestHairOpacity: 1, chestHairColor: -1,
-        skinToneEditable: false, overlays: { facialHair: true, eyebrows: true, chestHair: true },
+        makeup: -1, makeupOpacity: 1, makeupColor: -1, blush: -1, blushOpacity: 1, blushColor: -1, lipstick: -1, lipstickOpacity: 1, lipstickColor: -1,
+        shapeFirst: -1, shapeSecond: -1, skinFirst: -1, skinSecond: -1, shapeMix: 0.5, skinMix: 0.5,
+        skinToneEditable: false, heritageEditable: false, makeupPalette: hairPalette,
+        overlays: { facialHair: true, eyebrows: true, chestHair: true, makeup: true, blush: true, lipstick: true },
     },
     clothingToggles: [{ id: "hat", removed: true }, { id: "shirt", removed: false }, { id: "pants", removed: false }, { id: "shoes", removed: false }],
     selectedTattoos: [],

@@ -165,4 +165,91 @@ for _, key in ipairs({ 'facialHair', 'chestHair' }) do
     H.equal(runtime.headPayload('barber').overlayColors[key], true)
 end
 
+-- Make-up (overlays 4 blush 5 lipstick 8): own palette (colour type 2), creator-only by default.
+for _, key in ipairs({ 'makeup', 'blush', 'lipstick' }) do
+    H.ok(Shared.headOverlayEnabled(Config.services.creation, key), key .. ' is on in the creator by default')
+    H.ok(not Shared.headOverlayEnabled(Config.services.barber, key), key .. ' is off at the barber by default')
+    H.ok(not Shared.headOverlayEnabled(Config.services.clothing, key), key .. ' is never on in a clothing shop')
+    H.equal(Shared.overlayFollowsHair(key), false, key .. ' never follows the hair colour')
+end
+H.equal(Shared.sanitiseHead({}).makeup, -1, 'old saves have no make-up')
+H.equal(Shared.sanitiseHead({ makeup = 999 }).makeup, 74)
+H.equal(Shared.sanitiseHead({ blush = 999 }).blush, 6)
+H.equal(Shared.sanitiseHead({ lipstick = 999 }).lipstick, 9)
+local overlayCalls, colorCalls = {}, {}
+_G.SetPedHeadOverlay = function(_, id, style, opacity) overlayCalls[id] = { style = style, opacity = opacity } end
+_G.SetPedHeadOverlayColor = function(_, id, colorType, color, second) colorCalls[id] = { colorType = colorType, color = color, second = second } end
+runtime.applySkin(1, { hairColor = 5, head = { makeup = 10, makeupOpacity = 0.7, makeupColor = 21, lipstick = 3, beard = 2, beardColor = 9 } }, 'mp_f_freemode_01')
+H.equal(overlayCalls[4].style, 10, 'make-up is head overlay 4')
+H.equal(overlayCalls[4].opacity, 0.7)
+H.equal(colorCalls[4].colorType, 2, 'make-up colour uses colour type 2')
+H.equal(colorCalls[4].color, 21)
+H.equal(overlayCalls[8].style, 3, 'lipstick is head overlay 8')
+H.equal(colorCalls[8].color, 0, 'an unset make-up colour is the first make-up colour, not the hair colour')
+H.equal(overlayCalls[5].style, -1, 'blush off')
+H.equal(colorCalls[1].colorType, 1, 'facial hair keeps colour type 1')
+local snap = Shared.sanitiseHead(runtime.currentSkinSnapshot(1).head)
+H.equal(snap.makeup, 10, 'make-up round trips')
+H.equal(snap.makeupColor, 21)
+-- The creator payload carries the make-up palette, built from the game's make-up colours.
+H.equal(type(runtime.headPayload('creation').makeupPalette), 'table', 'the creator payload has a make-up palette')
+H.equal(#runtime.headPayload('creation').makeupPalette, 0, 'no make-up natives: empty palette')
+_G.GetNumMakeupColors = function() return 64 end
+_G.GetPedMakeupRgbColor = function(index) return index, 2, 3 end
+local palette = runtime.headPayload('creation').makeupPalette
+H.equal(#palette, 64)
+H.equal(palette[6].index, 5)
+H.equal(palette[6].r, 5)
+H.equal(runtime.headPayload('barber').makeupPalette, nil, 'no palette where no make-up overlay is editable')
+Config.headOverlays.makeup.barber = true
+H.equal(Shared.mergeHead(Config.services.barber, {}, { makeup = 4 }).makeup, 4, 'make-up at the barber when enabled')
+Config.headOverlays.makeup.barber = false
+H.equal(Shared.mergeHead(Config.services.barber, {}, { makeup = 4 }).makeup, -1, 'make-up ignored at the barber by default')
+Config.headOverlays.lipstick.creator = false
+H.equal(Shared.mergeHead(Config.services.creation, {}, { lipstick = 4 }).lipstick, -1, 'lipstick.creator=false ignores the request')
+Config.headOverlays.lipstick.creator = true
+
+-- Heritage: auto parents (-1) reproduce the old blend; picked parents blend by the saved mixes.
+local old = Shared.sanitiseHead({ skinTone = 7 })
+H.equal(old.shapeFirst, -1, 'old saves have auto parents')
+H.equal(old.skinSecond, -1)
+H.equal(old.shapeMix, 0.5)
+local wild = Shared.sanitiseHead({ shapeFirst = 99, shapeSecond = -9, skinFirst = 5.7, shapeMix = 3, skinMix = 0 / 0 })
+H.equal(wild.shapeFirst, 45, 'parents clamp to 0..45')
+H.equal(wild.shapeSecond, -1)
+H.equal(wild.skinFirst, 5)
+H.equal(wild.shapeMix, 1.0, 'mix clamps to 0..1')
+H.equal(wild.skinMix, 0.5, 'NaN mix falls back to the default')
+local blend
+_G.SetPedHeadBlendData = function(...) blend = { ... } end
+_G.GetPedDrawableVariation = function() return 22 end
+runtime.applySkin(1, { head = { skinTone = 26 } }, 'mp_f_freemode_01')
+H.equal(blend[2], 22, 'auto first shape parent is the face style')
+H.equal(blend[3], 22, 'auto second shape parent is the face style')
+H.equal(blend[5], 26, 'auto first skin parent is the skin tone')
+H.equal(blend[6], 26)
+runtime.applySkin(1, { head = { skinTone = 26, shapeFirst = 3, shapeSecond = 30, skinFirst = 4, skinSecond = 0, shapeMix = 0.25, skinMix = 0.75 } }, 'mp_f_freemode_01')
+H.equal(blend[2], 3, 'father is the first shape parent')
+H.equal(blend[3], 30, 'mother is the second shape parent')
+H.equal(blend[5], 4)
+H.equal(blend[6], 0, 'skin parent 0 is a real parent, not auto')
+H.equal(blend[8], 0.25, 'shape mix')
+H.equal(blend[9], 0.75, 'skin mix')
+local savedHeritage = Shared.sanitiseHead(runtime.currentSkinSnapshot(1).head)
+H.equal(savedHeritage.shapeSecond, 30, 'heritage round trips')
+H.equal(savedHeritage.skinMix, 0.75)
+_G.GetPedDrawableVariation = function() return 0 end
+
+-- Heritage is creation-only and follows Config.heritage.creator.
+H.equal(Config.heritage.creator, true, 'heritage is on in character creation by default')
+H.equal(runtime.headPayload('creation').heritageEditable, true)
+H.equal(runtime.headPayload('barber').heritageEditable, false, 'no heritage at the barber')
+local request = { shapeFirst = 8, shapeSecond = 25, shapeMix = 0.9 }
+H.equal(Shared.mergeHead(Config.services.creation, { shapeFirst = 1 }, request).shapeSecond, 25, 'creation edits heritage')
+H.equal(Shared.mergeHead(Config.services.barber, { shapeFirst = 1 }, request).shapeFirst, 1, 'the barber keeps the saved heritage')
+Config.heritage.creator = false
+H.equal(runtime.headPayload('creation').heritageEditable, false)
+H.equal(Shared.mergeHead(Config.services.creation, { shapeFirst = 1 }, request).shapeFirst, 1, 'heritage off keeps the saved parents')
+Config.heritage.creator = true
+
 H.finish()

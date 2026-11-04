@@ -7,18 +7,23 @@ export const HAIR_COMPONENT_ID = 2
 
 type Selected = { kind: string; id: number } | undefined
 
-export type OverlayKey = "facialHair" | "eyebrows" | "chestHair"
+export type OverlayKey = "facialHair" | "eyebrows" | "chestHair" | "makeup" | "blush" | "lipstick"
 
+/** `palette` is which swatches colour the overlay: the hair palette, or the make-up palette (HeadPayload.makeupPalette). */
 export const HEAD_OVERLAYS: {
     key: OverlayKey
-    style: "beard" | "eyebrows" | "chestHair"
-    opacity: "beardOpacity" | "eyebrowsOpacity" | "chestHairOpacity"
-    color: "beardColor" | "eyebrowsColor" | "chestHairColor"
+    style: "beard" | "eyebrows" | "chestHair" | "makeup" | "blush" | "lipstick"
+    opacity: "beardOpacity" | "eyebrowsOpacity" | "chestHairOpacity" | "makeupOpacity" | "blushOpacity" | "lipstickOpacity"
+    color: "beardColor" | "eyebrowsColor" | "chestHairColor" | "makeupColor" | "blushColor" | "lipstickColor"
     maxStyle: number
+    palette: "hair" | "makeup"
 }[] = [
-    { key: "facialHair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28 },
-    { key: "eyebrows", style: "eyebrows", opacity: "eyebrowsOpacity", color: "eyebrowsColor", maxStyle: 33 },
-    { key: "chestHair", style: "chestHair", opacity: "chestHairOpacity", color: "chestHairColor", maxStyle: 15 },
+    { key: "facialHair", style: "beard", opacity: "beardOpacity", color: "beardColor", maxStyle: 28, palette: "hair" },
+    { key: "eyebrows", style: "eyebrows", opacity: "eyebrowsOpacity", color: "eyebrowsColor", maxStyle: 33, palette: "hair" },
+    { key: "chestHair", style: "chestHair", opacity: "chestHairOpacity", color: "chestHairColor", maxStyle: 15, palette: "hair" },
+    { key: "makeup", style: "makeup", opacity: "makeupOpacity", color: "makeupColor", maxStyle: 74, palette: "makeup" },
+    { key: "blush", style: "blush", opacity: "blushOpacity", color: "blushColor", maxStyle: 6, palette: "makeup" },
+    { key: "lipstick", style: "lipstick", opacity: "lipstickOpacity", color: "lipstickColor", maxStyle: 9, palette: "makeup" },
 ]
 
 export type HairSection = "hair" | OverlayKey
@@ -43,6 +48,11 @@ function isComponent(selected: Selected, id: number) {
 /** Skin tone panel: only on the Face item, and only where skin tone is editable. */
 export function showFaceSkinPanel(selected: Selected, head: HeadPayload | null) {
     return !!head && head.skinToneEditable === true && isComponent(selected, FACE_COMPONENT_ID)
+}
+
+/** Heritage (mother/father) panel: only on the Face item, and only where the server allows it (Config.heritage). */
+export function showHeritagePanel(selected: Selected, head: HeadPayload | null) {
+    return !!head && head.heritageEditable === true && isComponent(selected, FACE_COMPONENT_ID)
 }
 
 /** Overlays the server allowed for this service; the panel shows on the Hair item. */

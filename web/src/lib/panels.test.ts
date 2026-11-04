@@ -1,13 +1,15 @@
 // Run with `npm test` (node's built-in runner; no extra dependency).
 import assert from "node:assert/strict"
 import test from "node:test"
-import { activeHairSection, enabledOverlays, hairSections, initialSelection, overlayColorEditable, showFaceSkinPanel } from "./panels.ts"
+import { activeHairSection, enabledOverlays, hairSections, HEAD_OVERLAYS, initialSelection, overlayColorEditable, showFaceSkinPanel, showHeritagePanel } from "./panels.ts"
 import { DEFAULT_STRINGS } from "./strings.ts"
 import type { HeadPayload } from "./types.ts"
 
 const head: HeadPayload = {
     skinTone: 0, beard: -1, beardOpacity: 1, beardColor: -1, eyebrows: -1, eyebrowsOpacity: 1, eyebrowsColor: -1,
     chestHair: -1, chestHairOpacity: 1, chestHairColor: -1,
+    makeup: -1, makeupOpacity: 1, makeupColor: -1, blush: -1, blushOpacity: 1, blushColor: -1, lipstick: -1, lipstickOpacity: 1, lipstickColor: -1,
+    shapeFirst: -1, shapeSecond: -1, skinFirst: -1, skinSecond: -1, shapeMix: 0.5, skinMix: 0.5,
     skinToneEditable: true, overlays: { facialHair: true, eyebrows: true, chestHair: true },
 }
 const face = { kind: "component", id: 0 }
@@ -31,6 +33,26 @@ test("eyebrows and facial hair show on the Hair item", () => {
     assert.deepEqual(enabledOverlays(hair, head).map((overlay) => overlay.key), ["facialHair", "eyebrows", "chestHair"])
     assert.deepEqual(enabledOverlays(face, head), [])
     assert.deepEqual(enabledOverlays(mask, head), [])
+})
+
+test("Heritage shows only on the Face item, and only where the server allows it", () => {
+    const allowed = { ...head, heritageEditable: true }
+    assert.equal(showHeritagePanel(face, allowed), true)
+    assert.equal(showHeritagePanel(mask, allowed), false)
+    assert.equal(showHeritagePanel(hair, allowed), false)
+    assert.equal(showHeritagePanel(face, head), false)
+    assert.equal(showHeritagePanel(face, { ...allowed, heritageEditable: false }), false)
+    assert.equal(showHeritagePanel(face, null), false)
+})
+
+test("make-up, blush and lipstick are Hair-item sections that use the make-up palette", () => {
+    const makeupHead = { ...head, overlays: { facialHair: false, eyebrows: false, chestHair: false, makeup: true, blush: true, lipstick: true } }
+    assert.deepEqual(enabledOverlays(hair, makeupHead).map((overlay) => overlay.key), ["makeup", "blush", "lipstick"])
+    assert.deepEqual(enabledOverlays(hair, makeupHead).map((overlay) => overlay.palette), ["makeup", "makeup", "makeup"])
+    assert.deepEqual(enabledOverlays(face, makeupHead), [])
+    assert.equal(HEAD_OVERLAYS.filter((overlay) => overlay.palette === "hair").length, 3)
+    const sections = hairSections(enabledOverlays(hair, makeupHead), DEFAULT_STRINGS)
+    assert.deepEqual(sections.map((section) => section.label), ["Hair", "Makeup", "Blush", "Lipstick"])
 })
 
 test("a category set to false is hidden", () => {

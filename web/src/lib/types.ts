@@ -83,15 +83,36 @@ export interface HeadValues {
     chestHair: number
     chestHairOpacity: number
     chestHairColor: number
+    makeup: number
+    makeupOpacity: number
+    makeupColor: number
+    blush: number
+    blushOpacity: number
+    blushColor: number
+    lipstick: number
+    lipstickOpacity: number
+    lipstickColor: number
+    /** Heritage: head blend parents 0..45, -1 = auto (the face style / the skin tone). First is the father, second the mother. */
+    shapeFirst: number
+    shapeSecond: number
+    skinFirst: number
+    skinSecond: number
+    /** 0 = all first parent (father), 1 = all second (mother). */
+    shapeMix: number
+    skinMix: number
 }
 
 export interface HeadPayload extends HeadValues {
     /** Skin tone is creation-only. */
     skinToneEditable?: boolean
+    /** Heritage (mother/father) is creation-only and follows Config.heritage.creator. */
+    heritageEditable?: boolean
+    /** The make-up palette (GetPedMakeupRgbColor), sent when a make-up overlay is editable. */
+    makeupPalette?: HairSwatch[]
     /** Which overlays this service may edit (Config.headOverlays). */
-    overlays?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean }
+    overlays?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean; makeup?: boolean; blush?: boolean; lipstick?: boolean }
     /** Whether each overlay has a colour palette of its own (false: locked to the hair colour). */
-    overlayColors?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean }
+    overlayColors?: { facialHair: boolean; eyebrows: boolean; chestHair?: boolean; makeup?: boolean; blush?: boolean; lipstick?: boolean }
 }
 
 export interface OpenPayload {

@@ -149,7 +149,23 @@ Shared.headOverlays = {
     { key = 'facialHair', overlay = 1, style = 'beard', opacity = 'beardOpacity', color = 'beardColor', maxStyle = 28 },
     { key = 'eyebrows', overlay = 2, style = 'eyebrows', opacity = 'eyebrowsOpacity', color = 'eyebrowsColor', maxStyle = 33 },
     { key = 'chestHair', overlay = 10, style = 'chestHair', opacity = 'chestHairOpacity', color = 'chestHairColor', maxStyle = 15 },
+    -- Make-up overlays. SetPedHeadOverlayColor takes colorType 2 and an index into the
+    -- make-up palette (GetNumMakeupColors), not the hair palette; an unset colour (-1)
+    -- is the first palette entry, since make-up never follows the hair colour.
+    { key = 'makeup', overlay = 4, style = 'makeup', opacity = 'makeupOpacity', color = 'makeupColor', maxStyle = 74, colorType = 2, palette = 'makeup' },
+    { key = 'blush', overlay = 5, style = 'blush', opacity = 'blushOpacity', color = 'blushColor', maxStyle = 6, colorType = 2, palette = 'makeup' },
+    { key = 'lipstick', overlay = 8, style = 'lipstick', opacity = 'lipstickOpacity', color = 'lipstickColor', maxStyle = 9, colorType = 2, palette = 'makeup' },
 }
+
+-- Heritage: the two head-blend parents (shape and skin) and how far each mix leans
+-- towards the second one. A parent of -1 is "auto": the shape parent is the face
+-- style (head drawable) and the skin parent is the skin tone, which is exactly what
+-- characters saved before heritage existed use, so they look the same. first is the
+-- father and second the mother in the menu; a mix of 0 is all first, 1 all second.
+-- GTA's parent ids run 0..45 (male, female, then the DLC faces).
+Shared.maxHeritageParent = 45
+Shared.heritageDefaults = { shapeFirst = -1, shapeSecond = -1, skinFirst = -1, skinSecond = -1, shapeMix = 0.5, skinMix = 0.5 }
+Shared.heritageKeys = { 'shapeFirst', 'shapeSecond', 'skinFirst', 'skinSecond', 'shapeMix', 'skinMix' }
 
 local function clampNumber(value, minimum, maximum, default)
     value = tonumber(value)
@@ -166,6 +182,14 @@ end
 function Shared.sanitiseHead(raw)
     raw = type(raw) == 'table' and raw or {}
     local head = { skinTone = math.floor(clampNumber(raw.skinTone, 0, 45, 0)) }
+    for _, key in ipairs(Shared.heritageKeys) do
+        local default = Shared.heritageDefaults[key]
+        if key:sub(-3) == 'Mix' then
+            head[key] = math.floor(clampNumber(raw[key], 0, 1, default) * 100 + 0.5) / 100
+        else
+            head[key] = math.floor(clampNumber(raw[key], -1, Shared.maxHeritageParent, default))
+        end
+    end
     for _, overlay in ipairs(Shared.headOverlays) do
         head[overlay.style] = math.floor(clampNumber(raw[overlay.style], -1, overlay.maxStyle, -1))
         head[overlay.opacity] = math.floor(clampNumber(raw[overlay.opacity], 0, 1, 1) * 100 + 0.5) / 100
@@ -190,7 +214,7 @@ end
 ---can edit the hair component (barber, hairdresser) use `barber`. A config
 ---without the table keeps the original behaviour: creator facial hair only.
 ---@param policy table Config.services entry
----@param key string 'facialHair' | 'eyebrows' | 'chestHair'
+---@param key string 'facialHair' | 'eyebrows' | 'chestHair' | 'makeup' | 'blush' | 'lipstick'
 ---@return boolean
 function Shared.headOverlayEnabled(policy, key)
     local entry = (Config.headOverlays or {})[key]
@@ -200,6 +224,16 @@ function Shared.headOverlayEnabled(policy, key)
         if id == 2 then return entry.barber == true end
     end
     return false
+end
+
+---Whether a service may edit heritage (mother/father), read live from
+---Config.heritage.creator. Like skin tone it is creation-only; a config without
+---the table keeps heritage off.
+---@param policy table Config.services entry
+---@return boolean
+function Shared.heritageEnabled(policy)
+    local entry = Config.heritage
+    return policy.all == true and type(entry) == 'table' and entry.creator == true
 end
 
 ---Whether the service may see any head control at all.
@@ -217,6 +251,8 @@ end
 function Shared.mergeHead(policy, current, requested)
     current, requested = Shared.sanitiseHead(current), Shared.sanitiseHead(requested)
     local merged = { skinTone = policy.all and requested.skinTone or current.skinTone }
+    local heritage = Shared.heritageEnabled(policy) and requested or current
+    for _, key in ipairs(Shared.heritageKeys) do merged[key] = heritage[key] end
     for _, overlay in ipairs(Shared.headOverlays) do
         local source = Shared.headOverlayEnabled(policy, overlay.key) and requested or current
         merged[overlay.style], merged[overlay.opacity], merged[overlay.color] = source[overlay.style], source[overlay.opacity], source[overlay.color]

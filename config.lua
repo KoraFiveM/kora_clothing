@@ -78,11 +78,63 @@ Config.services = {
     creation = { all = true, tattoos = true },
 }
 
+-- Heritage: the mother and father a character takes after (head blend parents), how
+-- much the face and the skin lean towards each, and the face style / skin tone as
+-- the "auto" parents. Creation-only, like skin tone, and saved with the character.
+-- Characters saved before this existed keep their look (auto parents). Read each
+-- time a menu opens and again on every change and confirm.
+Config.heritage = {
+    creator = boolean(true, {
+        label = 'Mother and father in character creation',
+        description = 'Shows a Heritage panel with the Face item while creating a character: pick a mother and a father for the face shape and the skin, and how much the face and skin resemble each one. Turn off to hide it; characters then keep the face style and skin tone they had.',
+        live = true,
+    }),
+}
+
 -- Which head overlays players can edit, per kind of session: `creator` is
 -- character creation (and admin sessions), `barber` is the barber/hairdresser.
 -- A category set to false is hidden in the menu and ignored by the client and
 -- the server. Skin tone stays creation-only and is not configurable here.
+-- The make-up overlays (makeup, blush, lipstick) appear next to hair, facial hair and
+-- the rest in the Hair item. They take their colour from the make-up palette, so they
+-- have no followHairColor option.
 Config.headOverlays = {
+    makeup = {
+        creator = boolean(true, {
+            label = 'Make-up in character creation',
+            description = 'Lets players choose a make-up style, opacity and colour while creating a character. Turn off to hide make-up options from creation.',
+            live = true,
+        }),
+        barber = boolean(false, {
+            label = 'Make-up at the barber',
+            description = 'Lets players change make-up style, opacity and colour at barbers and hairdressers, charged at the hair price. Off by default.',
+            live = true,
+        }),
+    },
+    blush = {
+        creator = boolean(true, {
+            label = 'Blush in character creation',
+            description = 'Lets players choose a blush style, opacity and colour while creating a character. Turn off to hide blush options from creation.',
+            live = true,
+        }),
+        barber = boolean(false, {
+            label = 'Blush at the barber',
+            description = 'Lets players change blush style, opacity and colour at barbers and hairdressers, charged at the hair price. Off by default.',
+            live = true,
+        }),
+    },
+    lipstick = {
+        creator = boolean(true, {
+            label = 'Lipstick in character creation',
+            description = 'Lets players choose a lipstick style, opacity and colour while creating a character. Turn off to hide lipstick options from creation.',
+            live = true,
+        }),
+        barber = boolean(false, {
+            label = 'Lipstick at the barber',
+            description = 'Lets players change lipstick style, opacity and colour at barbers and hairdressers, charged at the hair price. Off by default.',
+            live = true,
+        }),
+    },
     eyebrows = {
         creator = boolean(true, {
             label = 'Eyebrows in character creation',
