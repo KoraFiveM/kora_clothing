@@ -193,6 +193,23 @@ local function nearShop(src, shop)
     -- without a word and the menu simply did not open. The same reach plus one
     -- metre of slack (as for zone-less shops) is allowed from the zone volume.
     local reach = (tonumber(Config.interactDistance) or 2.0) + 1.0
+
+    -- Clothing shops opened from register/rack spheres (client shopPointCoords):
+    -- the same radius plus the same metre of slack, from either point.
+    if Config.clothingShopPoints and shop.service == 'clothing' and type(shop.points) == 'table' then
+        local pointReach = (tonumber(Config.clothingPointRadius) or 5.0) + 1.0
+        local hasPoint = false
+        for _, key in ipairs({ 'register', 'racks' }) do
+            local point = shop.points[key]
+            if point then
+                hasPoint = true
+                local dx, dy, dz = pos.x - point.x, pos.y - point.y, pos.z - point.z
+                if (dx * dx + dy * dy + dz * dz) <= pointReach * pointReach then return true end
+            end
+        end
+        if hasPoint then return false end
+    end
+
     local zone = shop.zone or Config.shopZoneDefault
     if withinShopZone(pos, zone, shop.coords) then return true end
     if zone then return distanceToShopZone(pos, zone, shop.coords) <= reach end

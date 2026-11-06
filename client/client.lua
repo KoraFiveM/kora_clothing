@@ -1432,6 +1432,20 @@ RegisterNetEvent('qb-clothing:client:CreateFirstCharacter', function()
     openSession('firstCharacter')
 end)
 
+-- Register/rack points of a clothing shop (Config.shops[n].points), or nil when
+-- the shop uses its own zone. The two spheres can overlap, so the text prompt
+-- counts how many of them the player is inside rather than trusting one exit.
+local function shopPointCoords(shop)
+    if not Config.clothingShopPoints or shop.service ~= 'clothing' or type(shop.points) ~= 'table' then return nil end
+    local list = {}
+    for _, key in ipairs({ 'register', 'racks' }) do
+        local point = shop.points[key]
+        if point then list[#list + 1] = vector3(point.x, point.y, point.z) end
+    end
+    if #list == 0 then return nil end
+    return list
+end
+
 -- Used by kora_admin's self-service clothing entry.  Keeping the nearest-shop
 -- selection inside kora_clothing means external callers never have to duplicate
 -- this resource's shop ordering; the server still performs the authoritative
@@ -1446,6 +1460,14 @@ local function openNearestShop(service)
             -- an unsupported operation, so drop to the vector3 component set.
             local shopCoords = vector3(shop.coords.x, shop.coords.y, shop.coords.z)
             local distance = #(coords - shopCoords)
+            -- Register/rack shops are opened from those points, not shop.coords.
+            local pointCoords = shopPointCoords(shop)
+            if pointCoords then
+                distance = math.huge
+                for _, point in ipairs(pointCoords) do
+                    distance = math.min(distance, #(coords - point) - (Config.clothingPointRadius - Config.interactDistance))
+                end
+            end
             if not nearestDistance or distance < nearestDistance then
                 nearestIndex, nearestDistance = index, distance
             end
@@ -1694,19 +1716,40 @@ local function showShopPrompt()
 end
 
 local function registerTextUiShop(index, shop, zone)
+    local inside = 0
     local callbacks = {
         onEnter = function()
-            textUiShop = { index = index, label = shop.label }
+            inside = inside + 1
+            -- Replacing the table would orphan the live handle, leaving the
+            -- prompt on screen forever after leaving (register + rack spheres).
+            if not textUiShop or textUiShop.index ~= index then
+                hideShopPrompt()
+                textUiShop = { index = index, label = shop.label }
+            end
             showShopPrompt()
         end,
         onExit = function()
-            -- Only this zone's own exit clears it: with neighbouring zones the
-            -- enter of the next one can arrive before the exit of the last.
-            if not textUiShop or textUiShop.index ~= index then return end
+            inside = math.max(0, inside - 1)
+            -- Only this shop's own exit clears it: with neighbouring zones the
+            -- enter of the next one can arrive before the exit of the last, and
+            -- a shop's register and rack spheres overlap.
+            if inside > 0 or not textUiShop or textUiShop.index ~= index then return end
             hideShopPrompt()
             textUiShop = nil
         end,
     }
+
+    local pointCoords = shopPointCoords(shop)
+    if pointCoords then
+        for _, coords in ipairs(pointCoords) do
+            Kora.zones.sphere({
+                coords = coords,
+                radius = Config.clothingPointRadius,
+                onEnter = callbacks.onEnter, onExit = callbacks.onExit,
+            })
+        end
+        return
+    end
 
     if zone.points then
         Kora.zones.poly({
@@ -1748,6 +1791,25 @@ local function registerTargetShop(index, shop, zone)
     -- kora_target's global sprites setting decides; true/false force it.
     local spriteCoords = vector3(shop.coords.x, shop.coords.y, shop.coords.z)
 
+    -- Register and rack spheres (see shopPointCoords): the first id is returned
+    -- like any other zone, the rest are removed with it in hideStorefront.
+    local pointCoords = shopPointCoords(shop)
+    if pointCoords then
+        options[1].distance = Config.clothingPointRadius
+        local ids = {}
+        for _, coords in ipairs(pointCoords) do
+            ids[#ids + 1] = exports.kora_target:addSphereZone({
+                coords = coords,
+                radius = Config.clothingPointRadius,
+                options = options,
+                distance = Config.clothingPointRadius,
+                spriteCoords = coords,
+                drawSprite = Config.showTargetHints,
+            })
+        end
+        return ids[1], ids
+    end
+
     if zone.points then
         return exports.kora_target:addPolyZone({
             points = zone.points,
@@ -1787,11 +1849,12 @@ end
 local tattooArtists = {} -- shop index -> { model, coords, scenario, zone, inside, spawning, ped, targetId }
 local tattooPedsFaded = false
 local storefrontZones = {} -- shop index -> kora_target zone id ('target' interaction mode only)
+local storefrontExtraZones = {} -- shop index -> every zone id of a register/rack shop (includes the one above)
 
 local function showStorefront(index)
     if Config.interactionMode == 'textui' or storefrontZones[index] then return end
     local shop = Config.shops[index]
-    storefrontZones[index] = registerTargetShop(index, shop, shop.zone or Config.shopZoneDefault)
+    storefrontZones[index], storefrontExtraZones[index] = registerTargetShop(index, shop, shop.zone or Config.shopZoneDefault)
 end
 
 local function hideStorefront(index)
@@ -1799,6 +1862,10 @@ local function hideStorefront(index)
     if not id then return end
     storefrontZones[index] = nil
     pcall(function() exports.kora_target:removeZone(id) end)
+    for _, extraId in ipairs(storefrontExtraZones[index] or {}) do
+        if extraId ~= id then pcall(function() exports.kora_target:removeZone(extraId) end) end
+    end
+    storefrontExtraZones[index] = nil
 end
 
 local function tattooPedsEnabled()

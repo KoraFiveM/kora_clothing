@@ -315,6 +315,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_02',
         coords = vector4(127.02, -223.29, 53.56, 70.0),
+        points = { register = vector4(125.35, -223.62, 54.56, 248.79), racks = vector4(121.63, -224.23, 54.56, 152.18) },
         zone = {
             points = {
                 vector3(133.37, -210.23, 53.78),
@@ -342,6 +343,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Suburban',
         ped = 'a_f_y_business_04',
         coords = vector4(72.32, -1399.2, 28.38, 0.0),
+        points = { register = vector4(75.80, -1392.88, 29.38, 90.89), racks = vector4(78.76, -1397.40, 29.38, 267.65) },
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 0.0 },
         blip = { enabled = true, sprite = 73, color = 3, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Suburban' },
     },
@@ -349,6 +351,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_m_y_business_03',
         coords = vector4(-708.61, -152.85, 36.42, 30.0),
+        points = { register = vector4(-710.34, -152.69, 37.42, 298.30), racks = vector4(-708.64, -160.39, 37.42, 209.55) },
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 30.0 },
         blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Ponsonbys' },
     },
@@ -356,6 +359,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Ponsonbys',
         ped = 'a_f_y_business_01',
         coords = vector4(-167.79, -299.05, 38.73, 250.0),
+        points = { register = vector4(-163.47, -303.67, 39.73, 70.19), racks = vector4(-158.79, -296.45, 39.73, 341.35) },
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 250.0 },
         blip = { enabled = true, sprite = 73, color = 27, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Ponsonbys' },
     },
@@ -363,6 +367,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_m_y_business_02',
         coords = vector4(-1193.44, -772.12, 16.32, 130.0),
+        points = { register = vector4(-1192.75, -768.44, 17.32, 36.34), racks = vector4(-1189.30, -769.79, 17.33, 245.16) },
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
         blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Binco' },
     },
@@ -370,6 +375,7 @@ Config.shops = {
         service = 'clothing', free = false, label = 'Binco',
         ped = 'a_f_y_hipster_02',
         coords = vector4(-827.86, -1073.75, 9.33, 130.0),
+        points = { register = vector4(-822.16, -1073.86, 11.33, 29.02), racks = vector4(-824.60, -1078.85, 11.33, 207.89) },
         zone = { size = vector3(2.2, 1.8, 2.2), rotation = 130.0 },
         blip = { enabled = true, sprite = 73, color = 5, scale = 0.8, shortRange = true, category = 'Clothing', name = 'Binco' },
     },
@@ -751,6 +757,22 @@ Config.tattoo = {
 }
 
 Config.interactDistance = 2.0
+
+-- Clothing shops with a `points = { register, racks }` entry (Config.shops) are
+-- opened from a sphere of Config.clothingPointRadius around each of those two
+-- points, in place of the shop's own zone, so every branch has the same two
+-- easy-to-find spots and several players can spread out. Shops without
+-- `points`, and barbers/tattoo/wardrobes, are unaffected.
+Config.clothingShopPoints = boolean(true, {
+    label = 'Clothing shop register/rack points',
+    description = 'Opens clothing shops from a wide area around the register and the clothing racks instead of the small per-shop zone. Turn off to use each shop zone as before. Applies after the resource restarts.',
+})
+
+Config.clothingPointRadius = config and config.number(5.0, {
+    min = 1.0, max = 15.0,
+    label = 'Clothing shop point radius',
+    description = 'Radius in metres around each clothing shop register and rack point in which the shop can be opened. Only used while Clothing shop register/rack points is on. Applies after the resource restarts.',
+}) or 5.0
 
 -- Hides the minimap while any clothing menu (shop, barber, tattoo, creator,
 -- wardrobe) is open and restores it afterwards. Only used when kora_hud is not
