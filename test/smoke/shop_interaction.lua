@@ -60,8 +60,8 @@ local function eachZone(fn)
     for _, opts in ipairs(boxZones) do fn(opts) end
 end
 
--- Defaults change nothing: target zones, hint left to kora_target.
-H.equal(Config.interactionMode, 'target')
+-- Shops open from the [E] text prompt by default; target mode stays available.
+H.equal(Config.interactionMode, 'textui')
 H.equal(Config.showTargetHints, nil)
 load({ mode = 'target' })
 H.equal(#polyZones + #boxZones, #Config.shops, 'one target zone per shop')
@@ -97,9 +97,16 @@ H.equal(prompts[#prompts].key, 'E')
 keybinds.kora_clothing_open_shop.onPressed()
 H.equal(requests[#requests].name, 'qbclothing:server:requestSession')
 H.equal(requests[#requests].extra.shopId, 2, 'E opens the shop whose zone the player is in')
-H.equal(#hidden, 1, 'the prompt is hidden while the menu opens')
-textZones[2].onExit()
+H.equal(#hidden, 0, 'the prompt stays until the server opens the session')
+-- A refused request (no session opened) leaves the prompt up and E usable.
 keybinds.kora_clothing_open_shop.onPressed()
-H.equal(#requests, 1, 'leaving the zone ends the E binding')
+H.equal(#requests, 2, 'E retries after a refused request')
+-- Exiting a different zone must not clear this one.
+textZones[1].onExit()
+H.equal(#hidden, 0, 'another zone exit leaves the prompt alone')
+textZones[2].onExit()
+H.equal(#hidden, 1, 'leaving the zone hides the prompt')
+keybinds.kora_clothing_open_shop.onPressed()
+H.equal(#requests, 2, 'leaving the zone ends the E binding')
 
 H.finish()

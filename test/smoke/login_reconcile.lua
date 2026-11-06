@@ -88,6 +88,8 @@ _G.Kora = {
 }
 
 dofile('config.lua')
+-- These checks exercise the kora_target storefront path; the shipped default is 'textui'.
+Config.interactionMode = 'target'
 Config.testMode = true
 -- Emptied so the unrelated chunk-load shop-ped spawn thread (Kora.entities.
 -- create/exports.kora_target) is a no-op -- irrelevant to this test and not

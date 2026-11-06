@@ -775,15 +775,16 @@ Config.genderLockedSalons = boolean(false, {
 
 -- How players open a shop. 'target' uses a kora_target zone option; 'textui'
 -- shows "[E] Open <shop>" through kora_lib's TextUI while inside the shop zone
--- and opens on E. Read when the resource starts.
-Config.interactionMode = config and config.enum('target', {
+-- and opens on E. Read when the resource starts. Default 'textui' since
+-- suggestion thread 1565520418167717949 (target zones were hard to find).
+Config.interactionMode = config and config.enum('textui', {
     label = 'Shop interaction',
     description = 'Chooses how players open a shop. Target Zone uses the kora_target prompt; Text Prompt shows an [E] Open message while standing inside the shop area. Changes apply after the resource restarts.',
     options = {
         { value = 'target', label = 'Target Zone' },
         { value = 'textui', label = 'Text Prompt' },
     },
-}) or 'target'
+}) or 'textui'
 
 -- Whether shop target zones draw their world icon. nil follows kora_target's
 -- own icon setting; true always draws it for shop zones; false never does.

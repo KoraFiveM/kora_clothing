@@ -118,6 +118,8 @@ _G.Kora = {
 }
 
 dofile('config.lua')
+-- These checks exercise the kora_target storefront path; the shipped default is 'textui'.
+Config.interactionMode = 'target'
 dofile('shared/components.lua')
 -- Only onChange is needed by the client; config.lua above used its plain defaults.
 Kora.config = { onChange = function(path, fn) changeHandlers[path] = fn end }

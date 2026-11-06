@@ -68,6 +68,8 @@ _G.Kora = {
 }
 
 dofile('config.lua')
+-- These checks exercise the kora_target storefront path; the shipped default is 'textui'.
+Config.interactionMode = 'target'
 Config.testMode = true
 Config.shops = {}
 dofile('shared/components.lua')

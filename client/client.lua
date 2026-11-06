@@ -6,7 +6,7 @@
 
 local activeSession -- { mode, service, mandatory, shopLabel, tattoos } while the NUI is open, else nil
 local disableControlsThread = false
-local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below
+local refreshShopPrompt -- set when Config.interactionMode == 'textui'; see shop targets below. Hides the prompt during a session, shows it otherwise.
 local previewTattoos = {}
 local startUndressDeathWatch -- assigned below triggerOrError; cancels a tattoo session if the player dies in it
 local closeWhenDowned, playerIsDowned -- assigned below triggerOrError; Config.closeWhenDowned state
@@ -740,6 +740,9 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     if QuickToggle then QuickToggle.forget() end
     activeSession.hudHidden = hideHudForSession()
     activeSession.radarHidden = hideRadarForSession()
+    -- The [E] shop prompt goes away only once a session really opens, so a
+    -- refused request (gender lock, downed, moved away) leaves it on screen.
+    if refreshShopPrompt then refreshShopPrompt() end
 
     -- After the real skin is applied, not before -- this has to override
     -- what the player actually walked in wearing, not whatever the ped's
@@ -1684,8 +1687,9 @@ local function hideShopPrompt()
 end
 
 local function showShopPrompt()
-    if not textUiShop or activeSession then return end
+    if not textUiShop then return end
     hideShopPrompt()
+    if activeSession then return end
     textUiShop.handle = Kora.textui.show(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
 end
 
@@ -1696,6 +1700,9 @@ local function registerTextUiShop(index, shop, zone)
             showShopPrompt()
         end,
         onExit = function()
+            -- Only this zone's own exit clears it: with neighbouring zones the
+            -- enter of the next one can arrive before the exit of the last.
+            if not textUiShop or textUiShop.index ~= index then return end
             hideShopPrompt()
             textUiShop = nil
         end,
@@ -1945,7 +1952,8 @@ CreateThread(function()
             defaultKey = 'E',
             onPressed = function()
                 if not textUiShop or activeSession then return end
-                hideShopPrompt()
+                -- The prompt stays until the session opens (see the
+                -- qbclothing:client:openSession handler).
                 openSession('shop', { shopId = textUiShop.index })
             end,
         })
