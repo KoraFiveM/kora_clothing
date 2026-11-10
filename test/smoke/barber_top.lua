@@ -27,7 +27,7 @@ _G.IsNuiFocused = function() return nuiFocused end
 _G.SendNUIMessage = function(message) messages[#messages + 1] = message end
 local cameraZone
 _G.Camera = { start = function() end, stop = function() end, setZone = function(zone) cameraZone = zone end, setCategory = function() end, currentZone = function() return cameraZone or 'full' end }
-_G.QBTheme = { refresh = function() end }
+_G.KoraTheme = { refresh = function() end }
 _G.GetResourceState = function() return 'stopped' end
 _G.IsRadarHidden = function() return false end
 _G.DisplayRadar = function() end
@@ -73,7 +73,7 @@ end
 -- kora_lib's cache reports the death edge; the menu reacts to it instead of polling.
 local cacheHandlers = {}
 local outfitSkin
-_G.QB = {
+_G.Kora = {
     notify = { send = function(notice) notices[#notices + 1] = notice end },
     events = { trigger = function(name, ...) triggered[#triggered + 1] = { name = name, args = { ... } }; return true end },
     cache = {
@@ -82,7 +82,7 @@ _G.QB = {
     },
     callback = { trigger = function() return 'mp_m_freemode_01', outfitSkin end },
 }
-_G.Kora = _G.QB
+_G.Kora = _G.Kora
 
 dofile('config.lua')
 dofile('shared/components.lua')
@@ -104,18 +104,18 @@ local function open(service, keepDressing)
     if not keepDressing then dress() end
     messages, triggered, threads = {}, {}, {}
     local original, skin = snapshotOriginal()
-    netEvents['qbclothing:client:openSession']({ mode = 'shop', service = service or 'tattoo', model = GetEntityModel(), skin = skin, tattoos = {} })
+    netEvents['kora_clothing:client:openSession']({ mode = 'shop', service = service or 'tattoo', model = GetEntityModel(), skin = skin, tattoos = {} })
     return original, skin
 end
 local function openMessage()
-    for _, message in ipairs(messages) do if message.action == 'qbclothing:nui:open' then return message.data end end
+    for _, message in ipairs(messages) do if message.action == 'kora_clothing:nui:open' then return message.data end end
 end
 local function call(name, data)
     local reply
     nuiCallbacks[name](data, function(value) reply = value end)
     return reply
 end
-local function toggle(id, removed) return call('qbclothing:nui:setClothingToggle', { id = id, removed = removed }) end
+local function toggle(id, removed) return call('kora_clothing:nui:setClothingToggle', { id = id, removed = removed }) end
 local function stateOf(list, id)
     for _, entry in ipairs(list or {}) do if entry.id == id then return entry.removed end end
 end
@@ -124,7 +124,7 @@ local function ids(list)
     for _, entry in ipairs(list or {}) do out[#out + 1] = entry.id end
     return table.concat(out, ',')
 end
-local function close(cancelled) netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = cancelled }) end
+local function close(cancelled) netEvents['kora_clothing:client:closeSession']({ ok = true, cancelled = cancelled }) end
 
 local function topIs(expected, label)
     for _, id in ipairs({ 3, 8, 11 }) do
@@ -181,12 +181,12 @@ H.equal(stateOf(reply.toggles, 'hat'), false)
 toggle('hat', true)
 H.equal(props[0], nil, 'hat off again')
 H.equal(#triggered, 0, 'switching sends nothing to the server')
-H.equal(call('qbclothing:nui:setClothingToggle', 'garbage').ok, false)
+H.equal(call('kora_clothing:nui:setClothingToggle', 'garbage').ok, false)
 H.equal(toggle('gloves', true).ok, false, 'unknown switch refused')
 
 -- Confirm never saves a removed item, and the ped gets everything back.
 toggle('shirt', true); toggle('pants', true); toggle('shoes', true)
-call('qbclothing:nui:confirm', {})
+call('kora_clothing:nui:confirm', {})
 local confirm = triggered[#triggered]
 for _, id in ipairs({ 3, 4, 6, 8, 11 }) do
     H.equal(confirm.args[1].skin.components[tostring(id)].d, original[id].d, 'confirm snapshot carries the original ' .. id)
@@ -210,7 +210,7 @@ dead = true
 cacheHandlers.isDead(true, false)
 dead = false
 sameAs(original, 'after death')
-H.equal(triggered[#triggered].name, 'qbclothing:server:cancelSession')
+H.equal(triggered[#triggered].name, 'kora_clothing:server:cancelSession')
 close(true)
 
 -- Resource stop while items are off.
@@ -237,7 +237,7 @@ original = open('barber')
 toggle('shirt', true)
 outfitSkin = { components = {}, props = { ['0'] = { d = 9, t = 0 } } }
 for id = 0, 11 do outfitSkin.components[tostring(id)] = { d = 60 + id, t = 1 } end
-reply = call('qbclothing:nui:loadOutfit', { id = 1 })
+reply = call('kora_clothing:nui:loadOutfit', { id = 1 })
 H.equal(reply.ok, true)
 H.equal(stateOf(reply.clothingToggles, 'shirt'), true, 'shirt stays off on the new outfit')
 H.equal(comps[11].d, 15)
@@ -301,7 +301,7 @@ H.equal(#triggered, 0, 'no request while downed')
 H.equal(notices[#notices] and notices[#notices].type, 'error', 'the player is told why')
 LocalPlayer.state.emsDown = false
 netEvents['qb-clothing:client:openMenu'](2)
-H.equal(triggered[#triggered].name, 'qbclothing:server:requestSession')
+H.equal(triggered[#triggered].name, 'kora_clothing:server:requestSession')
 
 -- A menu really on screen ignores a second open; one that lost its screen
 -- (no NUI focus) is cleared and the request goes through.
@@ -313,9 +313,9 @@ H.equal(#triggered, 0, 'an open menu is left alone')
 nuiFocused = false
 messages = {}
 netEvents['qb-clothing:client:openMenu'](2)
-H.equal(triggered[1] and triggered[1].name, 'qbclothing:server:cancelSession', 'the stale session is dropped server-side')
-H.equal(triggered[2] and triggered[2].name, 'qbclothing:server:requestSession', 'and the new menu is requested')
-H.equal(messages[#messages].action, 'qbclothing:nui:close')
+H.equal(triggered[1] and triggered[1].name, 'kora_clothing:server:cancelSession', 'the stale session is dropped server-side')
+H.equal(triggered[2] and triggered[2].name, 'kora_clothing:server:requestSession', 'and the new menu is requested')
+H.equal(messages[#messages].action, 'kora_clothing:nui:close')
 sameAs(original, 'stale session cleared')
 nuiFocused = true
 

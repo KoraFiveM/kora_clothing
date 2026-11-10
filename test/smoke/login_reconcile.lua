@@ -1,9 +1,9 @@
 -- Regression coverage for the state-bag reconcile path added alongside
--- kora_hud's (client/bridge/qbcore.lua): `ensure kora_clothing` mid-session must
+-- kora_hud's (client/bridge/kora_core.lua): `ensure kora_clothing` mid-session must
 -- re-apply the player's saved skin WITHOUT waiting for
 -- QBCore:Client:OnPlayerLoaded to fire again -- that legacy event does not
 -- re-fire on a resource restart, only on an actual fresh login. Proves the
--- reconcile fires purely off LocalPlayer.state['qbcore:loggedIn'] already
+-- reconcile fires purely off LocalPlayer.state['kora_core:loggedIn'] already
 -- being true at chunk load.
 local H = dofile('test/harness.lua')
 
@@ -36,7 +36,7 @@ _G.GetPlayerServerId = function() return 1 end
 -- Simulates `ensure kora_clothing` mid-session: the server-owned login state
 -- bag is ALREADY true by the time this chunk loads, and nothing will flip it
 -- again (no fresh login is happening).
-_G.LocalPlayer = { state = { ['qbcore:loggedIn'] = true } }
+_G.LocalPlayer = { state = { ['kora_core:loggedIn'] = true } }
 
 local stateBagHandlers = {}
 _G.AddStateBagChangeHandler = function(key, bag, cb)
@@ -105,9 +105,9 @@ H.ok(registeredNetEvents['QBCore:Client:OnPlayerLoaded'] ~= nil,
 
 local loginHandler
 for _, h in ipairs(stateBagHandlers) do
-    if h.key == 'qbcore:loggedIn' then loginHandler = h end
+    if h.key == 'kora_core:loggedIn' then loginHandler = h end
 end
-H.ok(loginHandler ~= nil, 'client.lua must watch the qbcore:loggedIn state bag')
+H.ok(loginHandler ~= nil, 'client.lua must watch the kora_core:loggedIn state bag')
 H.equal(loginHandler.bag, 'player:1', 'the handler must be scoped to the local player state bag')
 
 H.equal(getSkinCalls, 1, 'the saved skin must be fetched once purely from the already-true state bag at load')

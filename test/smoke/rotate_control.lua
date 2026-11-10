@@ -25,9 +25,8 @@ _G.SetNuiFocus = function() end
 _G.SendNUIMessage = function() end
 local ended = 0
 _G.Camera = { start = function() end, stop = function() end, rotateEnd = function() ended = ended + 1 end }
-_G.QBTheme = { refresh = function() end }
+_G.KoraTheme = { refresh = function() end }
 _G.Kora = { notify = { send = function() end } }
-_G.QB = _G.Kora -- the committed client code still says QB; the rename is in flight
 for _, name in ipairs({ 'GetNumberOfPedDrawableVariations', 'GetNumberOfPedTextureVariations', 'GetNumberOfPedPropDrawableVariations', 'GetNumberOfPedPropTextureVariations' }) do
     _G[name] = function() return 0 end
 end
@@ -50,7 +49,7 @@ _G.IsRadarHidden = function() return false end
 _G.DisplayRadar = function() end
 _G.GetResourceState = function() return 'stopped' end
 local sent
-_G.SendNUIMessage = function(message) if message.action == 'qbclothing:nui:open' then sent = message.data end end
+_G.SendNUIMessage = function(message) if message.action == 'kora_clothing:nui:open' then sent = message.data end end
 
 dofile('config.lua')
 dofile('shared/components.lua')
@@ -64,7 +63,7 @@ dofile('client/rotate.lua')
 
 local function open()
     sent = nil
-    handlers['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+    handlers['kora_clothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
     return sent
 end
 
@@ -91,7 +90,7 @@ _G.IsControlJustPressed = function() return false end
 _G.CreateThread = function(fn) threads[#threads + 1] = fn end
 _G.Wait = function() clock = clock + 16; frame = frame + 1; onFrame(frame) end
 _G.SendNUIMessage = function(message)
-    if message.action == 'qbclothing:nui:open' then sent = message.data end
+    if message.action == 'kora_clothing:nui:open' then sent = message.data end
     messages[#messages + 1] = message
 end
 _G.Camera = {
@@ -146,7 +145,7 @@ Config.rotateHideCursor = true
 Config.rotateMode = 'recenter'
 H.equal(open().rotateMode, 'recenter', 'mode is read live on the next open')
 Config.rotateMode = 'controls'
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 
 reset()
 Config.rotateMode = 'plain'
@@ -178,7 +177,7 @@ H.equal(a, true, 'focus restored'); H.equal(b, true, 'cursor restored')
 H.equal(keepInput, false, 'input handed back to the NUI')
 H.equal(cursor[1], 0.25, 'cursor put back where it was (x)'); H.equal(cursor[2], 0.75, 'cursor put back where it was (y)')
 H.ok(rotateEnds >= 1, 'camera settled')
-H.equal(lastMessage().action, 'qbclothing:nui:rotateStopped', 'NUI told the drag ended')
+H.equal(lastMessage().action, 'kora_clothing:nui:rotateStopped', 'NUI told the drag ended')
 H.equal(lastMessage().data.reason, 'released', 'reason is release')
 
 reset()
@@ -244,20 +243,20 @@ RotateControl.stop('nui')
 
 reset()
 local reply
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
 H.equal(reply.active, false, 'no session, no drag')
 open()
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
 H.equal(reply.active, true, 'session open: Lua takes the drag')
 H.equal(RotateControl.isActive(), true, 'drag running')
-callbacks['qbclothing:nui:rotateEnd']({}, function() end)
+callbacks['kora_clothing:nui:rotateEnd']({}, function() end)
 H.equal(RotateControl.isActive(), false, 'rotateEnd stops the controls drag')
 H.equal(select(2, lastFocus()), true, 'rotateEnd restores focus')
 
 -- menu closes mid-drag: no stuck drag, focus is fully dropped, not re-enabled
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.3, y = 0.3 }, function(v) reply = v end)
 H.equal(RotateControl.isActive(), true, 'drag running before close')
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 H.equal(RotateControl.isActive(), false, 'closing the menu ends the drag')
 local a2, b2 = lastFocus()
 H.equal(a2, false, 'focus dropped on close'); H.equal(b2, false, 'cursor dropped on close')
@@ -266,16 +265,16 @@ H.equal(keepInput, false, 'keep-input cleared on close')
 -- recenter callback: only in recenter mode, with a session, throttled
 reset()
 open()
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, false, 'recenter ignored outside recenter mode')
 Config.rotateMode = 'recenter'
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, true, 'recenter moves the cursor')
 H.equal(cursor[1], 0.5, 'to the centre'); H.equal(cursor[2], 0.5, 'to the centre')
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, false, 'throttled when repeated at once')
 clock = clock + 100
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, true, 'allowed again after the interval')
 Config.rotateMode = 'controls'
 
@@ -356,19 +355,19 @@ Config.rotateControlsMaxSeconds = 30.0
 -- Through the NUI callbacks, with a session; a menu closing mid-drag ends it.
 reset()
 open()
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
 H.equal(reply.active, true, 'session open: Lua takes the capture drag')
-callbacks['qbclothing:nui:rotateEnd']({}, function() end)
+callbacks['kora_clothing:nui:rotateEnd']({}, function() end)
 H.equal(RotateControl.isActive(), false, 'rotateEnd stops it')
 H.equal(cursor[1], 0.4, 'cursor back where it began')
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
-handlers['qbclothing:client:closeSession']({ ok = true })
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+handlers['kora_clothing:client:closeSession']({ ok = true })
 H.equal(RotateControl.isActive(), false, 'closing the menu ends the capture drag')
 H.equal(open().rotateMode, 'capture', 'payload carries capture')
 Config.rotateMode = 'plain'
 H.equal(open().rotateMode, 'plain', 'payload carries plain')
 Config.rotateMode = 'capture'
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 
 -- Plain (the default): the callbacks never start a Lua drag or move the cursor; the
 -- NUI's batched rotate messages are the whole drag.
@@ -376,16 +375,16 @@ reset()
 Config.rotateMode = 'plain'
 open()
 local threadsBefore, focusBefore = #threads, #focus -- the session's own, not the drag's
-callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
+callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end)
 H.equal(reply.active, false, 'plain: Lua declines the drag')
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, false, 'plain: the cursor is never recentred')
 H.equal(cursor, nil, 'plain: SetCursorLocation never called')
 H.equal(#threads, threadsBefore, 'plain: no per-frame thread')
 H.equal(#focus, focusBefore, 'plain: NUI focus untouched during the drag')
-callbacks['qbclothing:nui:rotate']({ deltaDeg = 3.0 }, function() end)
+callbacks['kora_clothing:nui:rotate']({ deltaDeg = 3.0 }, function() end)
 H.equal(#rotated, 1, 'plain: the NUI delta turns the camera')
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'capture'
 
 -- Without the cursor natives capture declines, and the NUI falls back to recentring.
@@ -396,9 +395,9 @@ H.equal(RotateControl.start(0, 0.5, 0.5), false, 'declined without GetNuiCursorP
 _G.GetNuiCursorPosition = savedRead
 open()
 clock = clock + 1000 -- past the recentre throttle left by the recenter tests above
-callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
 H.equal(reply.moved, true, 'the recenter fallback is allowed in capture mode')
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 Config.rotateMode = 'controls'
 
 -- Per-menu modes (Config.rotateModeByService): none by default, so every menu follows
@@ -426,12 +425,12 @@ Config.rotateMode = 'plain'
 
 local function openAs(mode, service, model)
     sent = nil
-    handlers['qbclothing:client:openSession']({ mode = mode, service = service, model = model or 'mp_m_freemode_01', skin = {}, tattoos = {} })
+    handlers['kora_clothing:client:openSession']({ mode = mode, service = service, model = model or 'mp_m_freemode_01', skin = {}, tattoos = {} })
     return sent
 end
-local function press() callbacks['qbclothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end) end
-local function release() callbacks['qbclothing:nui:rotateEnd']({}, function() end) end
-local function close() handlers['qbclothing:client:closeSession']({ ok = true }) end
+local function press() callbacks['kora_clothing:nui:rotateStart']({ button = 0, x = 0.4, y = 0.4 }, function(v) reply = v end) end
+local function release() callbacks['kora_clothing:nui:rotateEnd']({}, function() end) end
+local function close() handlers['kora_clothing:client:closeSession']({ ok = true }) end
 local function runLast() local fn = table.remove(threads); fn() end
 
 -- Character creation (new character and admin) stays plain: a press runs no thread,
@@ -442,7 +441,7 @@ for _, mode in ipairs({ 'firstCharacter', 'admin' }) do
     local threadsBefore, focusBefore = #threads, #focus
     press()
     H.equal(reply.active, false, mode .. ' creation: Lua declines the drag')
-    callbacks['qbclothing:nui:recenter']({}, function(v) reply = v end)
+    callbacks['kora_clothing:nui:recenter']({}, function(v) reply = v end)
     H.equal(reply.moved, false, mode .. ' creation: the cursor is never recentred')
     H.equal(#threads, threadsBefore, mode .. ' creation: no drag thread')
     H.equal(#focus, focusBefore, mode .. ' creation: NUI focus untouched')

@@ -66,7 +66,7 @@ _G.GetEntityModel = function() return 'mp_m_freemode_01' end
 _G.SetNuiFocus = function() end
 _G.SendNUIMessage = function() end
 _G.Camera = { start = function() end, stop = function() end }
-_G.QBTheme = { refresh = function() end }
+_G.KoraTheme = { refresh = function() end }
 _G.GetResourceState = function() return 'stopped' end
 _G.IsRadarHidden = function() return false end
 _G.DisplayRadar = function() end
@@ -127,7 +127,7 @@ Config.testMode = true
 _G.RegisterCommand = _G.RegisterCommand or function() end
 _G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
-local runtime = QBClothing._testRuntime
+local runtime = KoraClothing._testRuntime
 local shopsThread = threads[#threads] -- the last CreateThread at load registers the shops
 threads = {}
 
@@ -232,30 +232,30 @@ H.equal(#created, 1, 'no duplicate on re-enter')
 
 -- Selecting the target opens the studio for that shop.
 targets[1].options[1].onSelect()
-H.equal(requests[#requests].name, 'qbclothing:server:requestSession')
+H.equal(requests[#requests].name, 'kora_clothing:server:requestSession')
 H.equal(requests[#requests].mode, 'shop')
 H.equal(requests[#requests].extra.shopId, firstIndex)
 
 -- Studio open: faded to Config alpha (locally); closing resets it.
-netEvents['qbclothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+netEvents['kora_clothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
 H.equal(#alphaCalls, 1)
 H.equal(alphaCalls[1].entity, artistHandle)
 H.equal(alphaCalls[1].alpha, 0)
 H.equal(alphaCalls[1].skin, false, 'not networked skin alpha')
-netEvents['qbclothing:client:closeSession']({ ok = true })
+netEvents['kora_clothing:client:closeSession']({ ok = true })
 H.equal(resets[#resets], artistHandle, 'alpha reset on close')
 
 Config.tattoo.peds.alpha = 40
-netEvents['qbclothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+netEvents['kora_clothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
 H.equal(alphaCalls[#alphaCalls].alpha, 40, 'configured alpha is used')
-netEvents['qbclothing:client:closeSession']({ ok = true, cancelled = true })
+netEvents['kora_clothing:client:closeSession']({ ok = true, cancelled = true })
 H.equal(#resets, 2, 'cancel resets too')
 Config.tattoo.peds.alpha = 0
 
 -- A clothing shop session leaves the artist alone.
 local before = #alphaCalls
-netEvents['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
-netEvents['qbclothing:client:closeSession']({ ok = true })
+netEvents['kora_clothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+netEvents['kora_clothing:client:closeSession']({ ok = true })
 H.equal(#alphaCalls, before, 'only the tattoo studio fades the artist')
 
 -- Leaving deletes the artist and its target and brings the storefront back.
@@ -266,10 +266,10 @@ H.ok(storefrontOf(firstIndex), 'storefront zone is back without the artist')
 H.equal(zones[storefrontOf(firstIndex)].spriteCoords.x, first.coords.x, 'the same storefront is re-registered')
 
 -- An artist that spawns while the studio is open starts faded.
-netEvents['qbclothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+netEvents['kora_clothing:client:openSession']({ mode = 'shop', service = 'tattoo', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
 enter(first)
 H.equal(alphaCalls[#alphaCalls].entity, created[#created], 'a respawn during the studio starts faded')
-netEvents['qbclothing:client:closeSession']({ ok = true })
+netEvents['kora_clothing:client:closeSession']({ ok = true })
 exit(first)
 
 -- Leaving while the model streams: the late ped is deleted, the storefront stays.

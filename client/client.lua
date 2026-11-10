@@ -317,7 +317,7 @@ local function hairPayload(service)
 end
 
 -- Menu text. locales/en.json holds the English defaults; kora_lib (Kora.lang,
--- language from the qb_locale convar) swaps in a translation when the server
+-- language from the kora_locale convar) swaps in a translation when the server
 -- has locales/<language>.json for a key. The NUI shows whatever it is sent, so
 -- wording lives in the locale files rather than in the UI bundle.
 local defaultStrings
@@ -706,13 +706,13 @@ local function stopRotate(reason)
     return false
 end
 
-RegisterNetEvent('qbclothing:client:openSession', function(payload)
+RegisterNetEvent('kora_clothing:client:openSession', function(payload)
     if type(payload) ~= 'table' then return end
 
     -- The server granted this session a round trip ago; if the player went down
     -- meanwhile, hand it straight back instead of showing the menu.
     if not payload.mandatory and closeWhenDowned() and Config.closeWhenDowned.blockOpen and playerIsDowned() then
-        Kora.events.trigger('qbclothing:server:cancelSession')
+        Kora.events.trigger('kora_clothing:server:cancelSession')
         return
     end
 
@@ -767,9 +767,9 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
 
     local head = headPayload(activeSession.service)
 
-    QBTheme.refresh()
+    KoraTheme.refresh()
     SendNUIMessage({
-        action = 'qbclothing:nui:open',
+        action = 'kora_clothing:nui:open',
         data = {
             mode = payload.mode,
             service = activeSession.service,
@@ -811,14 +811,14 @@ RegisterNetEvent('qbclothing:client:openSession', function(payload)
     SetNuiFocus(true, true)
 end)
 
-RegisterNetEvent('qbclothing:client:outfitsUpdated', function(outfits)
+RegisterNetEvent('kora_clothing:client:outfitsUpdated', function(outfits)
     if not activeSession then return end
-    SendNUIMessage({ action = 'qbclothing:nui:outfits', data = outfits or {} })
+    SendNUIMessage({ action = 'kora_clothing:nui:outfits', data = outfits or {} })
 end)
 
-RegisterNetEvent('qbclothing:client:sessionError', function(message)
+RegisterNetEvent('kora_clothing:client:sessionError', function(message)
     if activeSession then
-        SendNUIMessage({ action = 'qbclothing:nui:error', data = { message = message } })
+        SendNUIMessage({ action = 'kora_clothing:nui:error', data = { message = message } })
     end
     notify(message, 'error')
 end)
@@ -832,7 +832,7 @@ local function closeSessionLocally(result)
     stopControlLock()
     setTattooPedsFaded(false)
     SetNuiFocus(false, false)
-    SendNUIMessage({ action = 'qbclothing:nui:close' })
+    SendNUIMessage({ action = 'kora_clothing:nui:close' })
     FreezeEntityPosition(PlayerPedId(), false)
 
     if result and result.ok and not result.cancelled then
@@ -872,12 +872,12 @@ local function closeSessionLocally(result)
     TriggerEvent('qb-clothing:client:onMenuClose')
 end
 
-RegisterNetEvent('qbclothing:client:closeSession', function(result)
+RegisterNetEvent('kora_clothing:client:closeSession', function(result)
     if not activeSession then return end
     closeSessionLocally(result)
 end)
 
-RegisterNUICallback('qbclothing:nui:setVariation', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setVariation', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local ped = PlayerPedId()
     local id = tonumber(data.id)
@@ -964,7 +964,7 @@ local function previewTattooArea(ped, model, before, after)
     end
 end
 
-RegisterNUICallback('qbclothing:nui:setTattoos', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setTattoos', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local policy = Config.services[activeSession.service] or {}
     if not policy.tattoos then cb({ ok = false }); return end
@@ -979,7 +979,7 @@ end)
 -- Preview-only clothing buttons in the tattoo studio. `part` is a part id from
 -- Config.tattoo.undress.parts, or 'all'; `undressed` says which way. The reply
 -- carries the parts now bared so the buttons always show the real state.
-RegisterNUICallback('qbclothing:nui:setUndress', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setUndress', function(data, cb)
     local cfg = undressConfig()
     if not activeSession or activeSession.service ~= 'tattoo' or not cfg or type(data) ~= 'table' then
         cb({ ok = false }); return
@@ -999,7 +999,7 @@ end)
 
 -- Preview-only clothing switches (see TOGGLE_PARTS): `id` is hat, shirt, pants
 -- or shoes, `removed` which way. The reply is every switch's real state.
-RegisterNUICallback('qbclothing:nui:setClothingToggle', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setClothingToggle', function(data, cb)
     if not activeSession or type(data) ~= 'table' or not toggleOffered(activeSession.service, data.id) then
         cb({ ok = false }); return
     end
@@ -1008,7 +1008,7 @@ RegisterNUICallback('qbclothing:nui:setClothingToggle', function(data, cb)
     cb({ ok = true, toggles = togglesPayload(activeSession.service) })
 end)
 
-RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setHairColor', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     -- Same gate the server applies at confirm time, so the preview can never
     -- show a recolour a clothing shop's merge would silently throw away.
@@ -1021,7 +1021,7 @@ RegisterNUICallback('qbclothing:nui:setHairColor', function(data, cb)
     cb({ ok = true, color = previewHair.color, highlight = previewHair.highlight })
 end)
 
-RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:setHead', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
     local policy = servicePolicy(activeSession.service)
     if not Shared.headEditable(policy) then
@@ -1036,7 +1036,7 @@ RegisterNUICallback('qbclothing:nui:setHead', function(data, cb)
     cb({ ok = true, head = previewHead, skinTone = previewHead.skinTone, beard = previewHead.beard })
 end)
 
-RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:camera', function(data, cb)
     if type(data) ~= 'table' then cb({}); return end
     -- `category` is a clothing or tattoo group picked in the menu; `zone` is
     -- the toolbar's explicit choice and always applies.
@@ -1048,7 +1048,7 @@ RegisterNUICallback('qbclothing:nui:camera', function(data, cb)
     cb({ zone = Camera.currentZone() })
 end)
 
-RegisterNUICallback('qbclothing:nui:rotate', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:rotate', function(data, cb)
     if type(data) == 'table' then Camera.rotate(data.deltaDeg) end
     cb({})
 end)
@@ -1068,7 +1068,7 @@ end
 -- The NUI says the drag is over (button up, cursor left the window, focus
 -- lost): settle the orbit where it is so nothing keeps rotating. A capture or
 -- controls drag puts the cursor back itself; any other drag does it here.
-RegisterNUICallback('qbclothing:nui:rotateEnd', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:rotateEnd', function(data, cb)
     Camera.rotateEnd()
     if not stopRotate('nui') then restoreDragCursor(data) end
     cb({})
@@ -1078,7 +1078,7 @@ end)
 -- or 'capture': the NUI hands the drag to Lua, which runs it until the button is
 -- released or the menu closes (client/rotate.lua). Nothing runs before the press.
 -- `active = false` means the NUI keeps its own cursor drag.
-RegisterNUICallback('qbclothing:nui:rotateStart', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:rotateStart', function(data, cb)
     local started = false
     if activeSession and type(data) == 'table' and RotateControl then
         started = RotateControl.start(data.button, data.x, data.y, activeSession.service)
@@ -1087,20 +1087,20 @@ RegisterNUICallback('qbclothing:nui:rotateStart', function(data, cb)
 end)
 
 -- Config.rotateMode = 'recenter': the cursor got close to a screen edge mid-drag.
-RegisterNUICallback('qbclothing:nui:recenter', function(_, cb)
+RegisterNUICallback('kora_clothing:nui:recenter', function(_, cb)
     local moved = false
     if activeSession and RotateControl then moved = RotateControl.recenter(activeSession.service) end
     cb({ moved = moved })
 end)
 
-RegisterNUICallback('qbclothing:nui:zoom', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:zoom', function(data, cb)
     if type(data) == 'table' then Camera.zoom(data.delta) end
     cb({})
 end)
 
-RegisterNUICallback('qbclothing:nui:loadOutfit', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:loadOutfit', function(data, cb)
     if not activeSession or type(data) ~= 'table' then cb({ ok = false }); return end
-    local model, skin = Kora.callback.trigger('qbclothing:server:getOutfitSkin', tonumber(data.id))
+    local model, skin = Kora.callback.trigger('kora_clothing:server:getOutfitSkin', tonumber(data.id))
     if not model then cb({ ok = false }); return end
     local wasUndressed = {}
     for id in pairs(undressActive) do wasUndressed[#wasUndressed + 1] = id end
@@ -1144,20 +1144,20 @@ end)
 -- other server-side rejection of these actions already is.
 local function triggerOrError(name, ...)
     local ok, err = Kora.events.trigger(name, ...)
-    if not ok then TriggerEvent('qbclothing:client:sessionError', err) end
+    if not ok then TriggerEvent('kora_clothing:client:sessionError', err) end
 end
 
-RegisterNUICallback('qbclothing:nui:deleteOutfit', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:deleteOutfit', function(data, cb)
     if activeSession and type(data) == 'table' and data.id then
-        triggerOrError('qbclothing:server:deleteOutfit', tonumber(data.id))
+        triggerOrError('kora_clothing:server:deleteOutfit', tonumber(data.id))
     end
     cb({})
 end)
 
-RegisterNUICallback('qbclothing:nui:confirm', function(data, cb)
+RegisterNUICallback('kora_clothing:nui:confirm', function(data, cb)
     if not activeSession then cb({ ok = false }); return end
     local ped = PlayerPedId()
-    triggerOrError('qbclothing:server:confirmSession', {
+    triggerOrError('kora_clothing:server:confirmSession', {
         model = currentModelName(ped),
         skin = currentSkinSnapshot(ped),
         saveName = type(data) == 'table' and data.saveName or nil,
@@ -1165,9 +1165,9 @@ RegisterNUICallback('qbclothing:nui:confirm', function(data, cb)
     cb({ ok = true })
 end)
 
-RegisterNUICallback('qbclothing:nui:cancel', function(_, cb)
+RegisterNUICallback('kora_clothing:nui:cancel', function(_, cb)
     if not activeSession or activeSession.mandatory then cb({ ok = false }); return end
-    triggerOrError('qbclothing:server:cancelSession')
+    triggerOrError('kora_clothing:server:cancelSession')
     cb({ ok = true })
 end)
 
@@ -1207,7 +1207,7 @@ local function endSessionDowned(session)
     session.downedHandled = true
     restoreTemporaryOverride(PlayerPedId())
     undressActive = {}
-    if not session.mandatory then triggerOrError('qbclothing:server:cancelSession') end
+    if not session.mandatory then triggerOrError('kora_clothing:server:cancelSession') end
 end
 
 local deathEvents = false
@@ -1247,7 +1247,7 @@ local function clearStaleSession()
     if activeSession.mandatory then return false end
     if type(IsNuiFocused) ~= 'function' or IsNuiFocused() then return false end
     closeSessionLocally({ ok = true, cancelled = true })
-    triggerOrError('qbclothing:server:cancelSession')
+    triggerOrError('kora_clothing:server:cancelSession')
     return true
 end
 
@@ -1257,7 +1257,7 @@ local function openSession(mode, extra)
         notify("You can't use this while you're down.", 'error')
         return
     end
-    triggerOrError('qbclothing:server:requestSession', mode, extra)
+    triggerOrError('kora_clothing:server:requestSession', mode, extra)
 end
 
 -- Re-applies the player's last-saved appearance on every login (not just
@@ -1273,7 +1273,7 @@ end
 -- reconcile below in close succession). Only the call whose generation is
 -- still current when its answer arrives actually applies the skin, so the
 -- player doesn't get the same (or a stale) skin applied twice. Mirrors
--- kora_hud's client/bridge/qbcore.lua loginGeneration pattern.
+-- kora_hud's client/bridge/kora_core.lua loginGeneration pattern.
 local skinApplyGeneration = 0
 
 local function applySavedSkin()
@@ -1313,12 +1313,12 @@ RegisterNetEvent('QBCore:Client:OnPlayerLoaded', applySavedSkin)
 -- already logged in" (e.g. `ensure kora_clothing` mid-session): the legacy
 -- OnPlayerLoaded event above does NOT re-fire on a resource restart, so
 -- without this a restarted kora_clothing leaves the player's saved skin
--- un-applied until they relog. Mirrors kora_hud's client/bridge/qbcore.lua --
+-- un-applied until they relog. Mirrors kora_hud's client/bridge/kora_core.lua --
 -- watch the server-owned login state bag directly rather than the legacy
 -- lifecycle event, and reconcile immediately at chunk load to cover the
 -- already-logged-in case, since a bag-change handler only observes future
 -- transitions.
-local CLOTHING_LOGIN_STATE = 'qbcore:loggedIn'
+local CLOTHING_LOGIN_STATE = 'kora_core:loggedIn'
 
 local function reconcileClothingLogin(value)
     if value == true then applySavedSkin() end
@@ -1331,10 +1331,10 @@ end)
 
 reconcileClothingLogin(LocalPlayer.state[CLOTHING_LOGIN_STATE] == true)
 
--- Config.clothingAsItem: fired by the server when a `qbclothing_outfit` item
+-- Config.clothingAsItem: fired by the server when a `kora_clothing_outfit` item
 -- is used from inventory. Never applied while a fitting-room session is open
 -- -- that would clobber whatever the player is currently trying on.
-RegisterNetEvent('qbclothing:client:wearItem', function(model, skin)
+RegisterNetEvent('kora_clothing:client:wearItem', function(model, skin)
     if activeSession then return end
     applyModel(model, skin)
 end)
@@ -1376,7 +1376,7 @@ end
 -- kora_clothing and kora_multichar start in the same batch, so a chunk-load read can
 -- catch kora_multichar as 'starting' and silently strand the session on the
 -- fallback path. By the time a character has been created both are running.
--- Preferred over sniffing the `qbmultichar:mode` state bag, which answers a
+-- Preferred over sniffing the `kora_multichar:mode` state bag, which answers a
 -- timing question ("has the mode replicated yet") rather than the capability
 -- question actually being asked here.
 local function hasSpawnCompleteSignal()
@@ -1407,7 +1407,7 @@ end)
 -- see themselves. `isNew` is its own record of which path the spawn came from;
 -- the armed flag is checked as well so that an ordinary login can never open
 -- the creation fitting room even if the two ever disagree.
-AddEventHandler('qbmultichar:client:spawnComplete', function(isNew)
+AddEventHandler('kora_multichar:client:spawnComplete', function(isNew)
     if not firstCharacterArmed then return end
     firstCharacterArmed = false
     if isNew ~= true then suppressPopulation(false) end
@@ -1423,7 +1423,7 @@ end)
 -- the server did not answer.
 exports('applyStarterAppearance', function()
     if activeSession then return false end
-    local model, skin = Kora.callback.trigger('qbclothing:server:getStarterAppearance')
+    local model, skin = Kora.callback.trigger('kora_clothing:server:getStarterAppearance')
     if type(model) ~= 'string' or type(skin) ~= 'table' then return false end
     return applyModel(model, skin)
 end)
@@ -1484,7 +1484,7 @@ local function openNearestShop(service)
     openSession('shop', { shopId = nearestIndex })
 end
 
-RegisterNetEvent('qbclothing:client:openNearestShop', openNearestShop)
+RegisterNetEvent('kora_clothing:client:openNearestShop', openNearestShop)
 
 RegisterNetEvent('qb-clothing:client:openMenu', function(shopType)
     if shopType == nil then return openNearestShop('clothing') end
@@ -1499,7 +1499,7 @@ end)
 -- and with no shop/model restrictions (mirrors the character-creation
 -- service policy). Permission is re-checked server-side in requestSession --
 -- this event is just the trigger.
-RegisterNetEvent('qbclothing:client:openAdminSession', function(service)
+RegisterNetEvent('kora_clothing:client:openAdminSession', function(service)
     openSession('admin', service and { service = service } or nil)
 end)
 
@@ -2020,7 +2020,7 @@ CreateThread(function()
             onPressed = function()
                 if not textUiShop or activeSession then return end
                 -- The prompt stays until the session opens (see the
-                -- qbclothing:client:openSession handler).
+                -- kora_clothing:client:openSession handler).
                 openSession('shop', { shopId = textUiShop.index })
             end,
         })
@@ -2089,8 +2089,8 @@ if QuickToggle then QuickToggle.sessionActive = function() return activeSession 
 -- Config.target.testMode -> Target._testRuntime: lets the standalone smoke
 -- suite exercise applySkin's index bounds-checking without a running client.
 if Config.testMode then
-    QBClothing = QBClothing or {}
-    QBClothing._testRuntime = {
+    KoraClothing = KoraClothing or {}
+    KoraClothing._testRuntime = {
         applySkin = applySkin, reapplyColours = reapplyColours, refreshHairVariation = refreshHairVariation,
         currentSkinSnapshot = currentSkinSnapshot, headPayload = headPayload,
         refreshTattooArtists = refreshTattooArtists, tattooArtists = tattooArtists, storefrontZones = storefrontZones,

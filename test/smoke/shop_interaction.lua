@@ -95,7 +95,7 @@ textZones[2].onEnter()
 H.equal(prompts[#prompts].text, 'Open ' .. Config.shops[2].label)
 H.equal(prompts[#prompts].key, 'E')
 keybinds.kora_clothing_open_shop.onPressed()
-H.equal(requests[#requests].name, 'qbclothing:server:requestSession')
+H.equal(requests[#requests].name, 'kora_clothing:server:requestSession')
 H.equal(requests[#requests].extra.shopId, 2, 'E opens the shop whose zone the player is in')
 H.equal(#hidden, 0, 'the prompt stays until the server opens the session')
 -- A refused request (no session opened) leaves the prompt up and E usable.

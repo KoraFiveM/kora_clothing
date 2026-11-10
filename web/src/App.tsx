@@ -98,7 +98,7 @@ function useRotate(): DragIO {
         if (pending.current === 0) return
         const deltaDeg = pending.current
         pending.current = 0
-        void sendIntent<RotatePayload, object>("qbclothing:nui:rotate", { deltaDeg })
+        void sendIntent<RotatePayload, object>("kora_clothing:nui:rotate", { deltaDeg })
     }, [])
     const rotate = useCallback((delta: number) => {
         pending.current += delta
@@ -110,15 +110,15 @@ function useRotate(): DragIO {
     const end = useCallback((origin?: DragOrigin) => {
         pending.current = 0
         if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
-        return sendIntent<RotateEndPayload, object>("qbclothing:nui:rotateEnd", origin ? { x: origin.x, y: origin.y } : {})
+        return sendIntent<RotateEndPayload, object>("kora_clothing:nui:rotateEnd", origin ? { x: origin.x, y: origin.y } : {})
     }, [])
     // Config.rotateMode = "controls": Lua takes over the mouse until the button is released.
     const start = useCallback(async (button: number, x: number, y: number) => {
-        const response = await sendIntent<{ button: number; x: number; y: number }, { active?: boolean }>("qbclothing:nui:rotateStart", { button, x, y })
+        const response = await sendIntent<{ button: number; x: number; y: number }, { active?: boolean }>("kora_clothing:nui:rotateStart", { button, x, y })
         return response?.active === true
     }, [])
     // Config.rotateMode = "recenter": Lua moves the cursor back to the screen centre.
-    const recenter = useCallback(() => { void sendIntent<object, object>("qbclothing:nui:recenter", {}) }, [])
+    const recenter = useCallback(() => { void sendIntent<object, object>("kora_clothing:nui:recenter", {}) }, [])
     return useMemo(() => ({ rotate, end, start, recenter }), [rotate, end, start, recenter])
 }
 
@@ -136,7 +136,7 @@ function useZoom() {
         if (pending.current === 0) return
         const delta = pending.current
         pending.current = 0
-        void sendIntent<ZoomPayload, object>("qbclothing:nui:zoom", { delta })
+        void sendIntent<ZoomPayload, object>("kora_clothing:nui:zoom", { delta })
     }, [])
     return useCallback((notches: number) => {
         pending.current += notches
@@ -228,7 +228,7 @@ function Viewport({ io, onZoom, onInteract, mode, pointerLock, dragGuard, rightB
         }
     }, [drag, dragGuard, unlock])
     // Lua ended a controls-mode drag (button released, safety stop): nothing more to send.
-    useNuiEvent<object>("qbclothing:nui:rotateStopped", () => { drag.luaStopped(); unlock() })
+    useNuiEvent<object>("kora_clothing:nui:rotateStopped", () => { drag.luaStopped(); unlock() })
     const sample = (event: { clientX: number; clientY: number; button?: number; buttons?: number; movementX?: number }) => ({
         button: event.button, buttons: event.buttons, movementX: event.movementX,
         clientX: event.clientX, clientY: event.clientY, width: window.innerWidth, height: window.innerHeight,
@@ -787,7 +787,7 @@ export default function App() {
         setOutfitsExpanded(false); setConfirmPending(false); setOwnedSnapshot(false); setHintDismissed(false)
     }, [])
 
-    useNuiEvent<OpenPayload>("qbclothing:nui:open", (payload) => {
+    useNuiEvent<OpenPayload>("kora_clothing:nui:open", (payload) => {
         resetLocalState()
         setOpen(payload)
         setCategories(payload.categories)
@@ -806,9 +806,9 @@ export default function App() {
         setSelectedKey(start.item ? itemKey(start.item) : undefined)
     })
 
-    useNuiEvent<OutfitSummary[]>("qbclothing:nui:outfits", (list) => setOutfits(list ?? []))
-    useNuiEvent<ErrorPayload>("qbclothing:nui:error", ({ message }) => { setConfirmPending(false); setError(message) })
-    useNuiEvent<object>("qbclothing:nui:close", () => resetLocalState())
+    useNuiEvent<OutfitSummary[]>("kora_clothing:nui:outfits", (list) => setOutfits(list ?? []))
+    useNuiEvent<ErrorPayload>("kora_clothing:nui:error", ({ message }) => { setConfirmPending(false); setError(message) })
+    useNuiEvent<object>("kora_clothing:nui:close", () => resetLocalState())
 
     const groupsPresent = useMemo(() => new Set(categories.map((item) => item.category)), [categories])
     const itemsInActiveGroup = useMemo(() => categories.filter((item) => item.category === activeGroup), [categories, activeGroup])
@@ -852,7 +852,7 @@ export default function App() {
     // The game resolves the framing (Config.camera.categoryZones, and whether
     // to move the camera at all) and reports the zone now in effect.
     const frameCategory = useCallback(async (category: string) => {
-        const response = await sendIntent<CategoryCameraPayload, CategoryCameraResponse>("qbclothing:nui:camera", { category })
+        const response = await sendIntent<CategoryCameraPayload, CategoryCameraResponse>("kora_clothing:nui:camera", { category })
         if (response.zone) setZone(response.zone)
     }, [])
 
@@ -878,14 +878,14 @@ export default function App() {
     }, [])
 
     const setVariation = useCallback(async (target: ClothingCategoryItem, next: { drawable: number; texture: number }) => {
-        const response = await sendIntent<SetVariationPayload, SetVariationResponse>("qbclothing:nui:setVariation", {
+        const response = await sendIntent<SetVariationPayload, SetVariationResponse>("kora_clothing:nui:setVariation", {
             kind: target.kind, id: target.id, drawable: next.drawable, texture: next.texture,
         })
         applyVariationResponse(target, response)
     }, [applyVariationResponse])
 
     const setHairColor = useCallback(async (next: { color: number; highlight: number }) => {
-        const response = await sendIntent<SetHairColorPayload, SetHairColorResponse>("qbclothing:nui:setHairColor", next)
+        const response = await sendIntent<SetHairColorPayload, SetHairColorResponse>("kora_clothing:nui:setHairColor", next)
         if (!response.ok) return
         setOwnedSnapshot(false)
         setHair((current) => current && {
@@ -896,7 +896,7 @@ export default function App() {
     }, [])
 
     const setHeadAppearance = useCallback(async (next: HeadValues) => {
-        const response = await sendIntent<SetHeadPayload, SetHeadResponse>("qbclothing:nui:setHead", next)
+        const response = await sendIntent<SetHeadPayload, SetHeadResponse>("kora_clothing:nui:setHead", next)
         if (response.ok && response.head) {
             const confirmed = response.head
             setHead((current) => current && mergeHeadValues(current, confirmed))
@@ -906,24 +906,24 @@ export default function App() {
 
     const changeZone = useCallback((next: Zone) => {
         setZone(next)
-        void sendIntent<CameraPayload, object>("qbclothing:nui:camera", { zone: next })
+        void sendIntent<CameraPayload, object>("kora_clothing:nui:camera", { zone: next })
     }, [])
 
     // Preview-only: the game bares or restores the parts on the local ped and
     // answers with what is bared now; nothing here reaches the saved outfit.
     const sendUndress = useCallback(async (request: SetUndressPayload) => {
-        const response = await sendIntent<SetUndressPayload, SetUndressResponse>("qbclothing:nui:setUndress", request)
+        const response = await sendIntent<SetUndressPayload, SetUndressResponse>("kora_clothing:nui:setUndress", request)
         if (response.ok) setUndressActive(activeParts(response.active))
     }, [])
 
     // Preview-only, like sendUndress: the game answers with every switch's real state.
     const sendToggle = useCallback(async (toggle: ClothingToggle) => {
-        const response = await sendIntent<SetClothingTogglePayload, SetClothingToggleResponse>("qbclothing:nui:setClothingToggle", toggleRequest(toggle))
+        const response = await sendIntent<SetClothingTogglePayload, SetClothingToggleResponse>("kora_clothing:nui:setClothingToggle", toggleRequest(toggle))
         if (response.ok) setToggles(togglesFrom(response.toggles))
     }, [])
 
     const wearOutfit = useCallback(async (id: number) => {
-        const response = await sendIntent<{ id: number }, LoadOutfitResponse>("qbclothing:nui:loadOutfit", { id })
+        const response = await sendIntent<{ id: number }, LoadOutfitResponse>("kora_clothing:nui:loadOutfit", { id })
         if (response.ok && response.categories) {
             setCategories(response.categories)
             setSelectedTattoos(response.selectedTattoos ?? [])
@@ -949,7 +949,7 @@ export default function App() {
 
         const next = change(selectedTattoos)
         if (next === selectedTattoos) return
-        const response = await sendIntent<{ tattoos: string[] }, SetTattoosResponse>("qbclothing:nui:setTattoos", { tattoos: next })
+        const response = await sendIntent<{ tattoos: string[] }, SetTattoosResponse>("kora_clothing:nui:setTattoos", { tattoos: next })
         if (response.ok && response.tattoos) {
             setOwnedSnapshot(false)
             setSelectedTattoos(response.tattoos)
@@ -957,19 +957,19 @@ export default function App() {
     }, [selectedTattoos, open, frameCategory])
 
     const deleteOutfit = useCallback((id: number) => {
-        void sendIntent<{ id: number }, object>("qbclothing:nui:deleteOutfit", { id })
+        void sendIntent<{ id: number }, object>("kora_clothing:nui:deleteOutfit", { id })
     }, [])
 
     const confirm = useCallback(async () => {
         setConfirmPending(true)
         const trimmed = saveName.trim()
-        const response = await sendIntent<ConfirmPayload, ConfirmResponse>("qbclothing:nui:confirm", trimmed ? { saveName: trimmed } : {})
+        const response = await sendIntent<ConfirmPayload, ConfirmResponse>("kora_clothing:nui:confirm", trimmed ? { saveName: trimmed } : {})
         if (!response.ok) setConfirmPending(false)
-        // On success, the session actually ends via the async qbclothing:nui:close message.
+        // On success, the session actually ends via the async kora_clothing:nui:close message.
     }, [saveName])
 
     const cancel = useCallback(() => {
-        void sendIntent<object, CancelResponse>("qbclothing:nui:cancel", {})
+        void sendIntent<object, CancelResponse>("kora_clothing:nui:cancel", {})
     }, [])
 
     // Fades out on its own if the player never touches the camera.

@@ -1,4 +1,4 @@
-QbClothingSchema = {
+KoraClothingSchema = {
     {
         name = 'playerskins',
         collate = 'utf8mb4_unicode_ci',

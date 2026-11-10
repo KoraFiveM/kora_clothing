@@ -30,11 +30,11 @@ local function setBucket(_, src, bucket)
     moves[#moves + 1] = { src = src, bucket = bucket }
 end
 TriggerEvent = function(name, src)
-    if name == 'qbvoice:server:bucketChanged' then bucketNotices[#bucketNotices + 1] = { src = src, bucket = buckets[src] } end
+    if name == 'kora_voice:server:bucketChanged' then bucketNotices[#bucketNotices + 1] = { src = src, bucket = buckets[src] } end
 end
 local function compatBucket(...)
     setBucket(...)
-    TriggerEvent('qbvoice:server:bucketChanged', select(2, ...))
+    TriggerEvent('kora_voice:server:bucketChanged', select(2, ...))
 end
 -- FiveM exposes a callable exports table; the metatable only adapts that host API.
 core.setPlayerBucket = compatBucket
@@ -65,9 +65,9 @@ AddEventHandler = function(name, callback)
     handlers[name][#handlers[name] + 1] = callback
 end
 TriggerClientEvent = function(name, src, payload)
-    if name == 'qbclothing:client:openSession' then opens[#opens + 1] = { src = src, payload = payload } end
-    if name == 'qbclothing:client:sessionError' then sessionErrors[#sessionErrors + 1] = { src = src, payload = payload } end
-    if name == 'qbclothing:client:closeSession' then closes[#closes + 1] = { src = src, payload = payload } end
+    if name == 'kora_clothing:client:openSession' then opens[#opens + 1] = { src = src, payload = payload } end
+    if name == 'kora_clothing:client:sessionError' then sessionErrors[#sessionErrors + 1] = { src = src, payload = payload } end
+    if name == 'kora_clothing:client:closeSession' then closes[#closes + 1] = { src = src, payload = payload } end
 end
 json = { encode = function() return '{}' end }
 Kora = {
@@ -106,13 +106,13 @@ local function resume(thread, ...)
 end
 local function start(mode, extra, src)
     local thread = coroutine.create(function()
-        events['qbclothing:server:requestSession'](src or 7, mode or 'wardrobe', extra)
+        events['kora_clothing:server:requestSession'](src or 7, mode or 'wardrobe', extra)
     end)
     local stage, citizenid = resume(thread)
     return thread, stage, citizenid
 end
 local function cancel(src)
-    events['qbclothing:server:cancelSession'](src or 7)
+    events['kora_clothing:server:cancelSession'](src or 7)
 end
 
 -- One request per source owns both reads; different players remain independent.
@@ -139,7 +139,7 @@ for _, exit in ipairs({ 'cancelSession', 'confirmSession' }) do
     H.equal(opens[#opens].payload.outfits, outfits)
     H.equal(opens[#opens].payload.money, players[7].money)
     holdSkin, holdOutfits = false, false
-    events['qbclothing:server:' .. exit](7, { skin = {} })
+    events['kora_clothing:server:' .. exit](7, { skin = {} })
     H.equal(buckets[7], 42, exit .. ' restores the original nonzero bucket')
 end
 H.equal(writes, 1, 'confirmation preserves ordinary persistence')
@@ -217,7 +217,7 @@ for _, denied in ipairs({ 'mode', 'offline', 'creation', 'shop', 'distance', 'ad
     elseif denied == 'model' then admin, mode, extra = true, 'admin', { service = 'tattoo' }; Config.services.tattoo.model = 'female'
     elseif denied == 'skin-error' then failSkin = true
     elseif denied == 'outfit-error' then failOutfits = true end
-    local ok, err = pcall(events['qbclothing:server:requestSession'], 7, mode, extra)
+    local ok, err = pcall(events['kora_clothing:server:requestSession'], 7, mode, extra)
     H.equal(ok, not (failSkin or failOutfits), denied .. ' retains existing error behavior')
     if not ok then H.ok(tostring(err):find('read failed', 1, true), 'read errors remain visible') end
     H.equal(#opens, count)
@@ -331,7 +331,7 @@ exports.kora_core.setPlayerBucket, rawBucketAllowed = compatBucket, false
 for _, mode in ipairs({ 'firstCharacter', 'wardrobe', 'shop', 'admin' }) do
     local count, moved, errors = #opens, #moves, #sessionErrors
     returnedSkinError = 'controlled saved-skin read failed'
-    local ok, err = pcall(events['qbclothing:server:requestSession'], 7, mode, { shopId = 2, service = 'creation' })
+    local ok, err = pcall(events['kora_clothing:server:requestSession'], 7, mode, { shopId = 2, service = 'creation' })
     H.equal(ok, false, 'a failed saved-skin read cannot authorize ' .. mode)
     H.ok(tostring(err):find(returnedSkinError, 1, true), 'the server retains the read diagnostic')
     H.equal(#sessionErrors, errors + 1, 'a failed open sends the existing client error response')
@@ -365,7 +365,7 @@ cancel()
 -- Cancellation can replace a fitting while its old confirmation is reading.
 start()
 holdSkin = true
-stale = coroutine.create(function() events['qbclothing:server:confirmSession'](7, { skin = {} }) end)
+stale = coroutine.create(function() events['kora_clothing:server:confirmSession'](7, { skin = {} }) end)
 local status, stage = coroutine.resume(stale)
 H.equal(status, true)
 H.equal(stage, 'skin')
@@ -385,7 +385,7 @@ H.equal(buckets[7], 42)
 -- A still-recorded confirmation must not notify a different character.
 start()
 holdSkin = true
-stale = coroutine.create(function() events['qbclothing:server:confirmSession'](7, { skin = {} }) end)
+stale = coroutine.create(function() events['kora_clothing:server:confirmSession'](7, { skin = {} }) end)
 status, stage = coroutine.resume(stale)
 H.equal(status, true)
 H.equal(stage, 'skin')
@@ -402,7 +402,7 @@ cancel()
 start()
 returnedSkinError = 'controlled confirmation read failed'
 local beforeWrites, moved, errors = writes, #moves, #sessionErrors
-local ok, err = pcall(events['qbclothing:server:confirmSession'], 7, { skin = {} })
+local ok, err = pcall(events['kora_clothing:server:confirmSession'], 7, { skin = {} })
 H.equal(ok, false)
 H.ok(tostring(err):find(returnedSkinError, 1, true))
 H.equal(#sessionErrors, errors + 1, 'a failed confirmation sends the existing client error response')
@@ -412,7 +412,7 @@ H.equal(sessionErrors[#sessionErrors].payload:find(returnedSkinError, 1, true), 
 H.equal(writes, beforeWrites, 'failed baseline read cannot overwrite an existing skin')
 H.equal(#moves, moved, 'a failed confirmation retains its existing fitting')
 returnedSkinError = nil
-events['qbclothing:server:confirmSession'](7, { skin = {} })
+events['kora_clothing:server:confirmSession'](7, { skin = {} })
 H.equal(writes, beforeWrites + 1, 'healthy confirmation retry preserves ordinary persistence')
 H.equal(buckets[7], 42)
 
@@ -477,7 +477,7 @@ for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
         players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
         start()
         phase = case.phase
-        local pending = coroutine.create(function() events['qbclothing:server:confirmSession'](7, payload) end)
+        local pending = coroutine.create(function() events['kora_clothing:server:confirmSession'](7, payload) end)
         local stage, citizenid = resume(pending)
         H.equal(stage, case.phase)
         H.equal(citizenid, 'first', 'SQL retains the initiating citizen identity')
@@ -517,7 +517,7 @@ for _, boundary in ipairs({ 'cancel', 'logout-same', 'logout-different' }) do
         start()
         Config.clothingAsItem, phase = provider == 'item', provider
         local pending = coroutine.create(function()
-            events['qbclothing:server:confirmSession'](7, { skin = payload.skin })
+            events['kora_clothing:server:confirmSession'](7, { skin = payload.skin })
         end)
         H.equal(resume(pending), provider)
         phase = nil
@@ -545,12 +545,12 @@ Config.clothingAsItem, GetResourceState, exports.kora_inventory = false, resourc
 players[7] = { citizenid = 'first', charinfo = { gender = 0 }, money = { cash = 1000 } }
 start()
 local written, inserted, charged, closed = #skinWrites, #presetWrites, #charges, #closes
-H.equal(events['qbclothing:server:confirmSession'](7, payload), nil)
+H.equal(events['kora_clothing:server:confirmSession'](7, payload), nil)
 H.equal(#skinWrites, written + 1)
 H.equal(#presetWrites, inserted + 1)
 H.equal(#charges, charged + 1)
 H.equal(charges[#charges].amount, Config.services.clothing.prices.tops)
-H.equal(charges[#charges].reason, 'qbclothing-purchase')
+H.equal(charges[#charges].reason, 'kora_clothing-purchase')
 H.equal(players[7].money.cash, 1000 - Config.services.clothing.prices.tops)
 H.equal(#closes, closed + 1)
 H.equal(buckets[7], 42)
@@ -566,13 +566,13 @@ end }
 Config.clothingAsItem = true
 start()
 written = #skinWrites
-H.equal(events['qbclothing:server:confirmSession'](7, { skin = payload.skin }), nil)
+H.equal(events['kora_clothing:server:confirmSession'](7, { skin = payload.skin }), nil)
 H.equal(#skinWrites, written, 'a boxed purchase still does not overwrite the worn appearance')
 H.equal(grant.src, 7)
 H.equal(grant.name, Config.clothingItem.name)
 H.equal(grant.amount, 1)
 H.equal(grant.slot, nil)
-H.equal(grant.reason, 'qbclothing-purchase')
+H.equal(grant.reason, 'kora_clothing-purchase')
 H.equal(grant.info.model, Shared.models.male)
 H.equal(grant.info.skin.components['11'].d, 2)
 H.equal(closes[#closes].payload.revertTo.model, Shared.models.male)
@@ -644,7 +644,7 @@ emit('QBCore:Server:OnPlayerUnload', 7, 7)
 
 populationCalls = {}
 start('firstCharacter')
-events['qbclothing:server:confirmSession'](7, { skin = {} })
+events['kora_clothing:server:confirmSession'](7, { skin = {} })
 H.equal(buckets[7], 42, 'finishing restores the previous bucket')
 
 -- A reused slot follows the current mode: shops are not emptied, and a bucket

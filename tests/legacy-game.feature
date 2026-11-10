@@ -822,10 +822,10 @@ Feature: kora_clothing — game tests
     1. Ask an admin to set Config.clothingAsItem = true and restart the resource.
     2. Buy an outfit and open your inventory.
     Expect: an Outfit item is added (no direct equip). Using it puts the outfit on. Skip if you can't change the config.
-    Also checklist kora_clothing:clothing-as-item (Outfit as inventory item (optional)): If Config.clothingAsItem is on, a purchase gives a qbclothing_outfit item; using it from inventory equips the look.
+    Also checklist kora_clothing:clothing-as-item (Outfit as inventory item (optional)): If Config.clothingAsItem is on, a purchase gives a kora_clothing_outfit item; using it from inventory equips the look.
     """
     When I manually: buy an outfit at a clothing shop
     And I open my inventory
     Then I confirm: an Outfit item is added and the outfit is not equipped directly (only applies when Config.clothingAsItem is enabled; otherwise mark Pass if nothing happens)
-    When I use a "qbclothing_outfit"
+    When I use a "kora_clothing_outfit"
     Then I confirm: the outfit is put on (only applies when Config.clothingAsItem is enabled; otherwise mark Pass if nothing happens)

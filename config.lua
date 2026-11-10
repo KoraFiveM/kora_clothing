@@ -268,10 +268,10 @@ Config.wardrobe = {
 Config.clothingAsItem = false
 
 Config.clothingItem = {
-    name = 'qbclothing_outfit',
+    name = 'kora_clothing_outfit',
     label = 'Outfit',
     weight = 300,
-    image = 'qbclothing_outfit.png',
+    image = 'kora_clothing_outfit.png',
     description = 'A saved outfit. Use it to put it on.',
 }
 
@@ -1092,7 +1092,7 @@ Config.ui = {
     },
 }
 
--- Camera zoom presets the NUI can request via the `qbclothing:nui:camera`
+-- Camera zoom presets the NUI can request via the `kora_clothing:nui:camera`
 -- callback. Offsets are relative to the ped's mid-spine bone (SKEL_Spine1,
 -- roughly the belly, about 1.2m above the feet on a standing freemode ped) in
 -- the ped's own forward-facing frame; client/camera.lua turns these into

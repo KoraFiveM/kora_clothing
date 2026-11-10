@@ -35,7 +35,7 @@ end
 -- Session state is the sole authority for bucket restore and mandatory-mode
 -- enforcement -- never trust client-submitted session identity.
 H.ok(server:find('local sessions = {}', 1, true), 'server keeps its own session table')
-H.ok(server:find("Kora.events.register('qbclothing:server:requestSession'", 1, true), 'session open is routed through kora_lib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
+H.ok(server:find("Kora.events.register('kora_clothing:server:requestSession'", 1, true), 'session open is routed through kora_lib\'s tokenised events gateway, not a raw guessable RegisterNetEvent')
 H.ok(server:find("if sessions[src] then return end", 1, true), 'duplicate session requests are rejected')
 H.ok(server:find('local session = sessions[src]', 1, true), 'confirm/cancel/delete look up session server-side')
 H.ok(server:find('if not session or session.mandatory then return end', 1, true), 'mandatory first-character sessions cannot be cancelled')
@@ -52,7 +52,7 @@ H.ok(server:find('pcall(leaveFittingRoom, src, session.previousBucket)', 1, true
 -- from the client or from a session-open-time cache.
 H.ok(server:find('local before = dbGetSkin%(session%.citizenid[,)]'), 'price diff re-reads the saved skin at confirm time')
 H.ok(server:find('local price = priceDiff(', 1, true), 'purchase price is computed server-side')
-H.ok(server:find("exports.kora_core:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')", 1, true), 'purchase takes server-side payment')
+H.ok(server:find("exports.kora_core:removeMoney(src, Config.shop.currency, price, 'kora_clothing-purchase')", 1, true), 'purchase takes server-side payment')
 H.ok(not server:find('payload.price', 1, true), 'server never trusts a client-submitted price')
 
 -- The free mandatory first-fitting must be usable exactly once per citizen --
@@ -83,18 +83,18 @@ H.ok(server:find('for _, row in ipairs(dbListOutfitSkins(citizenid)) do', 1, tru
 H.ok(server:find('not ownedOutfitMatch(session.citizenid, model, newSkin)', 1, true), 'pricing is skipped when the confirmed look matches an already-owned outfit')
 
 -- Config.clothingAsItem: off by default; when on, the item is registered
--- with kora_core/qbinventory rather than assumed to already exist, purchases
+-- with kora_core/kora_inventory rather than assumed to already exist, purchases
 -- still go through the same payment path as a direct equip, the item is
 -- reusable (not consumed) so it behaves like a real wardrobe piece, and the
 -- live try-on preview is reverted (never silently kept as "worn") once it's
 -- actually boxed instead of equipped.
 H.ok(config:find('Config.clothingAsItem = false', 1, true), 'clothing-as-item defaults off')
-H.ok(server:find("exports.kora_core:registerShared('items', Config.clothingItem.name,", 1, true), 'the outfit item is registered with qbcore, not assumed to pre-exist')
-H.ok(server:find("exports.kora_inventory:createUseable(Config.clothingItem.name, equipFromItem)", 1, true), 'the outfit item registers a qbinventory use handler')
+H.ok(server:find("exports.kora_core:registerShared('items', Config.clothingItem.name,", 1, true), 'the outfit item is registered with kora_core, not assumed to pre-exist')
+H.ok(server:find("exports.kora_inventory:createUseable(Config.clothingItem.name, equipFromItem)", 1, true), 'the outfit item registers a kora_inventory use handler')
 H.ok(server:find('local function equipFromItem(src, item)', 1, true) and server:find('return false\nend', 1, true), 'using an outfit item does not consume it')
 H.ok(server:find('local wantsBox = not session.free and session.mode ~= ' .. "'firstCharacter'" .. ' and Config.clothingAsItem', 1, true), 'free configured sessions never produce free inventory outfit items')
 H.ok(server:find('revertTo = boxed and { model = beforeModel, skin = beforeSkin } or nil', 1, true), 'a boxed purchase reverts the live try-on preview instead of leaving it worn')
-H.ok(client:find("RegisterNetEvent('qbclothing:client:wearItem'", 1, true), 'client applies an equipped item on use')
+H.ok(client:find("RegisterNetEvent('kora_clothing:client:wearItem'", 1, true), 'client applies an equipped item on use')
 H.ok(client:find('if activeSession then return end', 1, true), 'wearing an item is ignored while a fitting-room session is open')
 
 -- Appearance is clamped server-side even though the true per-model cap can
@@ -120,7 +120,7 @@ H.ok(server:find("Config.genderLockedSalons == true and mode == 'shop'", 1, true
     'the gender lock is read live, enforced server-side and limited to shop visits')
 H.ok(server:find('local function tattooPriceDiff(previousSkin, newSkin, model)', 1, true), 'new tattoos are individually priced server-side')
 H.ok(server:find('Shared.sanitiseTattoos(model, rawSkin.tattoos)', 1, true), 'tattoos are validated against the configured model catalogue')
-H.ok(client:find("RegisterNUICallback('qbclothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')
+H.ok(client:find("RegisterNUICallback('kora_clothing:nui:setTattoos'", 1, true), 'the NUI can preview tattoo selections')
 H.ok(client:find('ClearPedDecorations(ped)', 1, true) and client:find('AddPedDecorationFromHashes', 1, true), 'tattoo decorations are reapplied to live peds')
 
 -- A tattoo session bares whatever the catalogue needs to actually be seen,
@@ -146,9 +146,9 @@ H.ok(client:find('applyModel(previousAppearance.model, previousAppearance.skin)'
 -- close. A pre-existing hide (from another resource or the player) remains
 -- intact.
 H.ok(client:find("GetResourceState('kora_hud') ~= 'started'", 1, true),
-    'qbhud is checked at runtime so qbclothing remains compatible with other HUDs')
+    'kora_hud is checked at runtime so kora_clothing remains compatible with other HUDs')
 H.ok(client:find("exports['kora_hud']:isVisible()", 1, true) and client:find("exports['kora_hud']:hide()", 1, true),
-    'a clothing session hides qbhud only when it was already visible')
+    'a clothing session hides kora_hud only when it was already visible')
 H.ok(client:find('activeSession.hudHidden = hideHudForSession()', 1, true),
     'the session remembers whether it hid the HUD')
 H.ok(client:find('restoreHudForSession(session)', 1, true) and client:find('restoreHudForSession(activeSession)', 1, true),
@@ -159,41 +159,41 @@ H.ok(server:find("Kora.callback.register('qb-clothing:server:getSkin'", 1, true)
 H.ok(server:find('return saved.model, sanitiseSkin(saved.skin, saved.model)', 1, true),
     'the spawn-time getSkin callback sanitises the saved skin like every other read path -- ' ..
     'it used to return the raw DB blob straight to SetPedComponentVariation/SetPedPropIndex')
-H.ok(server:find("Kora.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'qbmultichar character-select preview callback is overridden')
+H.ok(server:find("Kora.callback.register('qb-multicharacter:server:getSkin'", 1, true), 'kora_multichar character-select preview callback is overridden')
 H.ok(server:find('exports.kora_core:ownsCharacter(src, citizenid)', 1, true), 'character preview appearance is ownership checked before reading the skin')
 H.ok(server:find('previewCache[src]', 1, true), 'selection-session appearance reads are cached per source')
-H.ok(server:find("AddStateBagChangeHandler('qbmultichar:mode'", 1, true), 'appearance cache clears when the cinematic selection session ends')
+H.ok(server:find("AddStateBagChangeHandler('kora_multichar:mode'", 1, true), 'appearance cache clears when the cinematic selection session ends')
 H.ok(server:find("rateLimit = { max = 20, window = 10000 }", 1, true), 'character preview appearance reads are rate limited')
 H.ok(server:find('local skin = sanitiseSkin(saved.skin, saved.model)', 1, true), 'character preview appearance is sanitised before it reaches a ped')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:CreateFirstCharacter'", 1, true), 'real qb-clothing CreateFirstCharacter event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openMenu'", 1, true), 'real qb-clothing openMenu event is implemented')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:openOutfitMenu'", 1, true), 'real qb-clothing openOutfitMenu event is implemented')
-H.ok(client:find("RegisterNetEvent('qbclothing:client:openNearestShop'", 1, true), 'admin integrations can request the nearest configured service shop')
-H.ok(client:find("RegisterNetEvent('qbclothing:client:openAdminSession'", 1, true), 'admin integrations use a dedicated full-styling session')
+H.ok(client:find("RegisterNetEvent('kora_clothing:client:openNearestShop'", 1, true), 'admin integrations can request the nearest configured service shop')
+H.ok(client:find("RegisterNetEvent('kora_clothing:client:openAdminSession'", 1, true), 'admin integrations use a dedicated full-styling session')
 H.ok(client:find("nearestDistance > (Config.interactDistance + 1.0)", 1, true), 'nearest-shop client feedback uses the same tolerance as the authoritative server check')
 H.ok(server:find("elseif mode == 'admin' then", 1, true) and server:find("exports.kora_core:hasPermission(src, 'admin')", 1, true), 'full-styling admin sessions are permission-checked server-side')
 H.ok(client:find("RegisterNetEvent('qb-clothing:client:loadOutfit'", 1, true), 'real qb-clothing loadOutfit event is implemented')
 H.ok(client:find("exports('OpenClothingRoom'", 1, true), 'real qb-clothing OpenClothingRoom export is implemented')
-H.ok(client:find("exports('ApplyAppearanceToPed'", 1, true), 'local preview peds can use qbclothing\'s bounded appearance application')
+H.ok(client:find("exports('ApplyAppearanceToPed'", 1, true), 'local preview peds can use kora_clothing\'s bounded appearance application')
 H.ok(manifest:find("provide 'qb-clothing'", 1, true), 'manifest advertises the qb-clothing identity')
 
 -- The character-creation hook is a listener: it arms on the event kora_core
 -- already fires and opens on the completion event kora_multichar publishes.
 H.ok(client:find("RegisterNetEvent('qb-multicharacter:client:closeNUIdefault'", 1, true), 'hooks the existing new-character signal')
-H.ok(client:find("AddEventHandler('qbmultichar:client:spawnComplete'", 1, true),
-    'first-character clothing opens on qbmultichar\'s spawn-completion event, not on a timer -- ' ..
-    'the qbmultichar:mode bag it used to poll is cleared BEFORE the teleport runs, so a poller ' ..
+H.ok(client:find("AddEventHandler('kora_multichar:client:spawnComplete'", 1, true),
+    'first-character clothing opens on kora_multichar\'s spawn-completion event, not on a timer -- ' ..
+    'the kora_multichar:mode bag it used to poll is cleared BEFORE the teleport runs, so a poller ' ..
     'woke while the ped was still being placed and put the fitting room on screen pre-spawn')
 H.ok(client:find("if isNew ~= true then return end", 1, true), 'an ordinary login never opens the creation fitting room')
 H.ok(client:find("local function hasSpawnCompleteSignal()", 1, true) and client:find("GetResourceState('kora_multichar') == 'started'", 1, true),
     'third-party qb-multicharacter, which publishes no completion event, keeps the ped-observing fallback -- ' ..
-    'asked at arm time, since a chunk-load read can catch qbmultichar still starting in the same batch')
+    'asked at arm time, since a chunk-load read can catch kora_multichar still starting in the same batch')
 H.ok(client:find('NetworkIsPlayerActive(PlayerId())', 1, true), 'the fallback path waits for the player to actually be spawned before opening')
 
 -- A new character starts in Config.starterOutfit, never the previous character's clothes.
 H.ok(server:find("if mode == 'firstCharacter' and not saved then skin = starterSkin(model) or skin end", 1, true),
     'the first-character fitting room opens on the starter outfit, not the live ped')
-H.ok(server:find("Kora.callback.register('qbclothing:server:getStarterAppearance'", 1, true) and server:find('if not ok or saved then return nil end', 1, true),
+H.ok(server:find("Kora.callback.register('kora_clothing:server:getStarterAppearance'", 1, true) and server:find('if not ok or saved then return nil end', 1, true),
     'the starter appearance is only handed out to a citizen with no saved skin')
 H.ok(client:find("exports('applyStarterAppearance'", 1, true), 'kora_multichar can dress a new character before the first spawn')
 
@@ -243,7 +243,7 @@ H.ok(camera:find('function Camera.zoom(delta)', 1, true), 'the camera exposes a 
 H.ok(camera:find('local function goalRadius(zoneCfg)', 1, true) and camera:find('lerp(state.radius, goalRadius(zoneCfg), zoomRate)', 1, true),
     'free zoom is folded into the zone lerp goal, not written onto the live camera radius')
 H.ok(config:find('zoom = {', 1, true) and config:find('step = 0.12,', 1, true), 'zoom bounds and step are configurable')
-H.ok(client:find("RegisterNUICallback('qbclothing:nui:zoom'", 1, true), 'the NUI can request a continuous zoom')
+H.ok(client:find("RegisterNUICallback('kora_clothing:nui:zoom'", 1, true), 'the NUI can request a continuous zoom')
 H.ok(camera:find('target.zoomOffset = 0.0\n    occlusionDirty = true', 1, true), 'a zone preset is a jump-to: it discards the accumulated free-zoom offset')
 
 -- Orbit interpolation must cross 0° on the short arc. A raw lerp from 359°
@@ -263,7 +263,7 @@ H.ok(server:find('touchedCategories[Shared.components[2].category] = true', 1, t
 H.ok(server:find('local function hairOf(skin) return (skin.hairColor or 0), (skin.hairHighlight or 0) end', 1, true), 'outfits saved before hair colour existed still match as owned')
 H.ok(client:find('local function buildHairPalette()', 1, true) and client:find('GetPedHairRgbColor(index)', 1, true), 'the palette the NUI paints is read from the game, not hardcoded')
 H.ok(client:find('SetPedHairColor(ped, previewHair.color, previewHair.highlight)', 1, true), 'hair colour reaches the ped through the indexed native')
-H.ok(client:find("RegisterNUICallback('qbclothing:nui:setHairColor'", 1, true), 'the NUI can preview a hair recolour')
+H.ok(client:find("RegisterNUICallback('kora_clothing:nui:setHairColor'", 1, true), 'the NUI can preview a hair recolour')
 H.ok(client:find('hair = hairPayload(activeSession.service),', 1, true), 'the palette is sent once with the session payload')
 H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return nil end', 1, true), 'a clothing shop is sent no palette at all')
 
@@ -278,7 +278,7 @@ H.equal(entityTargets, 1, 'the only ped-bound target is the tattoo artist')
 H.ok(client:find('local function tattooPedsEnabled()', 1, true) and client:find('if not tattooPedsEnabled() then', 1, true), 'the artist is spawned only when Config.tattoo.peds.enabled')
 H.ok(client:find('if restore ~= false then showStorefront(index) end', 1, true), 'the storefront zone comes back when the artist is gone')
 H.ok(client:find('artist.zone = Kora.zones.sphere({', 1, true) and not client:find('syncTattooPeds', 1, true), 'artists spawn from kora_lib zones, not a polling loop')
-H.ok(client:find('exports.kora_target:addBoxZone({', 1, true) and client:find('exports.kora_target:addPolyZone({', 1, true), 'shops are targeted through qbtarget zone geometry')
+H.ok(client:find('exports.kora_target:addBoxZone({', 1, true) and client:find('exports.kora_target:addPolyZone({', 1, true), 'shops are targeted through kora_target zone geometry')
 H.ok(client:find('options = options,', 1, true), 'the zone APIs take options INSIDE the opts table, unlike addEntity')
 H.ok(config:find('Config.shopPeds = false', 1, true), 'the decorative clerk is off by default')
 H.ok(client:find('if Config.shopPeds and not ownsTattooPed then', 1, true), 'the clerk is spawned only when configured, and carries no target options')
@@ -302,7 +302,7 @@ H.ok(client:find('stopControlLock()', 1, true), 'closing a session releases the 
 
 -- Schema is declared for kora_sql's declarative handler.
 local schema = read('server/schema.lua')
-H.ok(persistence:find('Kora.sql.ensureTables(QbClothingSchema)', 1, true), 'schema uses qbsql\'s ensureTables')
+H.ok(persistence:find('Kora.sql.ensureTables(KoraClothingSchema)', 1, true), 'schema uses kora_sql\'s ensureTables')
 H.ok(not persistence:find('migrateFiles', 1, true), 'no file migrator remains')
 H.ok(schema:find("name = 'playerskins'", 1, true) and schema:find("name = 'playeroutfits'", 1, true), 'schema declares both tables')
 H.ok(schema:find("primary = { 'citizenid' }", 1, true) and schema:find("idx_playeroutfits_citizenid", 1, true), 'schema keeps the key and outfit index')

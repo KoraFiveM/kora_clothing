@@ -22,7 +22,7 @@ _G.FreezeEntityPosition = function() end
 _G.SetNuiFocus = function() end
 _G.SendNUIMessage = function() end
 _G.Camera = { start = function() end, stop = function() end }
-_G.QBTheme = { refresh = function() end }
+_G.KoraTheme = { refresh = function() end }
 _G.Kora = { notify = { send = function() end } }
 for _, name in ipairs({ 'GetNumberOfPedDrawableVariations', 'GetNumberOfPedTextureVariations', 'GetNumberOfPedPropDrawableVariations', 'GetNumberOfPedPropTextureVariations' }) do
     _G[name] = function() return 0 end
@@ -57,9 +57,9 @@ _G.PlayerPedId = _G.PlayerPedId or function() return 1 end
 dofile('client/client.lua')
 
 local function cycle(service)
-    handlers['qbclothing:client:openSession']({ mode = 'shop', service = service, model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+    handlers['kora_clothing:client:openSession']({ mode = 'shop', service = service, model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
     local during = radarVisible
-    handlers['qbclothing:client:closeSession']({ ok = true })
+    handlers['kora_clothing:client:closeSession']({ ok = true })
     return during, radarVisible
 end
 
@@ -75,8 +75,8 @@ end
 
 -- Cancel (not ok) restores too.
 radarVisible = true
-handlers['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {} })
-handlers['qbclothing:client:closeSession']({ ok = false, cancelled = true })
+handlers['kora_clothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {} })
+handlers['kora_clothing:client:closeSession']({ ok = false, cancelled = true })
 H.equal(radarVisible, true, 'cancel restores the radar')
 
 -- A radar that was already hidden stays hidden.

@@ -33,7 +33,7 @@ test("an empty Lua list on the wire reads as nothing bared", () => {
 
 test("the studio wires the buttons to the game callback and resets them per session", () => {
     const app = readFileSync(new URL("../App.tsx", import.meta.url), "utf8")
-    assert.match(app, /qbclothing:nui:setUndress/)
+    assert.match(app, /kora_clothing:nui:setUndress/)
     assert.match(app, /<UndressToolbar/)
     assert.match(app, /setUndressActive\(\[\]\)/)
 })

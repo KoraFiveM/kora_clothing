@@ -62,5 +62,5 @@ const sample: OpenPayload = {
 
 export function openDevHarness() {
     const post = <T,>(action: string, data: T) => window.postMessage({ action, data } satisfies NuiWireMessage<T>, "*")
-    post("qbclothing:nui:open", sample)
+    post("kora_clothing:nui:open", sample)
 }

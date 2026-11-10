@@ -24,7 +24,7 @@ _G.exports = setmetatable({}, {
     __call = function() end, -- bare exports('Name', fn) registration
     __index = function() return function() end end, -- exports.other:fn(...)
 })
--- Chunk-load reconcile (mirrors kora_hud's client/bridge/qbcore.lua pattern):
+-- Chunk-load reconcile (mirrors kora_hud's client/bridge/kora_core.lua pattern):
 -- client.lua reads the login state bag and calls PlayerId/GetPlayerServerId
 -- as soon as it loads, so these need to exist even though this test never
 -- drives a login transition. CreateThread above is a no-op stub, so the
@@ -89,7 +89,7 @@ _G.RegisterCommand = _G.RegisterCommand or function() end
 _G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
 
-local runtime = QBClothing._testRuntime
+local runtime = KoraClothing._testRuntime
 
 local function callFor(calls, id)
     for _, c in ipairs(calls) do if c.id == id then return c end end

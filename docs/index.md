@@ -12,31 +12,31 @@ counter never lands in shot. Outfits are saved per citizen
 (`playerskins` for the current look, `playeroutfits` for up to
 `Config.wardrobe.maxOutfits` named presets) created
 at startup through
-[qbsql](https://qbcore2.github.io/kora_sql/)'s `Kora.sql.ensureTables`. Purchases are
+[kora_sql](https://qbcore2.github.io/kora_sql/)'s `Kora.sql.ensureTables`. Purchases are
 priced per touched category (clothing/hair/tattoos) and charged through
-[qbcore](https://qbcore2.github.io/kora_core/) money, with an optional
+[kora_core](https://qbcore2.github.io/kora_core/) money, with an optional
 "clothing-as-item" mode that boxes a purchase as a physical, reusable
 inventory item instead of equipping it directly. `kora_clothing` `provide`s
 `qb-clothing` and speaks the real upstream qb-clothing wire protocol (net
 events, callback names) directly, so third-party barber/tattoo/uniform
 scripts built against it keep working unmodified.
 
-When [qbhud](https://qbcore2.github.io/kora_hud/) is running, kora_clothing hides it
+When [kora_hud](https://qbcore2.github.io/kora_hud/) is running, kora_clothing hides it
 for the duration of a fitting-room session and restores it on close. Servers
 using another HUD need no configuration; the integration is optional.
 
 ## Requirements
 
 - [kora_lib](https://qbcore2.github.io/kora_lib/)
-- [qbsql](https://qbcore2.github.io/kora_sql/)
-- [qbcore](https://qbcore2.github.io/kora_core/)
-- [qbtarget](https://qbcore2.github.io/kora_target/) — shops are targeted through kora_target zones
+- [kora_sql](https://qbcore2.github.io/kora_sql/)
+- [kora_core](https://qbcore2.github.io/kora_core/)
+- [kora_target](https://qbcore2.github.io/kora_target/) — shops are targeted through kora_target zones
 
 ## Installation
 
 `server.cfg`, in this order:
 ```
-set mysql_connection_string "mysql://user:pass@localhost/qbcore?charset=utf8mb4"
+set mysql_connection_string "mysql://user:pass@localhost/kora_core?charset=utf8mb4"
 ensure kora_sql
 ensure kora_lib
 ensure kora_core
@@ -46,7 +46,7 @@ ensure kora_clothing
 kora_clothing owns its schema (`playerskins`, `playeroutfits`) and applies
 its declared tables (`server/schema.lua`) itself via kora_sql's schema handler on first
 boot — no manual SQL import needed. `fxmanifest.lua` also declares hard
-`dependency` edges on kora_lib/kora_sql/kora_core/qbtarget, so FXServer guarantees
+`dependency` edges on kora_lib/kora_sql/kora_core/kora_target, so FXServer guarantees
 correct start order even if `ensure` lines are reshuffled.
 
 ## Usage examples
@@ -90,8 +90,8 @@ end
 ### React once the schema is ready
 ```lua
 -- server
-AddEventHandler('qbclothing:server:persistenceReady', function()
-    print('qbclothing playerskins/playeroutfits tables are ready')
+AddEventHandler('kora_clothing:server:persistenceReady', function()
+    print('kora_clothing playerskins/playeroutfits tables are ready')
 end)
 ```
 
@@ -136,7 +136,7 @@ TriggerServerEvent('qb-clothes:loadPlayerSkin')          -- replies to the calle
 ```lua
 Kora.callback.trigger('qb-clothing:server:getSkin')                    -- -> model, skin
 Kora.callback.trigger('qb-multicharacter:server:getSkin', citizenid)   -- -> model, skin (char-select preview)
-Kora.callback.trigger('qbclothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
+Kora.callback.trigger('kora_clothing:server:getOutfitSkin', outfitId)     -- -> model, skin (session-scoped)
 ```
 
 The multicharacter preview callback is pre-login safe: kora_core verifies that
@@ -212,7 +212,7 @@ the plain, capture, pointer and recenter modes:
 
 - `'plain'` — a normal press/move/release drag. The NUI turns the
   character from the mouse movement it sees (`movementX`), one
-  `qbclothing:nui:rotate` message per animation frame, and the cursor is never
+  `kora_clothing:nui:rotate` message per animation frame, and the cursor is never
   touched: no Lua thread, no `SetCursorLocation`, no NUI focus change. A full-screen
   overlay owns the cursor for the whole drag: hidden by default
   (`Config.rotateHideCursor`), or with that off the cursor set by
@@ -249,10 +249,10 @@ the plain, capture, pointer and recenter modes:
   `Config.rotateControlsSensitivity` (default `8.0`) sets degrees per unit of
   movement. If the game never reports the held button, the drag lasts while
   the mouse moves and ends `Config.rotateControlsIdleSeconds` (0.4s) after it
-  stops. If Lua declines (`qbclothing:nui:rotateStart` replies
+  stops. If Lua declines (`kora_clothing:nui:rotateStart` replies
   `active = false`) the NUI falls back to a plain drag.
 - `'recenter'` — the cursor drag stays in the NUI; near a screen edge the NUI
-  asks Lua (`qbclothing:nui:recenter`, throttled) to `SetCursorLocation(0.5, 0.5)`
+  asks Lua (`kora_clothing:nui:recenter`, throttled) to `SetCursorLocation(0.5, 0.5)`
   and ignores the resulting jump.
 
 Every mode ends the drag on mouse release, window blur, Escape and menu close
@@ -271,7 +271,7 @@ whichever preset is selected — `Config.camera.zoom` sets the step per wheel
 notch and the radius bounds it is clamped to. The presets remain jump-to
 shortcuts: picking one discards the accumulated wheel offset and returns to its
 authored framing. The NUI sends wheel *notches* rather than pixel deltas
-(`qbclothing:nui:zoom`), because `deltaY` magnitude is not comparable between a
+(`kora_clothing:nui:zoom`), because `deltaY` magnitude is not comparable between a
 mouse, a trackpad and CEF's line/page delta modes.
 
 **No obstructions.** Before the camera settles at a framing, a capsule shape
@@ -322,17 +322,17 @@ to the hair component's category.
 -- gates an admin-only free fitting, so these go through the per-session
 -- token instead of a guessable static event name; see kora_lib's
 -- local/events/docs.md)
-Kora.events.trigger('qbclothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
-Kora.events.trigger('qbclothing:server:confirmSession', { model, skin, saveName })
-Kora.events.trigger('qbclothing:server:cancelSession')
-Kora.events.trigger('qbclothing:server:deleteOutfit', outfitId)
+Kora.events.trigger('kora_clothing:server:requestSession', mode, extra)  -- mode: 'firstCharacter'|'shop'|'wardrobe'
+Kora.events.trigger('kora_clothing:server:confirmSession', { model, skin, saveName })
+Kora.events.trigger('kora_clothing:server:cancelSession')
+Kora.events.trigger('kora_clothing:server:deleteOutfit', outfitId)
 
 -- server -> client
-TriggerClientEvent('qbclothing:client:openSession', src, payload)
-TriggerClientEvent('qbclothing:client:outfitsUpdated', src, outfits)
-TriggerClientEvent('qbclothing:client:sessionError', src, message)
-TriggerClientEvent('qbclothing:client:closeSession', src, result)
-TriggerClientEvent('qbclothing:client:wearItem', src, model, skin)   -- clothingAsItem use handler
+TriggerClientEvent('kora_clothing:client:openSession', src, payload)
+TriggerClientEvent('kora_clothing:client:outfitsUpdated', src, outfits)
+TriggerClientEvent('kora_clothing:client:sessionError', src, message)
+TriggerClientEvent('kora_clothing:client:closeSession', src, result)
+TriggerClientEvent('kora_clothing:client:wearItem', src, model, skin)   -- clothingAsItem use handler
 ```
 A session is entered by `requestSession` (shop sessions require standing
 inside the shop's target zone or within `Config.interactDistance` plus one
@@ -341,10 +341,10 @@ is told to move closer), finalised by
 `confirmSession` (server re-diffs, prices and persists — never trusts the
 client's price), and torn down by `cancelSession` or `closeSession`. Shop
 sessions are also reachable via kora_target zones placed on each configured
-shop, and `qbclothing:client:openNearestShop(service)` opens the closest
+shop, and `kora_clothing:client:openNearestShop(service)` opens the closest
 shop by proximity for the given service (`'clothing'` by default, or
 `'barber'`/`'tattoo'`) — used by kora_admin's self-service clothing/barber/tattoo
-entries. `qbclothing:client:openAdminSession` opens a free, unrestricted
+entries. `kora_clothing:client:openAdminSession` opens a free, unrestricted
 clothing+hair+tattoo session (the same `creation` service policy used for
 first-character fittings); the server re-checks `admin` permission before
 granting it regardless of what kora_admin's menu shows client-side.
@@ -361,8 +361,8 @@ to the hairdresser policy automatically.
 
 `qb-multicharacter:client:closeNUIdefault` (fired by kora_core only on successful
 character creation) *arms* the mandatory first fitting; it does not open it.
-The open waits for [qbmultichar](https://qbcore2.github.io/kora_multichar/)'s
-`qbmultichar:client:spawnComplete` event, which lands once the ped has been
+The open waits for [kora_multichar](https://qbcore2.github.io/kora_multichar/)'s
+`kora_multichar:client:spawnComplete` event, which lands once the ped has been
 placed, resurrected, revealed and the fade-in has finished — so the fitting
 room can never appear over the spawn carousel or mid-teleport. On a server
 running third-party `qb-multicharacter`, where no such event exists, the old
@@ -376,7 +376,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 - `Config.genderLockedSalons` (false, live in-game option) — when true, barbers serve only male and hairdressers only female freemode models at shops (no menu swap); admin sessions, creation and other services are unaffected
 - `Config.services` — per-service (`clothing`/`barber`/`hairdresser`/`tattoo`/`creation`) component/prop whitelists, prices and gender restrictions
 - `Config.wardrobe.maxOutfits` (20) — saved-outfit cap per citizen
-- `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `qbclothing_outfit` inventory item (via [qbinventory](https://qbcore2.github.io/kora_inventory/)) instead of equipping directly
+- `Config.clothingAsItem` (default `false`) — when `true`, a purchase/save is boxed as a `kora_clothing_outfit` inventory item (via [kora_inventory](https://qbcore2.github.io/kora_inventory/)) instead of equipping directly
 - `Config.shops` — per-shop service, coordinates, target zone geometry (`zone = { size, rotation }`, or `{ points, minZ, maxZ }` for an irregular shape), blip and optional clerk model
 - `Config.shopPeds` (default `false`) — spawn a decorative clerk per shop only while the local player is near it. The interaction target is the storefront zone either way; a ped-bound target dies with the ped (unstreamed model, shoved out of place, deleted by another resource) and leaves the shop silently unopenable, so the ped is set dressing only
 - `Config.shopPedScopeRadius` (75.0m) — the radius that creates a decorative clerk for the local player; independent of the interaction range
@@ -418,7 +418,7 @@ behaviour applies: wait for the ped to be active and alive, then open.
 
 ## Menu text and languages
 
-The hair, facial hair, eyebrows and chest hair boxes (and the clothing switches) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `qb_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
+The hair, facial hair, eyebrows and chest hair boxes (and the clothing switches) take their wording from `locales/en.json`, which the client sends with each session. English reads "Color". To translate, add `locales/<language>.json` with the same `ui` keys; kora_lib picks it from the `kora_locale` convar and falls back to English per key. Keys not listed in the locale file keep the English default.
 
 ## Preview clothing switches
 
@@ -524,9 +524,9 @@ interaction prompt.
 Part of the [qbcore2](https://github.com/qbcore2) resource set:
 
 - [kora_lib](https://qbcore2.github.io/kora_lib/) — shared helper library
-- [qbsql](https://qbcore2.github.io/kora_sql/) — database driver
-- [qbcore](https://qbcore2.github.io/kora_core/) — framework core
-- [qbinventory](https://qbcore2.github.io/kora_inventory/) — headless inventory
-- [qbtarget](https://qbcore2.github.io/kora_target/) — targeting/interaction
-- [qbadmin](https://qbcore2.github.io/kora_admin/) — admin menu
+- [kora_sql](https://qbcore2.github.io/kora_sql/) — database driver
+- [kora_core](https://qbcore2.github.io/kora_core/) — framework core
+- [kora_inventory](https://qbcore2.github.io/kora_inventory/) — headless inventory
+- [kora_target](https://qbcore2.github.io/kora_target/) — targeting/interaction
+- [kora_admin](https://qbcore2.github.io/kora_admin/) — admin menu
 - [full resource list ↗](https://github.com/orgs/qbcore2/repositories)

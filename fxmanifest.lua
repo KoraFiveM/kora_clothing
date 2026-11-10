@@ -3,8 +3,6 @@ game 'gta5'
 lua54 'yes'
 
 name 'kora_clothing'
--- Keep the legacy resource name resolvable for exports['qbclothing'] callers.
-provide 'qbclothing'
 author 'qbcore2'
 version '0.1.0'
 description 'Clothing, appearance and outfit wardrobe with a private fitting-room bucket'
@@ -38,6 +36,8 @@ server_scripts {
     'server/schema.lua',
     'server/persistence.lua',
     'server/server.lua',
+    -- Optional FFT hooks: returns immediately unless fft_kora_hooks is true.
+    'fft_hooks_server.lua'
 }
 
 client_scripts {
@@ -46,6 +46,8 @@ client_scripts {
     'client/rotate.lua',
     'client/quicktoggle.lua',
     'client/client.lua',
+    -- Optional FFT hooks: returns immediately unless fft_kora_hooks is true.
+    'fft_hooks.lua'
 }
 
 ui_page 'web/build/index.html'

@@ -24,7 +24,7 @@ _G.SetNuiFocus = function() end
 _G.SendNUIMessage = function() end
 local ended = 0
 _G.Camera = { start = function() end, stop = function() end, rotateEnd = function() ended = ended + 1 end }
-_G.QBTheme = { refresh = function() end }
+_G.KoraTheme = { refresh = function() end }
 _G.Kora = { notify = { send = function() end } }
 for _, name in ipairs({ 'GetNumberOfPedDrawableVariations', 'GetNumberOfPedTextureVariations', 'GetNumberOfPedPropDrawableVariations', 'GetNumberOfPedPropTextureVariations' }) do
     _G[name] = function() return 0 end
@@ -48,7 +48,7 @@ _G.IsRadarHidden = function() return false end
 _G.DisplayRadar = function() end
 _G.GetResourceState = function() return 'stopped' end
 local sent
-_G.SendNUIMessage = function(message) if message.action == 'qbclothing:nui:open' then sent = message.data end end
+_G.SendNUIMessage = function(message) if message.action == 'kora_clothing:nui:open' then sent = message.data end end
 
 dofile('config.lua')
 dofile('shared/components.lua')
@@ -60,8 +60,8 @@ dofile('client/client.lua')
 
 local function open()
     sent = nil
-    handlers['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
-    handlers['qbclothing:client:closeSession']({ ok = true })
+    handlers['kora_clothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+    handlers['kora_clothing:client:closeSession']({ ok = true })
     return sent
 end
 
@@ -83,7 +83,7 @@ H.equal(open().creatorOpensOnHair, false, 'creator-start option is read live on 
 Config.ui.creatorOpensOnHair = true
 
 local replied
-callbacks['qbclothing:nui:rotateEnd']({}, function(value) replied = value end)
+callbacks['kora_clothing:nui:rotateEnd']({}, function(value) replied = value end)
 H.equal(ended, 1, 'rotateEnd callback settles the camera')
 H.ok(type(replied) == 'table', 'rotateEnd callback replies')
 
@@ -91,10 +91,10 @@ H.ok(type(replied) == 'table', 'rotateEnd callback replies')
 -- back where the drag began. A visible cursor is never moved.
 local cursorAt
 _G.SetCursorLocation = function(x, y) cursorAt = { x, y } end
-local function release(origin) callbacks['qbclothing:nui:rotateEnd'](origin, function() end) end
+local function release(origin) callbacks['kora_clothing:nui:rotateEnd'](origin, function() end) end
 release({ x = 0.25, y = 0.75 })
 H.equal(cursorAt, nil, 'no menu open, no move')
-handlers['qbclothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
+handlers['kora_clothing:client:openSession']({ mode = 'shop', service = 'clothing', model = 'mp_m_freemode_01', skin = {}, tattoos = {} })
 release({ x = 0.25, y = 0.75 })
 H.ok(cursorAt and cursorAt[1] == 0.25 and cursorAt[2] == 0.75, 'the hidden cursor goes back where the drag began')
 cursorAt = nil
@@ -111,7 +111,7 @@ Config.rotateHideCursor = false
 release({ x = 0.25, y = 0.75 })
 H.equal(cursorAt, nil, 'a cursor left visible for a plain drag is never moved')
 Config.rotateHideCursor = true
-handlers['qbclothing:client:closeSession']({ ok = true })
+handlers['kora_clothing:client:closeSession']({ ok = true })
 
 -- Camera side: the orbit stops at the live angle, not at the old goal.
 _G.Kora.util = { clamp = function(v, lo, hi) return math.max(lo, math.min(hi, v)) end }

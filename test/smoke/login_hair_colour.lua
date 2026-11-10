@@ -87,7 +87,7 @@ local function hairCalls()
 end
 
 -- applySkin: the last hair tint comes after the head blend data.
-QBClothing._testRuntime.applySkin(1, savedSkin, 'mp_m_freemode_01')
+KoraClothing._testRuntime.applySkin(1, savedSkin, 'mp_m_freemode_01')
 local lastBlend, lastHair
 for i, c in ipairs(calls) do
     if c.name == 'blend' then lastBlend = i end

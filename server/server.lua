@@ -41,7 +41,7 @@ local function dbGetSkin(citizenid, src, context)
     if err then
         if src and context and citizenIdFor(src) == citizenid
             and (openingSessions[src] == context or sessions[src] == context) then
-            TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not load your saved appearance. Please try again.')
+            TriggerClientEvent('kora_clothing:client:sessionError', src, 'Could not load your saved appearance. Please try again.')
         end
         error(err, 0)
     end
@@ -438,7 +438,7 @@ local function setBucket(src, bucket)
     local ok = pcall(function() exports.kora_core:setPlayerBucket(src, bucket) end)
     if not ok then
         SetPlayerRoutingBucket(src, bucket)
-        TriggerEvent('qbvoice:server:bucketChanged', src)
+        TriggerEvent('kora_voice:server:bucketChanged', src)
     end
 end
 
@@ -462,7 +462,7 @@ local function leaveFittingRoom(src, previousBucket)
     setBucket(src, previousBucket or 0)
 end
 
--- Fires when a player uses a `qbclothing_outfit` item from their inventory.
+-- Fires when a player uses a `kora_clothing_outfit` item from their inventory.
 -- Equips it live and persists it as their current look, same as a direct
 -- shop purchase would -- the item is deliberately NOT consumed (`return
 -- false`, matching kora_inventory's own non-consumed-use convention) so it stays
@@ -475,11 +475,11 @@ local function equipFromItem(src, item)
     local citizenid = citizenIdFor(src)
     if not citizenid then return false end
     if not dbSetSkin(citizenid, model, skin) then
-        TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not save that outfit. Please try again.')
+        TriggerClientEvent('kora_clothing:client:sessionError', src, 'Could not save that outfit. Please try again.')
         return false
     end
 
-    TriggerClientEvent('qbclothing:client:wearItem', src, model, skin)
+    TriggerClientEvent('kora_clothing:client:wearItem', src, model, skin)
     return true
 end
 
@@ -487,7 +487,7 @@ if Config.clothingAsItem then
     CreateThread(function()
         local coreReady = Kora.resources.awaitStarted('kora_core', { timeout = 30000, interval = 200 })
         if not coreReady then
-            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbcore did not start in time.')
+            print('^1[kora_clothing]^7 Config.clothingAsItem is on but kora_core did not start in time.')
             return
         end
         local itemOk = pcall(function()
@@ -504,19 +504,19 @@ if Config.clothingAsItem then
             })
         end)
         if not itemOk then
-            print('^1[qbclothing]^7 Config.clothingAsItem is on but registering the outfit item with qbcore failed.')
+            print('^1[kora_clothing]^7 Config.clothingAsItem is on but registering the outfit item with kora_core failed.')
         end
 
         local inventoryReady = Kora.resources.awaitStarted('kora_inventory', { timeout = 30000, interval = 200 })
         if not inventoryReady then
-            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory did not start in time.')
+            print('^1[kora_clothing]^7 Config.clothingAsItem is on but kora_inventory did not start in time.')
             return
         end
         local useableOk = pcall(function()
             exports.kora_inventory:createUseable(Config.clothingItem.name, equipFromItem)
         end)
         if not useableOk then
-            print('^1[qbclothing]^7 Config.clothingAsItem is on but qbinventory:createUseable failed -- is kora_inventory running?')
+            print('^1[kora_clothing]^7 Config.clothingAsItem is on but kora_inventory:createUseable failed -- is kora_inventory running?')
         end
     end)
 end
@@ -539,7 +539,7 @@ local function giveOutfitItem(src, model, skin, label)
             model = model,
             skin = skin,
             label = label,
-        }, 'qbclothing-purchase')
+        }, 'kora_clothing-purchase')
     end)
     return ok and added == true
 end
@@ -549,7 +549,7 @@ end
 -- consumed by requestSession on the target's token-authenticated client flow;
 -- a player cannot manufacture one by firing a public net event.
 exports('OpenAdminSession', function(targetSrc, service)
-    if GetInvokingResource() ~= 'kora_admin' then return false, 'only qbadmin may open a remote admin session' end
+    if GetInvokingResource() ~= 'kora_admin' then return false, 'only kora_admin may open a remote admin session' end
     targetSrc = tonumber(targetSrc)
     if not targetSrc or targetSrc < 1 or not citizenIdFor(targetSrc) then return false, 'target is not online' end
     if sessions[targetSrc] or openingSessions[targetSrc] then return false, 'that player already has a clothing session open' end
@@ -562,7 +562,7 @@ exports('OpenAdminSession', function(targetSrc, service)
     SetTimeout(10000, function()
         if pendingAdminSessions[targetSrc] == grant then pendingAdminSessions[targetSrc] = nil end
     end)
-    TriggerClientEvent('qbclothing:client:openAdminSession', targetSrc, service)
+    TriggerClientEvent('kora_clothing:client:openAdminSession', targetSrc, service)
     return true
 end)
 
@@ -597,7 +597,7 @@ local function requestSession(src, mode, extra, opening)
         local shop = shopIndex and Config.shops[shopIndex]
         if not shop then return end
         if not nearShop(src, shop) then
-            TriggerClientEvent('qbclothing:client:sessionError', src, ('Move closer to the %s to open it.'):format(shop.label or 'shop'))
+            TriggerClientEvent('kora_clothing:client:sessionError', src, ('Move closer to the %s to open it.'):format(shop.label or 'shop'))
             return
         end
         shopLabel = shop.label
@@ -638,7 +638,7 @@ local function requestSession(src, mode, extra, opening)
     local groomingService = service == 'barber' or service == 'hairdresser'
     if groomingService and modelGender and Config.genderLockedSalons == true and mode == 'shop' then
         if modelGender ~= serviceConfig(service).model then
-            TriggerClientEvent('qbclothing:client:sessionError', src, service == 'barber'
+            TriggerClientEvent('kora_clothing:client:sessionError', src, service == 'barber'
                 and 'This barber only serves male characters. Try a hairdresser.'
                 or 'This hairdresser only serves female characters. Try a barber.')
             return
@@ -647,7 +647,7 @@ local function requestSession(src, mode, extra, opening)
         service = modelGender == 'female' and 'hairdresser' or 'barber'
     end
     if not serviceAllowsModel(service, model) then
-        TriggerClientEvent('qbclothing:client:sessionError', src,
+        TriggerClientEvent('kora_clothing:client:sessionError', src,
             service == 'barber' and 'Barbers are available to male freemode models only.' or 'Hairdressers are available to female freemode models only.')
         return
     end
@@ -670,7 +670,7 @@ local function requestSession(src, mode, extra, opening)
         free = free == true,
     }
 
-    TriggerClientEvent('qbclothing:client:openSession', src, {
+    TriggerClientEvent('kora_clothing:client:openSession', src, {
         mode = mode,
         service = service,
         free = free == true,
@@ -691,7 +691,7 @@ end
 -- player reconnects.
 local OPENING_TIMEOUT_SECONDS = 30
 
-Kora.events.register('qbclothing:server:requestSession', function(src, mode, extra)
+Kora.events.register('kora_clothing:server:requestSession', function(src, mode, extra)
     if sessions[src] then return end
     local pending = openingSessions[src]
     if pending and os.time() - pending.startedAt < OPENING_TIMEOUT_SECONDS then return end
@@ -707,7 +707,7 @@ AddEventHandler('playerDropped', function()
     pendingAdminSessions[source] = nil
 end)
 
-Kora.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
+Kora.callback.register('kora_clothing:server:getOutfitSkin', function(src, id)
     local session = sessions[src]
     if not session then return nil end
     local row = dbGetOutfit(session.citizenid, tonumber(id) or -1)
@@ -715,24 +715,24 @@ Kora.callback.register('qbclothing:server:getOutfitSkin', function(src, id)
     return row.model, decode(row.skin)
 end)
 
-Kora.events.register('qbclothing:server:deleteOutfit', function(src, id)
+Kora.events.register('kora_clothing:server:deleteOutfit', function(src, id)
     local session = sessions[src]
     if not session then return end
     id = tonumber(id)
     if not id then return end
 
     if not dbDeleteOutfit(session.citizenid, id) then
-        TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not delete that outfit. Please try again.')
+        TriggerClientEvent('kora_clothing:client:sessionError', src, 'Could not delete that outfit. Please try again.')
         return
     end
-    TriggerClientEvent('qbclothing:client:outfitsUpdated', src, dbListOutfits(session.citizenid))
+    TriggerClientEvent('kora_clothing:client:outfitsUpdated', src, dbListOutfits(session.citizenid))
 end)
 
 local function isCurrentSession(src, session)
     return sessions[src] == session and citizenIdFor(src) == session.citizenid
 end
 
-Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
+Kora.events.register('kora_clothing:server:confirmSession', function(src, payload)
     local session = sessions[src]
     if not session then return end
     if type(payload) ~= 'table' then return end
@@ -773,10 +773,10 @@ Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
             price = price + tattooPriceDiff(beforeSkin, newSkin, model)
         end
         if price > 0 then
-            local paid, err = exports.kora_core:removeMoney(src, Config.shop.currency, price, 'qbclothing-purchase')
+            local paid, err = exports.kora_core:removeMoney(src, Config.shop.currency, price, 'kora_clothing-purchase')
             if not isCurrentSession(src, session) then return end
             if not paid then
-                TriggerClientEvent('qbclothing:client:sessionError', src, err or 'You cannot afford this outfit.')
+                TriggerClientEvent('kora_clothing:client:sessionError', src, err or 'You cannot afford this outfit.')
                 return
             end
             chargedAmount = price
@@ -805,14 +805,14 @@ Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
         if not isCurrentSession(src, session) then return end
         if not persisted then
             if chargedAmount > 0 then
-                exports.kora_core:addMoney(src, Config.shop.currency, chargedAmount, 'qbclothing-persistence-refund')
+                exports.kora_core:addMoney(src, Config.shop.currency, chargedAmount, 'kora_clothing-persistence-refund')
                 if not isCurrentSession(src, session) then return end
             end
-            TriggerClientEvent('qbclothing:client:sessionError', src, 'Could not save your outfit. You were not charged.')
+            TriggerClientEvent('kora_clothing:client:sessionError', src, 'Could not save your outfit. You were not charged.')
             return
         end
         if wantsBox then
-            TriggerClientEvent('qbclothing:client:sessionError', src, "Couldn't fit that in your inventory -- equipped it directly instead.")
+            TriggerClientEvent('kora_clothing:client:sessionError', src, "Couldn't fit that in your inventory -- equipped it directly instead.")
         end
     end
 
@@ -820,19 +820,19 @@ Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
         local count = dbCountOutfits(session.citizenid)
         if not isCurrentSession(src, session) then return end
         if count >= Config.wardrobe.maxOutfits then
-            TriggerClientEvent('qbclothing:client:sessionError', src, 'Outfit slots are full.')
+            TriggerClientEvent('kora_clothing:client:sessionError', src, 'Outfit slots are full.')
         else
             local outfitId = dbInsertOutfit(session.citizenid, saveName, model, newSkin)
             if not isCurrentSession(src, session) then return end
             if not outfitId then
-                TriggerClientEvent('qbclothing:client:sessionError', src, 'Your outfit was equipped, but the named preset could not be saved.')
+                TriggerClientEvent('kora_clothing:client:sessionError', src, 'Your outfit was equipped, but the named preset could not be saved.')
             end
         end
     end
 
     leaveFittingRoom(src, session.previousBucket)
     sessions[src] = nil
-    TriggerClientEvent('qbclothing:client:closeSession', src, {
+    TriggerClientEvent('kora_clothing:client:closeSession', src, {
         ok = true,
         -- Tried-on-but-boxed: the live ped is currently wearing the new look,
         -- but it was purchased as an item, not equipped -- revert to whatever
@@ -841,13 +841,13 @@ Kora.events.register('qbclothing:server:confirmSession', function(src, payload)
     })
 end)
 
-Kora.events.register('qbclothing:server:cancelSession', function(src)
+Kora.events.register('kora_clothing:server:cancelSession', function(src)
     local session = sessions[src]
     if not session or session.mandatory then return end
 
     leaveFittingRoom(src, session.previousBucket)
     sessions[src] = nil
-    TriggerClientEvent('qbclothing:client:closeSession', src, { ok = true, cancelled = true })
+    TriggerClientEvent('kora_clothing:client:closeSession', src, { ok = true, cancelled = true })
 end)
 
 -- Real signature: cb(model, skin). kora_lib's Kora.callback is return-value based
@@ -913,7 +913,7 @@ RegisterNetEvent('qb-clothing:server:removeOutfit', function(outfitName, outfitI
     if not row or row.outfitname ~= outfitName then return end
     if not dbDeleteOutfit(citizenid, id) then return end
     local rows = dbListOutfits(citizenid)
-    TriggerClientEvent('qbclothing:client:outfitsUpdated', src, rows)
+    TriggerClientEvent('kora_clothing:client:outfitsUpdated', src, rows)
     TriggerClientEvent('qb-clothing:client:reloadOutfits', src, #rows > 0 and stockOutfitRows(citizenid) or nil)
 end)
 
@@ -933,7 +933,7 @@ end)
 -- character is created (before the first spawn) so the ped never shows the
 -- previous character's clothes. Refused for a citizen who already has a saved
 -- appearance, so it cannot be used to read or reset an existing one.
-Kora.callback.register('qbclothing:server:getStarterAppearance', function(src)
+Kora.callback.register('kora_clothing:server:getStarterAppearance', function(src)
     local citizenid = citizenIdFor(src)
     if not citizenid then return nil end
     local ok, saved = pcall(dbGetSkin, citizenid)
@@ -973,7 +973,7 @@ end, { replace = true, rateLimit = { max = 20, window = 10000 } })
 -- kora_multichar server clears its authoritative mode after spawn/cleanup; drop
 -- that source's cached pre-login reads at the same boundary so a later return
 -- to character selection cannot see an outfit saved during this session.
-AddStateBagChangeHandler('qbmultichar:mode', nil, function(bagName, _, value)
+AddStateBagChangeHandler('kora_multichar:mode', nil, function(bagName, _, value)
     -- A cleared mode is falsy: `false` from kora_multichar's writeMode, or nil on
     -- a server whose kora_multichar predates that change.
     if value or type(bagName) ~= 'string' then return end
@@ -996,7 +996,7 @@ AddEventHandler('QBCore:Server:OnPlayerUnload', function(src)
 
     -- Character logout retires even a mandatory fitting before the next character.
     leaveFittingRoom(src, session.previousBucket)
-    TriggerClientEvent('qbclothing:client:closeSession', src, { ok = true, cancelled = true })
+    TriggerClientEvent('kora_clothing:client:closeSession', src, { ok = true, cancelled = true })
 end)
 
 AddEventHandler('onResourceStop', function(resource)

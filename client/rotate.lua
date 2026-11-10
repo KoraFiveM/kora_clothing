@@ -126,7 +126,7 @@ function RotateControl.stop(reason)
         -- NUI focus never changed; only the cursor goes back where the drag began.
         if reason ~= 'close' then
             SetCursorLocation(drag.x, drag.y)
-            SendNUIMessage({ action = 'qbclothing:nui:rotateStopped', data = { reason = reason } })
+            SendNUIMessage({ action = 'kora_clothing:nui:rotateStopped', data = { reason = reason } })
             -- A centre pull still in flight lands after the line above and would leave
             -- the cursor in the middle of the screen; put it back once more next frame.
             CreateThread(function()
@@ -142,7 +142,7 @@ function RotateControl.stop(reason)
     if reason ~= 'close' then
         SetNuiFocus(true, true)
         SetCursorLocation(drag.x, drag.y)
-        SendNUIMessage({ action = 'qbclothing:nui:rotateStopped', data = { reason = reason } })
+        SendNUIMessage({ action = 'kora_clothing:nui:rotateStopped', data = { reason = reason } })
     end
     return true
 end

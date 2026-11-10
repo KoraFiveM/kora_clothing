@@ -38,7 +38,7 @@ dofile('shared/components.lua')
 _G.RegisterCommand = _G.RegisterCommand or function() end
 _G.TriggerEvent = _G.TriggerEvent or function() end
 dofile('client/client.lua')
-local runtime = QBClothing._testRuntime
+local runtime = KoraClothing._testRuntime
 
 -- Defaults: both overlays on for creator and barber.
 for _, key in ipairs({ 'eyebrows', 'facialHair' }) do

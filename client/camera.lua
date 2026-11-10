@@ -601,7 +601,7 @@ function Camera.isActive()
 end
 
 -- Deliberately absent in production. Same convention as client.lua's
--- QBClothing._testRuntime: lets the standalone smoke suite exercise the zoom
+-- KoraClothing._testRuntime: lets the standalone smoke suite exercise the zoom
 -- clamp arithmetic without a running client.
 if Config.testMode then
     Camera._testRuntime = {
