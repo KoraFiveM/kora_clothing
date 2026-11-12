@@ -1,11 +1,102 @@
 ---
-title: Configuration
-sidebar_position: 2
+title: "Configuration"
+sidebar_position: 5
 ---
+
+
+# Configuration
+
+`Config` is a shared script (client and server both see it). Every setting is self-contained to this resource — it does not read `kora_core`'s shared registries. Settings wrapped in the local `boolean`/`config.*` helpers become live-editable in `kora_lib`'s config workspace when `kora_lib`'s config module is present, falling back to the plain default otherwise.
+
+Namespace: `Config` · Source: `config.lua`
+
+## Options
+
+Pass an options table as the final argument to a play function. Omit the table or any field to use its default.
+
+### Shops and service pricing
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.shop.currency` | string | Currency key charged for every paid service. Default `'cash'`. |
+| `Config.services` | table | Per-service (`clothing`, `barber`, `hairdresser`, `tattoo`, `creation`) component/prop whitelists and prices. `creation` is `{ all = true, tattoos = true }` — always free and unrestricted. |
+| `Config.shops` | table[] | One entry per location: `service`, `free`, `label`, `ped` (clerk model), `coords` (vector4, heading in `.w`), `zone` (polygon or box), `blip`. Clothing shops may add `points = { register, racks }`. |
+| `Config.shopZoneDefault` | table | Fallback `{ size }` box used when a shop entry has no `zone` of its own. |
+| `Config.interactDistance` | number | Default 2.0. Server-side tolerance is this plus 1.0 metre. |
+| `Config.interactionMode` | 'target' \| 'textui' | How a shop is opened. Default `'textui'`. Read once at resource start. |
+| `Config.clothingShopPoints / clothingPointRadius` | boolean / number | Opens clothing shops from a radius (default 5.0m) around their register/rack points instead of the shop zone. |
+| `Config.genderLockedSalons` | boolean | Off by default. Restricts barbers to male and hairdressers to female freemode models when on. |
+| `Config.shopPeds / shopPedScopeRadius` | boolean / number | Decorative clerk peds, off by default; spawned client-locally within `shopPedScopeRadius` (75m) when on. |
+
+### Tattoo studio
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.tattoos` | table[] | The tattoo catalogue: `id, label, group, collection, male?, female?, price`. Entries missing one gender's overlay simply do not appear for that model. |
+| `Config.tattoo.allowStacking / maxStack / stackPriceMultiplier` | boolean / integer(1–10) / number | Whether a tattoo can be applied more than once, the cap, and the price multiplier for extra instances. |
+| `Config.tattoo.undress` | table | `enabled` (preview buttons), `previewInCreator`, `autoUndressOnOpen` (parts bared on open), `parts` (per-part male/female bare drawables and cleared prop slots). |
+| `Config.tattoo.peds` | table | `enabled` (artist peds, default on), `alpha` (fade while in studio), `scopeRadius`, `model`, `scenario`. Per-shop overrides live on `Config.shops[n].tattooPed`. |
+| `Config.tattooStrip` | table | Fixed per-gender bare drawables used when `undress.enabled` is off. |
+
+### Fitting-room camera
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.camera.zones` | table | Named camera presets (`full`, `face`, `torso`, `legs`, `shoes`): `boneOffset`, `camOffset`, `fov`, optional `track`/`trackOffset` to follow head/feet bones. |
+| `Config.camera.categoryZones` | table | Maps a clothing/tattoo category name to the zone it frames when selected. |
+| `Config.camera.holdStill / frameToBones / minHeightAboveGround` | boolean / boolean / number | Stops idle sway while a menu is open, frames face/shoes on real bones, and floor-clamps the camera. |
+| `Config.camera.initialView / initialPreset` | 'front' \| 'current' / string | Starting orbit angle and zone when a menu opens. |
+| `Config.camera.zoom` | table | `min`, `max`, `step` — free mouse-wheel zoom as an offset on top of the selected preset. |
+| `Config.camera.orbitDegPerSec / transitionMs / occlusionMaxSwing` | number | Orbit speed (`orbitDegPerSec` is defined in `config.lua` but not read by any code, so it has no effect), view-change easing time, and how far the camera may swing to dodge an obstruction before it pulls in instead. |
+
+### Rotate drag
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.rotateMode / rotateModeByService` | 'plain'\|'capture'\|'pointer'\|'controls'\|'recenter' | How drag-to-rotate reads the mouse; default `'capture'` (hidden cursor held at screen centre). Per-service override for clothing/barber/hairdresser/tattoo/creation. |
+| `Config.rotateTurnsPed` | boolean | Default true: dragging turns the character, not the camera, so the camera can never swing through a wall. |
+| `Config.rotateSensitivity / rotateInvert / rotateRightButton` | number / boolean / boolean | Drag speed, direction and whether the right mouse button also rotates. |
+| `Config.rotatePointerLock / rotateDragGuard / rotateRestoreCursor` | boolean | Mouse capture during drag, ending a drag if the release can't be observed, and returning the cursor to where the drag began. |
+
+### Quick toggle (/c)
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.quickToggle.enabled / command / chatSuggestion` | boolean / string / boolean | Master switch, command name (default `c`), and whether it appears in chat suggestions. |
+| `Config.quickToggle.cooldownMs` | integer | Minimum time between two uses by one player, default 1500ms. |
+| `Config.quickToggle.allowDead / allowCuffed / allowInVehicle` | boolean | Whether the command works in each state. |
+| `Config.quickToggle.parts` | table[] | One entry per argument: `id`, `aliases`, male/female bare component list, cleared prop slots, and an optional clothing animation. |
+| `Config.quickToggle.visor` | table | Per-gender map of a helmet drawable to its visor-swapped counterpart, used by `/c visor`. Empty by default — fill in for your clothing pack's helmets. |
+
+### Wardrobe, starter outfit and misc
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `Config.starterOutfit` | table | `enabled` (default true) plus per-gender starter components/props a brand-new character spawns in. |
+| `Config.wardrobe.maxOutfits` | integer | Default 20 saved outfits per citizen. |
+| `Config.clothingAsItem / clothingItem` | boolean / table | Off by default. When on, a confirmed purchase/save gives a `kora_clothing_outfit` inventory item instead of equipping directly; requires `kora_inventory` running. |
+| `Config.heritage.creator` | boolean | Default true. Shows the mother/father head-blend panel in character creation only. |
+| `Config.headOverlays` | table | Per-overlay (`makeup`, `blush`, `lipstick`, `eyebrows`, `facialHair`, `chestHair`) `creator`/`barber` visibility and an optional `followHairColor` lock. |
+| `Config.loginColourReapply` | table | Re-applies saved hair/overlay colours a short time after login (`delays`, ms) because a spawn sequence can reset them. |
+| `Config.closeWhenDowned` | table | `enabled` cancels an open menu when the player goes down/dies; `blockOpen` also refuses to open one while downed. |
+| `Config.ui.clothingToggles` | table | Preview clothing switches (Hat/Shirt/Pants/Shoes) shown in barber/hairdresser (and configurably other) menus; preview-only, never saved. |
+| `Config.hideRadarInMenu` | boolean | Hides the minimap while any menu is open, when `kora_hud` is not running (kora_hud hides it itself otherwise). |
+
+## Functions
+
+Grouped by what each option affects.
+
+## Limits and related APIs
+
+Most settings marked `live` in the source re-read on next use (next session/drag/toggle) without a resource restart; `interactionMode`, `showTargetHints` and the quick-toggle command name are read once at resource start and need a restart to change.
+
+## Full option reference
+
+Every key in `config.lua` with its type and default, checked against the code.
 
 All settings are in `config.lua` (shared, so the client and the server read the same table). Most entries are kora_lib config descriptors. When kora_lib's config module is loaded, `Kora.config.adopt(Config)` resolves them to plain values and makes them editable in kora_lib's config workspace. Settings marked **live** apply without a restart, at the moment noted in the description. Without the config module, the plain default after `or` is used.
 
-## Routing bucket and population
+### Routing bucket and population
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -13,7 +104,7 @@ All settings are in `config.lua` (shared, so the client and the server read the 
 | `Config.bucket.disablePopulation` | boolean | `true` | Turns ambient peds and vehicles off in the bucket, for the first-character fitting room only. Shop, barber and wardrobe sessions keep the population. Live, read on each fitting-room entry. |
 | `Config.bucket.suppressClientPopulation` | boolean | `true` | During character creation, also sets this client's ped and vehicle population budgets to 0 and clears peds and vehicles within 80 m. The budgets go back to 3 when the fitting room closes. Live. |
 
-## Money and services
+### Money and services
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -38,12 +129,12 @@ Config.services = {
 ```
 
 - `components` and `props` are allowlists of GTA component and prop IDs. When a session is confirmed, any ID not listed keeps its saved value.
-- `prices` is keyed by category (`tops`, `legs`, `shoes`, `body`, `accessories`, see [Sessions](./features/sessions.md#pricing)). Each changed category is charged once. Hair colour and head overlay changes count as `body`.
+- `prices` is keyed by category (`tops`, `legs`, `shoes`, `body`, `accessories`, see [Sessions](../features/sessions.md#pricing)). Each changed category is charged once. Hair colour and head overlay changes count as `body`.
 - `model` (`'male'` or `'female'`) limits the service to one freemode model.
 - `tattoos = true` lets the service change tattoos, priced per tattoo from `Config.tattoos`.
 - `all = true` (creation) allows every component, prop, the face, skin tone and heritage.
 
-## Character creation
+### Character creation
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -53,7 +144,7 @@ Config.services = {
 
 Default starter outfit (both models): torso `3 = { d = 0 }`, legs `4 = { d = 0 }`, shoes `6 = { d = 1 }`, undershirt `8 = { d = 15 }` (none), top `11 = { d = 0 }` (plain t-shirt), no props. The face, skin tone and head overlays start on their defaults, with no tattoos.
 
-## Head overlays
+### Head overlays
 
 `Config.headOverlays.<key>` exists for `makeup`, `blush`, `lipstick`, `eyebrows`, `facialHair` and `chestHair`. All values are live.
 
@@ -63,25 +154,25 @@ Default starter outfit (both models): torso `3 = { d = 0 }`, legs `4 = { d = 0 }
 | `<key>.barber` | boolean | `false` for makeup, blush, lipstick. `true` for eyebrows, facialHair, chestHair | The overlay can be edited at barbers and hairdressers, charged at the hair (`body`) price. |
 | `<key>.followHairColor` | boolean | `false` | Only for `eyebrows`, `facialHair` and `chestHair`. When `true`, the overlay's palette is hidden and it always uses the primary hair colour. |
 
-## Login colour re-apply
+### Login colour re-apply
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Config.loginColourReapply.enabled` | boolean | `true` | After the saved skin is applied on login, the hair colour, highlight and overlay colours are applied again at each delay, because the spawn sequence can reset them. Skipped if a menu opens or the model changes. Live. |
 | `Config.loginColourReapply.delays` | number list | `{ 750, 3000 }` | Milliseconds after the first apply. |
 
-## Clothing as items
+### Clothing as items
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Config.clothingAsItem` | boolean | `false` | When `true`, a paid purchase is given as a `kora_clothing_outfit` item instead of being put on. Requires kora_inventory. Read at resource start for item registration. |
-| `Config.clothingItem` | table | see [Items](./items.md) | `name`, `label`, `weight`, `image`, `description` used to register the item. |
+| `Config.clothingItem` | table | see [Items](../items.md) | `name`, `label`, `weight`, `image`, `description` used to register the item. |
 
-## Shops
+### Shops
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `Config.shops` | list | 16 shops | Each entry is one service location. See [Shops and blips](./features/shops.md). |
+| `Config.shops` | list | 16 shops | Each entry is one service location. See [Shops and blips](../features/shops.md). |
 | `Config.shopZoneDefault` | table | `{ size = vector3(2.0, 1.6, 2.2) }` | Box used for a shop entry without its own `zone`. |
 | `Config.shopPeds` | boolean | `false` | Spawns a decorative clerk (`shop.ped`) per shop, client-local, only while the player is near it. |
 | `Config.shopPedScopeRadius` | number | `75.0` | Distance at which the decorative clerk is created and removed. |
@@ -92,7 +183,7 @@ Default starter outfit (both models): torso `3 = { d = 0 }`, legs `4 = { d = 0 }
 | `Config.showTargetHints` | boolean or nil | `nil` | Forces the kora_target world icon on shop zones on (`true`) or off (`false`). `nil` follows kora_target's own setting. Applies after a restart. |
 | `Config.genderLockedSalons` | boolean | `false` | When `true`, barbers serve only male and hairdressers only female freemode models at shop visits. Live, read on each shop visit. |
 
-## Tattoos
+### Tattoos
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -111,7 +202,7 @@ Default starter outfit (both models): torso `3 = { d = 0 }`, legs `4 = { d = 0 }
 | `Config.tattoo.peds.model` | string | `'u_m_y_tattoo_01'` | Fallback model when neither `shop.tattooPed.model` nor `shop.ped` is set. Live. |
 | `Config.tattoo.peds.scenario` | string or nil | `'WORLD_HUMAN_STAND_IMPATIENT'` | Scenario the artist plays. Unset or `''` for idle. Live. |
 
-## Menu (NUI)
+### Menu (NUI)
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -124,7 +215,7 @@ Default starter outfit (both models): torso `3 = { d = 0 }`, legs `4 = { d = 0 }
 | `Config.ui.barberTopToggle` | boolean | unset | Legacy option, not in `config.lua`. If set to `false`, it still hides the Shirt switch. |
 | `Config.hideRadarInMenu` | boolean | `true` | Hides the minimap while a menu is open, only when kora_hud is not running. Live. |
 
-## Camera
+### Camera
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -147,9 +238,9 @@ Zone example:
 face = { boneOffset = vector3(0.0, 0.0, 0.5), camOffset = vector3(0.0, 0.65, 0.0), fov = 30.0, track = 'head', trackOffset = 0.04 },
 ```
 
-## Rotation
+### Rotation
 
-See [Camera and rotation](./features/camera.md) for how each mode behaves. All values are live.
+See [Camera and rotation](../features/camera.md) for how each mode behaves. All values are live.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -170,9 +261,9 @@ See [Camera and rotation](./features/camera.md) for how each mode behaves. All v
 | `Config.rotateControlsIdleSeconds` | number | `0.4` | `'controls'` only: ends the drag this long after the mouse stops, if the held button cannot be seen. |
 | `Config.rotateControlsMaxSeconds` | number | `30.0` | `'controls'` and `'capture'`: hard limit for one drag. |
 
-## Quick toggles
+### Quick toggles
 
-See [Quick toggles](./features/quick-toggles.md).
+See [Quick toggles](../features/quick-toggles.md).
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -189,7 +280,7 @@ See [Quick toggles](./features/quick-toggles.md).
 | `Config.quickToggle.visor` | table | `{ male = {}, female = {} }` | Pairs of hat drawables (visor up and down) for each gender. |
 | `Config.quickToggle.parts` | list | 13 parts | `id`, `label`, `aliases`, `male` / `female` lists of `{ id, d, t }`, `props`, `visor`, `animDict`, `animClip`, `animMs`. Live. |
 
-## Closing menus when the player goes down
+### Closing menus when the player goes down
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -197,6 +288,11 @@ See [Quick toggles](./features/quick-toggles.md).
 | `Config.closeWhenDowned.blockOpen` | boolean | `true` | Refuses to open a menu while the player is downed or dead. Live. |
 | `Config.closeWhenDowned.checkIntervalMs` | integer | `250` | Poll interval (minimum 50), used only when kora_lib has no cache module. |
 
-## Test-only
+### Test-only
 
 `Config.testMode` is not in `config.lua`. The smoke tests set it to expose internal functions. Do not set it on a server.
+
+## Related guides
+
+- [Client exports](./exports-client.md)
+- [Legacy qb-clothing protocol](./legacy-protocol.md)

@@ -54,4 +54,4 @@ Stock keys: `face`, `mask`, `hair`, `arms`, `pants`, `bag`, `shoes`, `accessory`
 
 ## Exports
 
-`OpenClothingRoom`, `OpenWardrobe`, `getOutfits`, `reloadSkin` and `IsCreatingCharacter` match qb-clothing names. See [Exports](./exports.md).
+`OpenClothingRoom`, `OpenWardrobe`, `getOutfits`, `reloadSkin` and `IsCreatingCharacter` match qb-clothing names. See [Client exports](./api/exports-client.md) and [Server export](./api/exports-server.md).
