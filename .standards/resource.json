@@ -1,0 +1,72 @@
+{
+  "resource": "kora_clothing",
+  "standardsRevision": "2026-11-12.1",
+  "realms": {
+    "client": [
+      "client/camera.lua",
+      "client/client.lua",
+      "client/quicktoggle.lua",
+      "client/rotate.lua",
+      "fft_hooks.lua"
+    ],
+    "server": [
+      "fft_hooks_server.lua",
+      "server/persistence.lua",
+      "server/schema.lua",
+      "server/server.lua"
+    ],
+    "shared": [
+      "config.lua",
+      "shared/components.lua"
+    ],
+    "manifest": [
+      "fxmanifest.lua"
+    ],
+    "test": [
+      "test/harness.lua",
+      "test/smoke/apply_skin_bounds.lua",
+      "test/smoke/barber_top.lua",
+      "test/smoke/camera_bones.lua",
+      "test/smoke/camera_category.lua",
+      "test/smoke/camera_zoom.lua",
+      "test/smoke/head_overlays.lua",
+      "test/smoke/login_hair_colour.lua",
+      "test/smoke/login_reconcile.lua",
+      "test/smoke/quicktoggle.lua",
+      "test/smoke/radar_hide.lua",
+      "test/smoke/rotate_control.lua",
+      "test/smoke/rotate_end.lua",
+      "test/smoke/rotate_lock.lua",
+      "test/smoke/security.lua",
+      "test/smoke/session_open.lua",
+      "test/smoke/shop_interaction.lua",
+      "test/smoke/shop_zones.lua",
+      "test/smoke/stock_compat.lua",
+      "test/smoke/tattoo_peds.lua",
+      "test/smoke/tattoo_stacking.lua",
+      "test/smoke/tattoo_undress.lua",
+      "tests/qa.lua"
+    ]
+  },
+  "exclude": [
+    ".git/*",
+    ".github/*",
+    ".standards/*",
+    "node_modules/*",
+    "**/node_modules/*",
+    "vendor/*",
+    "**/vendor/*",
+    "web/*",
+    "ui/*",
+    "html/*",
+    "dist/*",
+    "artifacts/*",
+    "runtime/*",
+    "txData/*",
+    "storage/*",
+    "stream/*",
+    "docs/*",
+    "__pycache__/*",
+    "modules/lookup/data/*"
+  ]
+}
