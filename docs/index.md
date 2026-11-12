@@ -57,15 +57,15 @@ ensure kora_clothing
 
 3. No manual SQL import is needed. On start the resource creates or updates `playerskins` and `playeroutfits` through kora_sql's schema handler (`server/schema.lua`). See [Database](./database.md).
 4. You do not need to add any items unless you turn on `Config.clothingAsItem`. In that case the resource registers the `kora_clothing_outfit` item with kora_core itself. You only provide the item image. See [Items](./items.md).
-5. Review `config.lua`. Most settings are kora_lib config descriptors, so they can also be edited in kora_lib's config workspace. See [Configuration](./configuration.md).
+5. Review `config.lua`. Most settings are kora_lib config descriptors, so they can also be edited in kora_lib's config workspace. See [Configuration](./api/configuration.md).
 
-## Documentation
+## Documentation map
 
-- [Configuration](./configuration.md): every option in `config.lua`
+- [Installation](./installation.md): setup steps and the manifest reference
+- [How to use](./how-to-use.md): shops, tattoo studio, character creation, wardrobe, quick toggles and driving it from other resources
+- [Commands and keybinds](./commands.md): `/c`, `/refreshskin`, keybinds and menu inputs
+- API reference: [overview](./api/index.md), [client exports](./api/exports-client.md), [server export](./api/exports-server.md), [events, callbacks and the legacy qb-clothing protocol](./api/legacy-protocol.md), [configuration](./api/configuration.md) (every option in `config.lua`)
 - Features: [sessions](./features/sessions.md), [camera](./features/camera.md), [hair and head](./features/hair-and-head.md), [tattoo studio](./features/tattoos.md), [preview switches](./features/clothing-toggles.md), [quick toggles](./features/quick-toggles.md), [shops and blips](./features/shops.md)
-- [Commands and keybinds](./commands.md)
-- [Exports](./exports.md)
-- [Events and callbacks](./events.md)
 - [Database](./database.md)
 - [Items](./items.md)
 - [Compatibility](./compatibility.md)
