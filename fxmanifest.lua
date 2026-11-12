@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'kora_clothing'
 author 'qbcore2'
-version '0.1.0'
+version '0.2.0'
 description 'Clothing, appearance and outfit wardrobe with a private fitting-room bucket'
 
 -- Speaks the REAL qb-clothing wire protocol directly (net events + callback
