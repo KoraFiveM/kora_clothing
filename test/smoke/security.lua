@@ -258,14 +258,14 @@ H.ok(camera:find('state.angle = lerpAngle(state.angle, target.angle, math.min(1.
 -- indexed native is never fronted by a fake free colour picker.
 H.ok(shared:find('function Shared.clampHairColor(value)', 1, true), 'hair colour indices are validated by one shared clamp')
 H.ok(server:find('skin.hairColor = Shared.clampHairColor(rawSkin.hairColor)', 1, true), 'submitted hair colour is clamped server-side like every other index')
-H.ok(server:find('local hairSource = idAllowed(policy.components, 2) and requested or before', 1, true), 'hair colour is gated by the same whitelist as the hair component itself')
+H.ok(server:find('local hairSource = Shared.componentAllowed(policy, 2) and requested or before', 1, true), 'hair colour is gated by the same whitelist as the hair component itself')
 H.ok(server:find('touchedCategories[Shared.components[2].category] = true', 1, true), 'a recolour-only barber visit is still priced')
 H.ok(server:find('local function hairOf(skin) return (skin.hairColor or 0), (skin.hairHighlight or 0) end', 1, true), 'outfits saved before hair colour existed still match as owned')
 H.ok(client:find('local function buildHairPalette()', 1, true) and client:find('GetPedHairRgbColor(index)', 1, true), 'the palette the NUI paints is read from the game, not hardcoded')
 H.ok(client:find('SetPedHairColor(ped, previewHair.color, previewHair.highlight)', 1, true), 'hair colour reaches the ped through the indexed native')
 H.ok(client:find("RegisterNUICallback('kora_clothing:nui:setHairColor'", 1, true), 'the NUI can preview a hair recolour')
 H.ok(client:find('hair = hairPayload(activeSession.service),', 1, true), 'the palette is sent once with the session payload')
-H.ok(client:find('if not policyAllows(policy, policy.components, 2) then return nil end', 1, true), 'a clothing shop is sent no palette at all')
+H.ok(client:find('if not Shared.componentAllowed(policy, 2) then return nil end', 1, true), 'a clothing shop is sent no palette at all')
 
 -- Shop interaction is geometry, not a ped: a ped-bound target dies with the
 -- ped (unstreamed model, shoved out of place, deleted by another resource) and

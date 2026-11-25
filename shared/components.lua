@@ -209,6 +209,19 @@ function Shared.overlayFollowsHair(key)
     return type(entry) == 'table' and entry.followHairColor == true
 end
 
+---Whether a service may edit a drawable component.
+---@param policy table Config.services entry
+---@param id integer
+---@return boolean
+function Shared.componentAllowed(policy, id)
+    if policy.all then return true end
+    if id == 1 and policy.masks == false then return false end
+    for _, candidate in ipairs(policy.components or {}) do
+        if candidate == id then return true end
+    end
+    return false
+end
+
 ---Whether a service may edit one head overlay, read live from
 ---Config.headOverlays. Creation/admin sessions use `creator`; sessions that
 ---can edit the hair component (barber, hairdresser) use `barber`. A config

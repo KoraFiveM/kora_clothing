@@ -312,7 +312,7 @@ end
 -- keeps hair colour on the same whitelist as component 2).
 local function hairPayload(service)
     local policy = servicePolicy(service)
-    if not policyAllows(policy, policy.components, 2) then return nil end
+    if not Shared.componentAllowed(policy, 2) then return nil end
     return { palette = buildHairPalette(), color = previewHair.color, highlight = previewHair.highlight }
 end
 
@@ -382,7 +382,7 @@ local function buildCategoryPayload(ped, service)
     local categories = {}
     local policy = servicePolicy(service)
     for id, meta in pairs(Shared.components) do
-        if policyAllows(policy, policy.components, id) then
+        if Shared.componentAllowed(policy, id) then
             local drawable = GetPedDrawableVariation(ped, id)
             categories[#categories + 1] = {
                 kind = 'component',
@@ -1013,7 +1013,7 @@ RegisterNUICallback('kora_clothing:nui:setHairColor', function(data, cb)
     -- Same gate the server applies at confirm time, so the preview can never
     -- show a recolour a clothing shop's merge would silently throw away.
     local policy = servicePolicy(activeSession.service)
-    if not policyAllows(policy, policy.components, 2) then cb({ ok = false }); return end
+    if not Shared.componentAllowed(policy, 2) then cb({ ok = false }); return end
     local ped = PlayerPedId()
     refreshHairVariation(ped)
     applyHairColor(ped, data.color, data.highlight)
