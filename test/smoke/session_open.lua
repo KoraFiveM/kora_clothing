@@ -55,6 +55,7 @@ GetInvokingResource = function() return 'kora_admin' end
 GetPlayerName = function(src) return players[src] and 'connected player' end
 GetPlayerPed = function(src) return src end
 DoesEntityExist = function() return true end
+Config.clothingShopPoints = false -- This fixture uses shop centres.
 local position = Config.shops[2].coords
 GetEntityCoords = function() return position end
 CreateThread = function() error('default config must not start an item-registration thread') end
@@ -554,6 +555,33 @@ H.equal(charges[#charges].reason, 'kora_clothing-purchase')
 H.equal(players[7].money.cash, 1000 - Config.services.clothing.prices.tops)
 H.equal(#closes, closed + 1)
 H.equal(buckets[7], 42)
+
+-- Clothing shops can buy and remove masks. The opt-out preserves the saved mask.
+local clothing = Config.services.clothing
+local originalSkin, originalEncode = saved.skin, json.encode
+local encodedSkin
+json.encode = function(skin)
+    encodedSkin = skin
+    return originalEncode(skin)
+end
+saved.skin = { components = { ['1'] = { d = 0, t = 0 } } }
+for _, drawable in ipairs({ 5, 0 }) do
+    start('shop', { shopId = 2 })
+    charged = #charges
+    events['kora_clothing:server:confirmSession'](7, { skin = { components = { ['1'] = { d = drawable, t = 0 } } } })
+    H.equal(encodedSkin.components['1'].d, drawable)
+    H.equal(#charges, charged + 1)
+    H.equal(charges[#charges].amount, clothing.prices.body)
+    saved.skin = encodedSkin
+end
+clothing.masks = false
+saved.skin = { components = { ['1'] = { d = 8, t = 0 } } }
+start('shop', { shopId = 2 })
+charged = #charges
+events['kora_clothing:server:confirmSession'](7, { skin = { components = { ['1'] = { d = 0, t = 0 } } } })
+H.equal(encodedSkin.components['1'].d, 8)
+H.equal(#charges, charged)
+clothing.masks, saved.skin, json.encode = true, originalSkin, originalEncode
 
 -- Boxed purchases retain their existing item arguments and before-look reversion.
 local oldResourceState = GetResourceState

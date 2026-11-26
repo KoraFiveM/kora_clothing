@@ -309,7 +309,7 @@ local function mergeServiceSkin(before, requested, service, model)
     local merged = { components = {}, props = {}, tattoos = {} }
     for id in pairs(Shared.components) do
         local key = tostring(id)
-        merged.components[key] = idAllowed(policy.components, id) and requested.components[key] or before.components[key]
+        merged.components[key] = Shared.componentAllowed(policy, id) and requested.components[key] or before.components[key]
     end
     for id in pairs(Shared.props) do
         local key = tostring(id)
@@ -318,7 +318,7 @@ local function mergeServiceSkin(before, requested, service, model)
     -- Hair colour rides on the hair component's own whitelist entry: whoever
     -- may change component 2 may recolour it, and nobody else can. Without
     -- this a clothing shop could recolour hair a barber charges for.
-    local hairSource = idAllowed(policy.components, 2) and requested or before
+    local hairSource = Shared.componentAllowed(policy, 2) and requested or before
     merged.hairColor, merged.hairHighlight = hairSource.hairColor, hairSource.hairHighlight
     -- Skin tone stays creation-only; overlays follow Config.headOverlays.barber.
     merged.head = Shared.mergeHead(policy, before.head, requested.head)

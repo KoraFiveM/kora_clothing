@@ -110,6 +110,7 @@ All settings are in `config.lua` (shared, so the client and the server read the 
 | --- | --- | --- | --- |
 | `Config.shop.currency` | string | `'cash'` | kora_core money account charged for purchases. |
 | `Config.services` | table | see below | Policy for each service: which components and props may change, prices, model restriction, tattoos. |
+| `Config.services.clothing.masks` | boolean | `true` | Allows buying and removing masks (component 1) at clothing shops. Turn off in the kora_lib config workspace if streamed beard assets occupy the mask slot. The shop menu reflects the setting when opened, and the server checks it on confirmation. |
 | `Config.wardrobe.maxOutfits` | number | `20` | Most saved outfits per citizen. |
 
 `Config.services` keys are `clothing`, `barber`, `hairdresser`, `tattoo` and `creation`:
@@ -117,7 +118,8 @@ All settings are in `config.lua` (shared, so the client and the server read the 
 ```lua
 Config.services = {
     clothing = {
-        components = { 3, 4, 5, 6, 7, 8, 9, 10, 11 }, -- component 1 (mask / facial hair assets) is excluded
+        components = { 1, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+        masks = true,
         props = { 0, 1, 2, 6, 7 },
         prices = { tops = 175, legs = 150, shoes = 120, body = 90, accessories = 60 },
     },
