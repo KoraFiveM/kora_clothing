@@ -1703,7 +1703,7 @@ local textUiShop -- { index, label, handle } while inside a shop zone, else nil
 
 local function hideShopPrompt()
     if textUiShop and textUiShop.handle then
-        Kora.textui.hide(textUiShop.handle)
+        Kora.bridge.hideText(textUiShop.handle)
         textUiShop.handle = nil
     end
 end
@@ -1712,7 +1712,7 @@ local function showShopPrompt()
     if not textUiShop then return end
     hideShopPrompt()
     if activeSession then return end
-    textUiShop.handle = Kora.textui.show(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
+    textUiShop.handle = Kora.bridge.drawText(('Open %s'):format(textUiShop.label), { key = 'E', icon = 'Shirt' })
 end
 
 local function registerTextUiShop(index, shop, zone)
