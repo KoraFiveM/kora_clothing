@@ -221,11 +221,13 @@ end
 -- Clamps to a generous plausible range. The true per-model/per-slot cap can
 -- only be queried from a live ped (client-side natives), so this is a coarse
 -- anti-garbage bound, not a per-model authority -- the client's own live
--- query is what keeps a legitimate player's selection in range.
+-- query is what keeps a legitimate player's selection in range. The bound must
+-- sit above the largest drawable a server can hold (add-on packs can exceed
+-- 999), otherwise saved indices get silently capped on reload.
 local function clampIndex(value)
     value = tonumber(value)
     if not value then return 0 end
-    return Kora.util.clamp(math.floor(value), -1, 999)
+    return Kora.util.clamp(math.floor(value), -1, 9999)
 end
 
 local function sanitiseSkin(rawSkin, model)
